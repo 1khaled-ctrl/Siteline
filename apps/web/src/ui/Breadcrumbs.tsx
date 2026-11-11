@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { findLander } from '../landers';
 import { type MoonView, useApp } from '../store';
 
 interface Crumb {
@@ -15,6 +16,7 @@ export function Breadcrumbs() {
   const view = useApp((s) => s.view);
   const place = useApp((s) => s.earthPlace);
   const marsPlace = useApp((s) => s.marsPlace);
+  const missionId = useApp((s) => s.missionId);
 
   const solar: Crumb = { id: 'solar', text: t('crumbs.solar'), go: to('solar') };
   const trail: Crumb[] = [solar];
@@ -51,6 +53,12 @@ export function Breadcrumbs() {
   } else if (view === 'globe' || view === 'pole') {
     trail.push({ id: 'moon', text: t('crumbs.moon'), go: to('globe') });
     if (view === 'pole') trail.push({ id: 'pole', text: t('crumbs.pole'), go: to('pole') });
+  }
+
+  const site = view === 'site' && missionId ? findLander(missionId) : undefined;
+  if (site) {
+    trail.push({ id: 'body', text: t(`crumbs.${site.body.toLowerCase()}`), go: () => useApp.getState().closeSite() });
+    trail.push({ id: 'site', text: t('siteView.crumb', { name: site.name }), go: () => {} });
   }
 
   return (

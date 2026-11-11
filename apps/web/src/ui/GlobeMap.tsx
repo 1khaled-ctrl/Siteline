@@ -1,13 +1,19 @@
 import { GlobeView } from '@siteline/engine';
+import { MOON_RADIUS_M } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
+import { useFlyToMission, useShownUtcMs } from '../useLanders';
+import { LanderPins } from './LanderPins';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 // The loaded terrain reaches about 76°S; anything south of this opens in the south-pole view.
 const POLE_VIEW_LIMIT_DEG = -77;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// A lander is framed from this many Moon radii from the centre.
+const LANDER_DISTANCE_KM = 1.9 * (MOON_RADIUS_M / 1000);
 
 async function flyToPole(view: GlobeView, setFlying: (v: boolean) => void, focus?: { lat: number; lon: number }) {
   setFlying(true);
@@ -25,6 +31,11 @@ export function GlobeMap() {
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
   const lightingUtcMs = useLightingUtcMs();
+  const shownMs = useShownUtcMs();
+  useFlyToMission(
+    'Moon',
+    globe ? (lat, lon) => void globe.flyTo(lat, lon, LANDER_DISTANCE_KM, reducedMotion() ? 0 : 1200) : undefined,
+  );
 
   useEffect(() => {
     if (!ref.current) return;
@@ -68,6 +79,7 @@ export function GlobeMap() {
   return (
     <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
       <div ref={ref} className="absolute inset-0" data-testid="globe-map" />
+      <LanderPins host={globe} missions={PINNED.Moon} tracks={undefined} atUtcMs={shownMs} />
       <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
         {t('globe.hint')}
       </p>

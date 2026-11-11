@@ -1,9 +1,15 @@
-import type { EarthPlace, MarsPlace } from '@siteline/engine';
+import type { EarthPlace, LanderBody, MarsPlace, MissionFilter } from '@siteline/engine';
 import { create } from 'zustand';
+import { findLander } from './landers';
 
-/** Where the camera is: the solar system, the Earth, Mars, the Moon as a globe, or the Moon's south pole. */
-export type MoonView = 'solar' | 'earth' | 'mars' | 'globe' | 'pole';
-export const VIEWS: MoonView[] = ['solar', 'earth', 'mars', 'globe', 'pole'];
+/**
+ * Where the camera is: the solar system, the Earth, Mars, the Moon as a globe, the Moon's south pole, or the close-up
+ * terrain around the selected lander's site (on the Moon or Mars).
+ */
+export type MoonView = 'solar' | 'earth' | 'mars' | 'globe' | 'pole' | 'site';
+export const VIEWS: MoonView[] = ['solar', 'earth', 'mars', 'globe', 'pole', 'site'];
+/** The view that shows each body as a whole. */
+export const BODY_VIEW: Record<LanderBody, MoonView> = { Moon: 'globe', Mars: 'mars' };
 export type Layer = 'none' | 'sun' | 'earth' | 'shadow';
 export const LAYERS: Layer[] = ['none', 'sun', 'earth', 'shadow'];
 export const MAX_PINS = 4;
@@ -21,6 +27,8 @@ export interface View {
   view: MoonView;
   layer: Layer;
   pins: Pin[];
+  /** The lander whose card is open, by its id in `data/missions.json`. */
+  missionId: string | null;
 }
 
 interface AppState extends View {
@@ -36,6 +44,15 @@ interface AppState extends View {
   marsCommand: { id: number; type: 'home' | 'feature' } | null;
   setMarsPlace: (place: MarsPlace | null) => void;
   commandMars: (type: 'home' | 'feature') => void;
+  /** Which landers the list shows, and a counter that asks the camera to fly to the open lander. Not saved in the link. */
+  missionFilter: MissionFilter;
+  missionFlySeq: number;
+  setMissionFilter: (filter: MissionFilter) => void;
+  /** Open a lander's card and fly to it, switching to its planet if needed; null closes the card. */
+  selectMission: (id: string | null) => void;
+  /** Show the close-up terrain around the open lander, or go back to its planet. */
+  openSite: () => void;
+  closeSite: () => void;
   /** Time-lapse: lighting time offset from landing, in hours, and the play speed in hours per second. */
   playOffsetH: number;
   playing: boolean;
@@ -55,6 +72,7 @@ const DEFAULTS: View = {
   view: 'solar',
   layer: 'none',
   pins: [],
+  missionId: null,
 };
 export const MAX_SLIP_DAYS = 15;
 export const PLAY_SPEEDS_H_PER_S = [6, 24, 72];
@@ -83,6 +101,8 @@ function clean(patch: Partial<View>): Partial<View> {
   if (patch.lonDeg !== undefined && Number.isFinite(patch.lonDeg)) out.lonDeg = wrapLon(patch.lonDeg);
   if (patch.view && VIEWS.includes(patch.view)) out.view = patch.view;
   if (patch.layer && LAYERS.includes(patch.layer)) out.layer = patch.layer;
+  if (patch.missionId !== undefined)
+    out.missionId = patch.missionId && findLander(patch.missionId) ? patch.missionId : null;
   if (Array.isArray(patch.pins)) {
     out.pins = patch.pins.map(cleanPin).filter((p): p is Pin => p !== undefined);
     out.pins = out.pins.filter((p, i) => out.pins?.findIndex((q) => samePin(p, q)) === i).slice(0, MAX_PINS);
@@ -98,20 +118,31 @@ function fromUrl(): Partial<View> {
     .filter(Boolean)
     .map((s) => s.split(',').map(Number))
     .map(([latDeg, lonDeg]) => ({ latDeg, lonDeg }));
-  return clean({
+  const link = clean({
     landingUtc: p.get('t') ?? undefined,
     slipDays: num('slip'),
     latDeg: num('lat'),
     lonDeg: num('lon'),
     view: (p.get('view') as MoonView | null) ?? undefined,
     layer: (p.get('layer') as Layer | null) ?? undefined,
+    missionId: p.get('mission'),
     pins,
   });
+  // The close-up needs a lander that has terrain to show.
+  if (link.view === 'site' && !findLander(link.missionId ?? '')?.patch) link.view = 'solar';
+  return link;
 }
 
+/** Where leaving the close-up goes: the lander's planet. */
+const closedSiteView = (missionId: string | null): MoonView => {
+  const m = findLander(missionId ?? '');
+  return m ? BODY_VIEW[m.body] : 'solar';
+};
+
+const initial = { ...DEFAULTS, ...fromUrl() };
+
 export const useApp = create<AppState>((set) => ({
-  ...DEFAULTS,
-  ...fromUrl(),
+  ...initial,
   focusSeq: 0,
   earthPlace: null,
   earthCommand: null,
@@ -121,6 +152,18 @@ export const useApp = create<AppState>((set) => ({
   marsCommand: null,
   setMarsPlace: (marsPlace) => set({ marsPlace }),
   commandMars: (type) => set((s) => ({ marsCommand: { id: (s.marsCommand?.id ?? 0) + 1, type } })),
+  missionFilter: 'all',
+  // A link that names a lander flies to it once its planet is on screen.
+  missionFlySeq: initial.missionId ? 1 : 0,
+  setMissionFilter: (missionFilter) => set({ missionFilter }),
+  selectMission: (id) =>
+    set((s) => {
+      const m = id ? findLander(id) : undefined;
+      if (!m) return { missionId: null, view: s.view === 'site' ? closedSiteView(s.missionId) : s.view };
+      return { missionId: m.id, view: BODY_VIEW[m.body], missionFlySeq: s.missionFlySeq + 1 };
+    }),
+  openSite: () => set((s) => (findLander(s.missionId ?? '')?.patch ? { view: 'site' } : {})),
+  closeSite: () => set((s) => ({ view: closedSiteView(s.missionId), missionFlySeq: s.missionFlySeq + 1 })),
   playOffsetH: 0,
   playing: false,
   speedHPerS: PLAY_SPEEDS_H_PER_S[1],
@@ -145,6 +188,7 @@ useApp.subscribe((s) => {
     lon: String(s.lonDeg),
   });
   if (s.layer !== 'none') p.set('layer', s.layer);
+  if (s.missionId) p.set('mission', s.missionId);
   if (s.pins.length) p.set('pins', s.pins.map((x) => `${x.latDeg},${x.lonDeg}`).join(';'));
   window.history.replaceState(null, '', `?${p}`);
 });

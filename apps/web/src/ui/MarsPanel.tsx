@@ -81,18 +81,24 @@ export function MarsPanel() {
           </div>
         )}
       </section>
-      <p className="px-1 text-xs text-quiet">
-        <Trans
-          i18nKey="mars.panel.sources"
-          components={{
-            megdr: <Ext href="https://pds-geosciences.wustl.edu/missions/mgs/megdr.html" />,
-            jaanga: <Ext href="https://github.com/jaanga/mars-heightmaps-128p" />,
-            sss: <Ext href="https://www.solarsystemscope.com/textures/" />,
-            gaz: <Ext href="https://planetarynames.wr.usgs.gov/" />,
-            ccby: <Ext href={CC_BY} />,
-          }}
-        />
-      </p>
     </aside>
+  );
+}
+
+/** Where the Mars heights, colours and names come from; shown under whichever tab of the Mars column is open. */
+export function MarsSources() {
+  return (
+    <p className="px-1 text-xs text-quiet">
+      <Trans
+        i18nKey="mars.panel.sources"
+        components={{
+          megdr: <Ext href="https://pds-geosciences.wustl.edu/missions/mgs/megdr.html" />,
+          jaanga: <Ext href="https://github.com/jaanga/mars-heightmaps-128p" />,
+          sss: <Ext href="https://www.solarsystemscope.com/textures/" />,
+          gaz: <Ext href="https://planetarynames.wr.usgs.gov/" />,
+          ccby: <Ext href={CC_BY} />,
+        }}
+      />
+    </p>
   );
 }

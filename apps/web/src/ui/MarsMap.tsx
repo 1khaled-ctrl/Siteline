@@ -1,8 +1,11 @@
-import { findFeature, type MarsFeature, MarsView } from '@siteline/engine';
+import { findFeature, type MarsFeature, MarsView, marsRoutes } from '@siteline/engine';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MISSIONS, PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
+import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
+import { LanderPins } from './LanderPins';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const MARS_ASSETS = {
@@ -13,6 +16,8 @@ const MARS_ASSETS = {
   names: `${URLS.data}/names/mars_names.json`,
 };
 const DEFAULT_RELIEF = 3;
+// A lander is framed from this many Mars radii from the centre.
+const LANDER_DISTANCE = 1.9;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ms = (n: number) => (reducedMotion() ? 0 : n);
 
@@ -34,6 +39,9 @@ export function MarsMap() {
   const place = useApp((s) => s.marsPlace);
   const command = useApp((s) => s.marsCommand);
   const lightingUtcMs = useLightingUtcMs();
+  const shownMs = useShownUtcMs();
+  const { tracks } = useLanderFiles();
+  useFlyToMission('Mars', globe ? (lat, lon) => void globe.flyTo(lat, lon, LANDER_DISTANCE, ms(1200)) : undefined);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -55,6 +63,7 @@ export function MarsMap() {
   useEffect(() => globe?.setRealLight(realLight), [globe, realLight]);
   useEffect(() => globe?.setNames(names), [globe, names]);
   useEffect(() => globe?.setRelief(relief), [globe, relief]);
+  useEffect(() => globe?.setRoutes(tracks ? marsRoutes(MISSIONS, tracks, shownMs) : []), [globe, tracks, shownMs]);
   useEffect(
     () => globe?.setPlace(place ? { latDeg: place.latDeg, lonDeg: place.lonDeg, feature: place.feature } : undefined),
     [globe, place],
@@ -100,6 +109,7 @@ export function MarsMap() {
   return (
     <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
       <div ref={ref} className="absolute inset-0" data-testid="mars-map" />
+      <LanderPins host={globe} missions={PINNED.Mars} tracks={tracks} atUtcMs={shownMs} />
       <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
         {t('mars.hint')}
       </p>

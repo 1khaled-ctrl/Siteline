@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lonLatToScene, sceneToLonLat } from './earthData';
+import type { SurfaceLine } from './landerData';
 import {
   decodeHeights,
   featureAt,
@@ -51,6 +52,10 @@ const HOME = { latDeg: 5, lonDeg: -60, distance: 3.4 };
 const RELIEF_MAX_KM = 21.5;
 const FONT = '"IBM Plex Sans", system-ui, sans-serif';
 const LABEL_POOL = 90;
+/** How far above the ground the lander pins and the drawn routes sit. */
+const PIN_LIFT_M = 40;
+const ROUTE_LIFT_M = 140;
+const ROUTE_DOT_LIFT_M = 170;
 
 const VERTEX = `varying vec2 vUv; varying vec3 vP; varying vec3 vV;
 void main() {
@@ -137,6 +142,9 @@ export class MarsView {
   private selected?: MarsFeature;
   private placed?: { latDeg: number; lonDeg: number };
   private flightId = 0;
+  private frameListener?: () => void;
+  private routes: readonly SurfaceLine[] = [];
+  private routeObjects: (THREE.Line | THREE.Points)[] = [];
   /** Where the flight in progress ends, so a zoom during it builds on the destination, not the half-way point. */
   private destination?: { latDeg: number; lonDeg: number; distance: number };
   private down?: { x: number; y: number };
@@ -328,8 +336,39 @@ export class MarsView {
     return this.flyTo(at.latDeg, at.lonDeg, 1 + (at.distance - 1) * factor, durationMs);
   }
 
+  /** Called after every draw, so overlays such as the lander pins can follow the camera. */
+  setFrameListener(listener: (() => void) | undefined): void {
+    this.frameListener = listener;
+  }
+
+  /** Where a place is in the view, in pixels; undefined when it is on the far side of Mars. */
+  project(latDeg: number, lonDeg: number): { xPx: number; yPx: number } | undefined {
+    const D = this.camera.position.length();
+    const dir = dirOf(latDeg, lonDeg);
+    // On the near side when within the horizon angle of the camera's direction, plus a margin.
+    if (dir.dot(this.camera.position.clone().normalize()) < 1 / D + 0.01) return undefined;
+    this.camera.updateMatrixWorld();
+    const p = dir.multiplyScalar(this.radiusAt(latDeg, lonDeg, PIN_LIFT_M)).project(this.camera);
+    if (p.z > 1) return undefined;
+    const { clientWidth: w, clientHeight: h } = this.container;
+    return { xPx: (p.x * 0.5 + 0.5) * w, yPx: (-p.y * 0.5 + 0.5) * h };
+  }
+
+  /** True when the camera is close enough that every lander can carry a name. */
+  isClose(): boolean {
+    return this.camera.position.length() < 2.2;
+  }
+
+  /** Draw rover routes and helicopter flights on the ground, lifted a little so the relief does not hide them. */
+  setRoutes(lines: readonly SurfaceLine[]): void {
+    this.routes = lines;
+    this.buildRoutes();
+    this.requestRender();
+  }
+
   dispose(): void {
     this.disposed = true;
+    this.clearRoutes();
     cancelAnimationFrame(this.frame);
     this.resize.disconnect();
     this.controls.dispose();
@@ -346,6 +385,40 @@ export class MarsView {
     this.renderer.dispose();
     canvas.remove();
     this.labelLayer.remove();
+  }
+
+  /** Radius of a point `liftM` metres above the surface, in Mars radii, with the heights stretched. */
+  private radiusAt(latDeg: number, lonDeg: number, liftM: number): number {
+    const heightM = this.grid ? heightAtM(this.grid, latDeg, lonDeg) : 0;
+    return 1 + ((heightM + liftM) * this.exag) / (1000 * MARS_RADIUS_KM);
+  }
+
+  private clearRoutes(): void {
+    for (const o of this.routeObjects) {
+      this.scene.remove(o);
+      o.geometry.dispose();
+      (o.material as THREE.Material).dispose();
+    }
+    this.routeObjects = [];
+  }
+
+  private buildRoutes(): void {
+    this.clearRoutes();
+    for (const line of this.routes) {
+      const lift = line.dots ? ROUTE_DOT_LIFT_M : ROUTE_LIFT_M;
+      const points = line.points.map(([lat, lon]) => dirOf(lat, lon).multiplyScalar(this.radiusAt(lat, lon, lift)));
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const object = line.dots
+        ? new THREE.Points(
+            geometry,
+            new THREE.PointsMaterial({ color: line.colourHex, size: 4, sizeAttenuation: false }),
+          )
+        : new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: line.colourHex }));
+      object.frustumCulled = false;
+      object.renderOrder = 4;
+      this.scene.add(object);
+      this.routeObjects.push(object);
+    }
   }
 
   /** The closest the camera may come: above the highest peak at the current exaggeration. */
@@ -371,6 +444,7 @@ export class MarsView {
     pos.needsUpdate = true;
     this.globe.geometry.computeBoundingSphere();
     this.placeMarker();
+    this.buildRoutes();
     this.requestRender();
   }
 
@@ -483,6 +557,7 @@ export class MarsView {
       .normalize();
     this.renderer.render(this.scene, this.camera);
     this.placeLabels(D);
+    this.frameListener?.();
   }
 
   private placeLabels(D: number): void {

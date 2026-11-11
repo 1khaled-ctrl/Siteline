@@ -1,5 +1,6 @@
 // Smoke test against a running app (default http://localhost:5173): the Earth globe names a country and a city, the Mars globe finds Olympus Mons at its real height, the Moon globe draws, the fly-to reaches the
 // south-pole view, a site report appears, and clicking the terrain picks a new site.
+// Landers: the list, filters, cards with routes and 3D models, and the close-up ground, on Mars and on the Moon.
 // Usage: node tests/e2e/smoke.mjs [url] [screenshot-prefix]
 import { chromium } from 'playwright';
 
@@ -96,6 +97,44 @@ await page.getByRole('button', { name: 'Day and night' }).click();
 await page.getByRole('button', { name: 'Whole Mars' }).click();
 await page.waitForTimeout(2500);
 if (shots) await page.screenshot({ path: `${shots}-mars-night.png` });
+// Landers on Mars: the list and its filters, a card with the rover's distance and a 3D model, the close-up ground.
+const noMoonControls = async (where) => {
+  if (
+    (await page.getByRole('heading', { name: 'Landing site' }).count()) +
+    (await page.getByText('Play a lunar day').count())
+  )
+    throw new Error(`Moon controls are showing on the ${where}`);
+};
+await page.getByTestId('side-landers').click();
+await page.getByTestId('lander-list').waitFor({ timeout: 10_000 });
+await page.getByRole('button', { name: 'Next and planned' }).click();
+await page.getByTestId('mission-rosalind').waitFor({ timeout: 5_000 });
+if (await page.getByTestId('mission-curiosity').count()) throw new Error('Curiosity is listed as next or planned');
+await page.getByRole('button', { name: 'All', exact: true }).click();
+await page.getByTestId('mission-perseverance').click();
+await page.getByTestId('mission-card').getByText('45.25 km').waitFor({ timeout: 10_000 });
+await page.getByText(/^NASA 3D model/).waitFor({ timeout: 30_000 });
+await page.getByText('NASA 3D Resources, free and without copyright').waitFor({ timeout: 5_000 });
+await page.waitForTimeout(4000);
+if (shots) await page.screenshot({ path: `${shots}-mars-lander.png` });
+await page.getByTestId('open-site').click();
+await page.waitForSelector('[data-testid="site-map"] canvas', { timeout: 60_000 });
+await page.getByRole('navigation').getByText('Perseverance, close up').waitFor({ timeout: 5_000 });
+await page.getByTestId('pin-ingenuity').waitFor({ state: 'visible', timeout: 30_000 });
+await noMoonControls('Mars close-up');
+await page.waitForTimeout(3500);
+if (shots) await page.screenshot({ path: `${shots}-mars-site.png` });
+await page.getByRole('button', { name: 'Back to the globe' }).click();
+await page.waitForSelector('[data-testid="mars-map"] canvas', { timeout: 60_000 });
+// Every 3D model on Mars reads and draws (Viking, the Mars rovers' shared model, Ingenuity).
+for (const id of ['viking1', 'spirit', 'ingenuity']) {
+  await page.getByRole('button', { name: /All landings/ }).click();
+  await page.getByTestId(`mission-${id}`).click();
+  await page.getByText(/^NASA 3D model/).waitFor({ timeout: 30_000 });
+  if (await page.getByText('The 3D model could not be loaded.').count())
+    throw new Error(`The ${id} model did not load`);
+}
+await page.getByRole('button', { name: /All landings/ }).click();
 await page.getByRole('button', { name: 'Solar system' }).click();
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.waitForTimeout(1500);
@@ -104,6 +143,22 @@ await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000
 await page.getByRole('heading', { name: 'Landing site' }).waitFor({ timeout: 5_000 });
 await page.waitForTimeout(3000);
 if (shots) await page.screenshot({ path: `${shots}-globe.png` });
+// Landers on the Moon: Apollo 11 with its 3D model, its close-up ground with Surveyor 5 on it, then back.
+await page.getByTestId('lander-list').waitFor({ timeout: 5_000 });
+await page.getByTestId('mission-apollo11').click();
+await page.getByText(/^NASA 3D model/).waitFor({ timeout: 30_000 });
+if (await page.getByText('The 3D model could not be loaded.').count()) throw new Error('The Apollo model did not load');
+await page.getByTestId('open-site').click();
+await page.waitForSelector('[data-testid="site-map"] canvas', { timeout: 60_000 });
+await page.getByTestId('pin-surveyor5').waitFor({ state: 'visible', timeout: 30_000 });
+await noMoonControls('Moon close-up');
+await page.waitForTimeout(3500);
+if (shots) await page.screenshot({ path: `${shots}-moon-site.png` });
+await page.getByRole('button', { name: 'Back to the globe' }).click();
+await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000 });
+await page.getByRole('button', { name: /All landings/ }).click();
+await page.waitForTimeout(1500);
+if (shots) await page.screenshot({ path: `${shots}-moon-landers.png` });
 
 await page.getByRole('button', { name: 'Fly to the south pole' }).click();
 await page.waitForSelector('[data-testid="pole-map"] canvas', { timeout: 60_000 });
@@ -129,6 +184,18 @@ await page.getByRole('button', { name: '▶ Play a lunar day' }).click();
 await page.waitForTimeout(1500);
 await page.getByRole('button', { name: '❚❚ Pause' }).click();
 if (shots) await page.screenshot({ path: `${shots}-layers.png` });
+
+// A lander in the polar region opens the landing-site check there, and a shared link opens a lander's card.
+await page.getByRole('navigation').getByRole('button', { name: 'Moon' }).click();
+await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000 });
+await page.getByTestId('side-landers').click();
+await page.getByTestId('mission-im2').click();
+await page.getByRole('button', { name: 'Plan this site in 3D' }).click();
+await page.waitForSelector('[data-testid="pole-map"] canvas', { timeout: 60_000 });
+const planned = Number(new URL(page.url()).searchParams.get('lat'));
+if (Math.abs(planned + 84.79) > 0.01) throw new Error(`Plan this site went to latitude ${planned}`);
+await page.goto(`${new URL(url).origin}/?view=mars&mission=curiosity`, { waitUntil: 'networkidle' });
+await page.getByTestId('mission-card').getByText('38.16 km').waitFor({ timeout: 30_000 });
 
 if (errors.length) {
   console.error(`FAIL: console errors:\n${errors.join('\n')}`);

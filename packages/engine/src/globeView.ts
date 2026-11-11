@@ -70,6 +70,7 @@ export class GlobeView {
   private userMoved = false;
   private flying = false;
   private frame = 0;
+  private frameListener?: () => void;
 
   constructor(
     private readonly container: HTMLElement,
@@ -165,9 +166,77 @@ export class GlobeView {
         this.controls.target.lerpVectors(startTarget, endTarget, e);
         this.camera.lookAt(this.controls.target);
         this.renderer.render(this.scene, this.camera);
+        this.frameListener?.();
         if (k < 1) this.frame = requestAnimationFrame(step);
         else {
           this.frame = 0;
+          resolve();
+        }
+      };
+      this.frame = requestAnimationFrame(step);
+    });
+  }
+
+  /** Called after every draw, so overlays such as the lander pins can follow the camera. */
+  setFrameListener(listener: (() => void) | undefined): void {
+    this.frameListener = listener;
+  }
+
+  /** Where a place is in the view, in pixels; undefined when it is on the far side of the Moon. */
+  project(latDeg: number, lonDeg: number): { xPx: number; yPx: number } | undefined {
+    const dir = toScene(siteFrame(latDeg, lonDeg).u);
+    // On the near side when within the horizon angle of the camera's direction, plus a margin.
+    if (dir.dot(this.camera.position.clone().normalize()) < R_KM / this.camera.position.length() + 0.01)
+      return undefined;
+    this.camera.updateMatrixWorld();
+    const p = dir.multiplyScalar(R_KM).project(this.camera);
+    if (p.z > 1) return undefined;
+    const { clientWidth: w, clientHeight: h } = this.container;
+    return { xPx: (p.x * 0.5 + 0.5) * w, yPx: (-p.y * 0.5 + 0.5) * h };
+  }
+
+  /** True when the camera is close enough that every lander can carry a name. */
+  isClose(): boolean {
+    return this.camera.position.length() < 2.2 * R_KM;
+  }
+
+  /** Swing the camera over a place, `distanceKm` from the Moon's centre; resolves when it arrives. */
+  flyTo(latDeg: number, lonDeg: number, distanceKm: number, durationMs = 1400): Promise<void> {
+    const startPos = this.camera.position.clone();
+    const startTarget = this.controls.target.clone();
+    const r1 = Math.min(this.controls.maxDistance, Math.max(this.controls.minDistance, distanceKm));
+    const endDir = toScene(siteFrame(latDeg, lonDeg).u);
+    const turn = new THREE.Quaternion().setFromUnitVectors(startPos.clone().normalize(), endDir);
+    const still = new THREE.Quaternion();
+    const q = new THREE.Quaternion();
+    const r0 = startPos.length();
+    const origin = new THREE.Vector3();
+    cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    this.userMoved = true;
+    this.flying = true;
+    this.controls.enabled = false;
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const step = () => {
+        const k = durationMs <= 0 ? 1 : Math.min(1, (performance.now() - t0) / durationMs);
+        const e = easeInOut(k);
+        q.slerpQuaternions(still, turn, e);
+        this.camera.position
+          .copy(startPos)
+          .normalize()
+          .applyQuaternion(q)
+          .multiplyScalar(r0 + (r1 - r0) * e);
+        this.controls.target.lerpVectors(startTarget, origin, e);
+        this.camera.lookAt(this.controls.target);
+        this.renderer.render(this.scene, this.camera);
+        this.frameListener?.();
+        if (k < 1) this.frame = requestAnimationFrame(step);
+        else {
+          this.frame = 0;
+          this.flying = false;
+          this.controls.enabled = true;
+          this.controls.update();
           resolve();
         }
       };
@@ -213,6 +282,7 @@ export class GlobeView {
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
       this.renderer.render(this.scene, this.camera);
+      this.frameListener?.();
     });
   }
 

@@ -4,6 +4,7 @@ import { EarthMap } from './EarthMap';
 import { GlobeMap } from './GlobeMap';
 import { MarsMap } from './MarsMap';
 import { PoleMap } from './PoleMap';
+import { SiteMap } from './SiteMap';
 import { SolarMap } from './SolarMap';
 
 const LOOP_HOURS = 30 * 24;
@@ -33,5 +34,6 @@ export function MoonView() {
   if (view === 'solar') return <SolarMap />;
   if (view === 'earth') return <EarthMap />;
   if (view === 'mars') return <MarsMap />;
+  if (view === 'site') return <SiteMap />;
   return view === 'globe' ? <GlobeMap /> : <PoleMap />;
 }

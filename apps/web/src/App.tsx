@@ -1,10 +1,10 @@
 import { useTranslation } from 'react-i18next';
 import { useApp } from './store';
 import { BodyClock } from './ui/BodyClock';
+import { MarsSide, MoonSide, SiteSide } from './ui/BodySide';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { Controls } from './ui/Controls';
 import { EarthPanel } from './ui/EarthPanel';
-import { MarsPanel } from './ui/MarsPanel';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
 
@@ -24,7 +24,17 @@ export function App() {
         <div className="lg:overflow-y-auto">{view === 'globe' || view === 'pole' ? <Controls /> : <BodyClock />}</div>
         <MoonView />
         <div className="lg:overflow-y-auto">
-          {view === 'earth' ? <EarthPanel /> : view === 'mars' ? <MarsPanel /> : <SiteReport />}
+          {view === 'earth' ? (
+            <EarthPanel />
+          ) : view === 'mars' ? (
+            <MarsSide />
+          ) : view === 'globe' ? (
+            <MoonSide />
+          ) : view === 'site' ? (
+            <SiteSide />
+          ) : (
+            <SiteReport />
+          )}
         </div>
       </main>
     </div>
