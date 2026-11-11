@@ -16,7 +16,7 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 // Solar system first: the planets draw, then flying to the Moon lands on the globe. The Earth comes first.
 await page.goto(url.replace('view=globe', 'view=solar'), { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
-await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
 if (
   (await page.getByRole('heading', { name: 'Landing site' }).count()) +
   (await page.getByText('Play a lunar day').count())
@@ -28,8 +28,8 @@ if (shots) await page.screenshot({ path: `${shots}-solar.png` });
 await page.getByRole('button', { name: 'Earth', exact: true }).first().click();
 await page.waitForSelector('[data-testid="earth-map"] canvas', { timeout: 60_000 });
 await page.getByText('Egypt', { exact: true }).first().waitFor({ timeout: 60_000 });
-// The Moon's landing controls stay with the Moon views; Earth and Mars show only the date for the Sun.
-await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+// The Moon's landing controls stay with the Moon views; the header's date is on every view.
+await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
 if (
   (await page.getByRole('heading', { name: 'Landing site' }).count()) +
   (await page.getByText('Play a lunar day').count())
@@ -65,7 +65,7 @@ await page.waitForTimeout(1500);
 await page.getByRole('button', { name: 'Mars', exact: true }).first().click();
 await page.waitForSelector('[data-testid="mars-map"] canvas', { timeout: 60_000 });
 await page.getByText('Valles Marineris', { exact: true }).first().waitFor({ timeout: 60_000 });
-await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
 if (
   (await page.getByRole('heading', { name: 'Landing site' }).count()) +
   (await page.getByText('Play a lunar day').count())

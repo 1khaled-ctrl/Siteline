@@ -40,7 +40,7 @@ export function Timeline({ series }: { series: StayResult['series'] }) {
 
   return (
     <figure>
-      <figcaption className="mb-2 text-sm font-semibold">{t('timeline.heading')}</figcaption>
+      <figcaption className="mb-2 font-display text-base font-semibold">{t('timeline.heading')}</figcaption>
       {/* Time runs left to right in both languages. */}
       <div ref={ref} dir="ltr" className="text-xs text-quiet" />
     </figure>

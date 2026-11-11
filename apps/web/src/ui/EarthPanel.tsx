@@ -29,7 +29,7 @@ export function EarthPanel() {
           <p className="text-sm text-quiet">{t('earth.panel.empty')}</p>
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-lg font-semibold" data-testid="earth-country">
+            <p className="font-display text-xl font-semibold" data-testid="earth-country">
               {place.country?.name ?? t('earth.panel.sea')}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -39,7 +39,7 @@ export function EarthPanel() {
                 {hemisphere(place.lonDeg, 'earth.panel.east', 'earth.panel.west')}
               </dd>
               <dt className="text-quiet">{t('earth.panel.nearestCity')}</dt>
-              <dd className="text-end" data-testid="earth-city">
+              <dd className="text-end" data-text data-testid="earth-city">
                 {place.city ? place.city.name : t('earth.panel.noCity', { km: PICK_CITY_KM })}
               </dd>
               {place.city && (

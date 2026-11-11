@@ -6,6 +6,7 @@ import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
+import { ViewHint, ViewPills, viewButton } from './ViewPills';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const MARS_ASSETS = {
@@ -20,10 +21,6 @@ const DEFAULT_RELIEF = 3;
 const LANDER_DISTANCE = 1.9;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const ms = (n: number) => (reducedMotion() ? 0 : n);
-
-const buttonBase = 'min-h-9 rounded-lg px-3 text-sm backdrop-blur-md';
-const toggle = (on: boolean) =>
-  `${buttonBase} border ${on ? 'border-accent bg-accent/20' : 'border-white/15 bg-panel/80'}`;
 
 export function MarsMap() {
   const { t } = useTranslation();
@@ -107,12 +104,58 @@ export function MarsMap() {
   };
 
   return (
-    <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
+    <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="mars-map" />
       <LanderPins host={globe} missions={PINNED.Mars} tracks={tracks} atUtcMs={shownMs} />
-      <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
-        {t('mars.hint')}
-      </p>
+      <ViewPills wide>
+        <button
+          type="button"
+          aria-pressed={realLight}
+          title={t('mars.realSunHint')}
+          className={viewButton}
+          onClick={() => setRealLight((v) => !v)}
+        >
+          {t('mars.realSun')}
+        </button>
+        <button type="button" aria-pressed={names} className={viewButton} onClick={() => setNames((v) => !v)}>
+          {t('mars.names')}
+        </button>
+        <label className={`${viewButton} flex items-center gap-2`}>
+          <span>{t('mars.relief')}</span>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={1}
+            value={relief}
+            className="w-24 accent-sun"
+            onChange={(e) => setRelief(Number(e.currentTarget.value))}
+          />
+          <output dir="ltr" className="w-6 text-end tabular-nums">
+            {t('mars.reliefValue', { n: relief })}
+          </output>
+        </label>
+        <button type="button" className={viewButton} onClick={() => void globe?.flyHome(ms(1400))}>
+          {t('mars.home')}
+        </button>
+        <button
+          type="button"
+          aria-label={t('mars.zoomIn')}
+          className={viewButton}
+          onClick={() => void globe?.zoomBy(0.55, ms(300))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label={t('mars.zoomOut')}
+          className={viewButton}
+          onClick={() => void globe?.zoomBy(1.8, ms(300))}
+        >
+          −
+        </button>
+      </ViewPills>
+      <ViewHint>{t('mars.hint')}</ViewHint>
       <search className="absolute inset-e-3 top-3">
         <form onSubmit={search} className="flex flex-col items-end gap-1">
           <input
@@ -121,7 +164,7 @@ export function MarsMap() {
             value={query}
             aria-label={t('mars.search')}
             placeholder={t('mars.searchPlaceholder')}
-            className="min-h-9 w-64 rounded-lg border border-white/15 bg-panel/80 px-3 text-sm backdrop-blur-md"
+            className="min-h-8 w-64 rounded-md border border-line bg-panel-raised/92 px-2.5 text-[12.5px]"
             onChange={(e) => {
               setQuery(e.currentTarget.value);
               setNotFound(false);
@@ -133,65 +176,12 @@ export function MarsMap() {
             ))}
           </datalist>
           {notFound && (
-            <p role="status" className="rounded-lg bg-panel/80 px-2 py-1 text-xs text-quiet">
+            <p role="status" className="rounded-md bg-panel-raised/92 px-2 py-1 text-xs text-quiet">
               {t('mars.searchNone', { query })}
             </p>
           )}
         </form>
       </search>
-      <div className="absolute inset-s-3 bottom-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={realLight}
-          title={t('mars.realSunHint')}
-          className={toggle(realLight)}
-          onClick={() => setRealLight((v) => !v)}
-        >
-          {t('mars.realSun')}
-        </button>
-        <button type="button" aria-pressed={names} className={toggle(names)} onClick={() => setNames((v) => !v)}>
-          {t('mars.names')}
-        </button>
-        <label className={`${buttonBase} flex items-center gap-2 border border-white/15 bg-panel/80`}>
-          <span>{t('mars.relief')}</span>
-          <input
-            type="range"
-            min={1}
-            max={8}
-            step={1}
-            value={relief}
-            onChange={(e) => setRelief(Number(e.currentTarget.value))}
-          />
-          <output dir="ltr" className="w-6 text-end tabular-nums">
-            {t('mars.reliefValue', { n: relief })}
-          </output>
-        </label>
-      </div>
-      <div className="absolute inset-e-3 bottom-3 flex flex-col gap-1">
-        <button
-          type="button"
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.flyHome(ms(1400))}
-        >
-          {t('mars.home')}
-        </button>
-        <button
-          type="button"
-          aria-label={t('mars.zoomIn')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.zoomBy(0.55, ms(300))}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label={t('mars.zoomOut')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.zoomBy(1.8, ms(300))}
-        >
-          −
-        </button>
-      </div>
     </section>
   );
 }

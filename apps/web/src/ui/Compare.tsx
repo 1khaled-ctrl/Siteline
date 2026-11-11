@@ -29,11 +29,11 @@ export function Compare() {
           {pins.map((p, i) => {
             const r = rows[i]?.result;
             return (
-              <tr key={label(p)} className="border-t border-white/10">
+              <tr key={label(p)} className="border-t border-line">
                 <td className="py-1">
                   <button
                     type="button"
-                    className="rounded px-1 text-start hover:bg-white/5"
+                    className="rounded px-1 text-start hover:bg-panel-raised"
                     onClick={() => useApp.getState().focusSite(p.latDeg, p.lonDeg)}
                   >
                     {label(p)}

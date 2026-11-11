@@ -48,7 +48,7 @@ export function BodySide({ body, placeLabel, placeKey, children, footer }: Props
             type="button"
             aria-pressed={tab === id}
             data-testid={`side-${id}`}
-            className={`${smallButton} flex-1 ${tab === id ? 'border-accent bg-accent/20' : ''}`}
+            className={`${smallButton} flex-1`}
             onClick={() => setTab(id)}
           >
             {label}

@@ -15,8 +15,8 @@ export function Checks() {
   const sun = validation.sunlight as { rows: SunlightRow[]; toleranceBusseyPct: number; terrain: string };
 
   return (
-    <details className="rounded-lg border border-white/10 p-3 text-sm">
-      <summary className="cursor-pointer font-semibold">{t('checks.heading')}</summary>
+    <details className="rounded-lg border border-line p-3 text-sm">
+      <summary className="cursor-pointer font-display text-base font-semibold">{t('checks.heading')}</summary>
       <ul className="mt-3 space-y-3">
         <li>
           <span className="text-pass">✓ </span>
@@ -40,7 +40,7 @@ export function Checks() {
               {sun.rows.map((r) => {
                 const ok = Math.abs(r.oursPct - r.busseyPct) < sun.toleranceBusseyPct;
                 return (
-                  <tr key={r.point} className="border-t border-white/10">
+                  <tr key={r.point} className="border-t border-line">
                     <td className="py-1">
                       <span className={ok ? 'text-pass' : 'text-warn'}>{ok ? '✓' : '△'} </span>
                       {r.point}

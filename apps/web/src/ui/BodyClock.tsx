@@ -2,45 +2,30 @@ import { useTranslation } from 'react-i18next';
 import { formatUtc } from '../format';
 import { useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
-import { panel, smallButton } from './Controls';
-
-const input = 'mt-1 block w-full min-h-11 rounded-lg border border-white/15 bg-space/60 px-3';
+import { box, smallButton } from './Controls';
 
 /**
- * The left column of the solar-system, Earth and Mars views. They read one thing from the clock, the date the planets
- * are placed and lit for, so that is all this shows; the Moon's landing controls stay with the Moon views.
+ * Top of the floating panel on the solar-system, Earth and Mars views. The header sets the date they are placed and
+ * lit for; this shows only when the Moon's launch slip or time-lapse has moved the lighting off that date, with a
+ * way back.
  */
 export function BodyClock() {
   const { t } = useTranslation();
   const landingUtc = useApp((s) => s.landingUtc);
   const playing = useApp((s) => s.playing);
   const playOffsetH = useApp((s) => s.playOffsetH);
-  const set = useApp((s) => s.set);
   const setPlay = useApp((s) => s.setPlay);
   const litMs = useLightingUtcMs();
 
+  if (litMs === Date.parse(landingUtc) && !playing) return null;
   return (
-    <aside className="flex flex-col gap-4">
-      <section className={`${panel} flex flex-col gap-3`}>
-        <label className="block text-sm text-quiet">
-          {t('clock.label')}
-          <input
-            type="datetime-local"
-            dir="ltr"
-            min="2026-01-01T00:00"
-            max="2035-12-31T23:59"
-            value={landingUtc.slice(0, 16)}
-            className={`${input} text-ink`}
-            onChange={(e) => set({ landingUtc: `${e.currentTarget.value}:00Z` })}
-          />
-        </label>
-        <p className="text-xs text-quiet">{t('clock.litFor', { when: formatUtc(new Date(litMs).toISOString()) })}</p>
-        {(playing || playOffsetH > 0) && (
-          <button type="button" className={smallButton} onClick={() => setPlay({ playing: false, playOffsetH: 0 })}>
-            {t('clock.reset')}
-          </button>
-        )}
-      </section>
-    </aside>
+    <section className={`${box} flex flex-col gap-3`}>
+      <p className="text-xs text-quiet">{t('clock.litFor', { when: formatUtc(new Date(litMs).toISOString()) })}</p>
+      {(playing || playOffsetH > 0) && (
+        <button type="button" className={smallButton} onClick={() => setPlay({ playing: false, playOffsetH: 0 })}>
+          {t('clock.reset')}
+        </button>
+      )}
+    </section>
   );
 }

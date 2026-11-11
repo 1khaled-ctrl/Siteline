@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { REGIONS } from '../regions';
 import { LAYERS, type Layer, useApp } from '../store';
+import { ViewHint, ViewPills, viewButton } from './ViewPills';
 
 const EXAGGERATION = 3;
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
@@ -119,40 +120,42 @@ export function PoleMap() {
   }, [view, lightingUtcMs]);
 
   return (
-    <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
+    <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="pole-map" />
-      <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
+      <ViewPills
+        below={
+          layer !== 'none' && (
+            <p className="w-60 rounded-lg border border-line bg-panel/92 px-2.5 py-2 text-xs text-quiet">
+              {t(`layers.${layer}Legend`)}
+            </p>
+          )
+        }
+      >
+        <fieldset aria-label={t('layers.heading')} className="flex flex-wrap gap-1.5">
+          {LAYERS.map((l) => (
+            <button
+              key={l}
+              type="button"
+              aria-pressed={layer === l}
+              disabled={l !== 'none' && !maps}
+              className={`${viewButton} disabled:opacity-50`}
+              onClick={() => useApp.getState().set({ layer: l })}
+            >
+              {t(`layers.${l}`)}
+            </button>
+          ))}
+        </fieldset>
+      </ViewPills>
+      <ViewHint>
         {error ? t('map.error', { message: error }) : view ? t('map.hint', { exag: EXAGGERATION }) : t('map.loading')}
-      </p>
+      </ViewHint>
       <button
         type="button"
         onClick={() => useApp.getState().set({ view: 'globe' })}
-        className="absolute inset-e-3 top-3 min-h-11 rounded-lg border border-white/15 bg-panel/72 px-4 text-sm backdrop-blur-md hover:border-accent"
+        className={`${viewButton} absolute inset-e-3 top-3`}
       >
         {t('map.backToGlobe')}
       </button>
-      <fieldset
-        aria-label={t('layers.heading')}
-        className="absolute inset-s-3 bottom-3 flex flex-wrap gap-1 rounded-lg bg-panel/72 p-1 backdrop-blur-md"
-      >
-        {LAYERS.map((l) => (
-          <button
-            key={l}
-            type="button"
-            aria-pressed={layer === l}
-            disabled={l !== 'none' && !maps}
-            className={`min-h-9 rounded-md px-3 text-sm ${layer === l ? 'bg-accent text-space' : 'hover:bg-white/10'} disabled:opacity-50`}
-            onClick={() => useApp.getState().set({ layer: l })}
-          >
-            {t(`layers.${l}`)}
-          </button>
-        ))}
-      </fieldset>
-      {layer !== 'none' && (
-        <p className="pointer-events-none absolute inset-e-3 bottom-3 max-w-xs rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
-          {t(`layers.${layer}Legend`)}
-        </p>
-      )}
     </section>
   );
 }

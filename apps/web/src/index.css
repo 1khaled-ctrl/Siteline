@@ -1,21 +1,83 @@
 @import "tailwindcss";
 
 @theme {
-  --color-space: #05070a;
-  --color-panel: #10141c;
-  --color-ink: #e8edf2;
-  --color-quiet: #9aa7b4;
-  --color-accent: #5aa9ff;
-  --color-pass: #3ccf7f;
-  --color-fail: #ff5c5c;
-  --color-warn: #ffb547;
+  /* The concept demo's deep space: a full-window 3D view under a slim top bar, with one floating panel at the end. */
+  --color-space: #060913;
+  --color-bar: #080d1a;
+  /* Three panel depths. Base is the floating panel; raised sits on it (tiles, list rows, buttons); sunk is cut into
+     it (inputs, charts, the 3D model box). Lines are the borders of all three. */
+  --color-panel: #0c1322;
+  --color-panel-raised: #121b30;
+  --color-panel-sunk: #0a1120;
+  --color-line: #22304f;
+  --color-line-hover: #3a4c80;
+  --color-ink: #e8edf7;
+  --color-quiet: #8e9ab5;
+  --color-accent: #5ba9ff;
+  --color-pass: #41cf8f;
+  --color-fail: #ff6f6f;
+  --color-warn: #f0c050;
+  /* Gold marks the Sun's readings and whichever toggle is on. */
+  --color-sun: #f4b63f;
+  --color-sun-ink: #ffe2a6;
+  --color-sun-wash: rgb(60 45 15 / 0.9);
+
+  /* Corners. Cards 10 to 14 px; buttons, tabs and filters are pills. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* Three voices: display for titles, body for reading, mono for numbers and data values. */
+  --font-display: "Saira Semi Condensed", "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 body {
-  background: var(--color-space);
+  min-height: 100dvh;
+  background-color: var(--color-space);
   color: var(--color-ink);
+  font-size: 14px;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
+}
+
+/* In the base layer so a class on an element (`font-sans`, `text-sm`) still wins. */
+@layer base {
+  /* Titles are set in the display face. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  h1 {
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+    line-height: 1.25;
+  }
+
+  /* Readouts are set in mono: the values in every stat list, the dates in the date box and live outputs. */
+  dd,
+  output,
+  time,
+  input[type="datetime-local"],
+  input[type="number"] {
+    font-family: var(--font-mono);
+  }
+
+  /* A value that is a name or a sentence, not a reading, stays in the body face. */
+  dd[data-text] {
+    font-family: var(--font-sans);
+  }
 }
 
 @keyframes fade-in {

@@ -3,12 +3,24 @@ import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../format';
 import { useStay } from '../physics';
 import { MAX_PINS, samePin, useApp } from '../store';
+import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { panel, smallButton } from './Controls';
 import { Timeline } from './Timeline';
 
 type Check = 'yes' | 'no' | 'unknown';
 
+/** The verdict's box and the check chips, tinted like the demo's pass and fail boxes. */
+const VERDICT_BOX = {
+  pass: 'border-pass/60 bg-pass/8',
+  fail: 'border-fail/60 bg-fail/7',
+  undecided: 'border-warn/60 bg-warn/8',
+} as const;
+const CHIP: Record<Check, string> = {
+  yes: 'border-pass/55 bg-pass/10 text-pass',
+  no: 'border-fail/55 bg-fail/10 text-fail',
+  unknown: 'border-warn/55 bg-warn/10 text-warn',
+};
 const STYLE: Record<Check, { icon: string; color: string }> = {
   yes: { icon: '✓', color: 'text-pass' },
   no: { icon: '✗', color: 'text-fail' },
@@ -65,60 +77,55 @@ export function SiteReport() {
   return (
     <section className={`${panel} flex flex-col gap-4`} aria-busy={loading}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold">{t('report.heading')}</h2>
+        <h2 className="text-2xl">{t('report.heading')}</h2>
         <span className="text-sm text-quiet">{t('report.landing', { date: formatUtc(query.landingUtc) })}</span>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={`text-2xl font-semibold ${verdictStyle.color}`} aria-live="polite">
-          <span aria-hidden="true">{verdictStyle.icon} </span>
-          {t(`report.verdict.${verdict}`)}
-        </p>
-        <button
-          type="button"
-          className={smallButton}
-          disabled={!pinned && pins.length >= MAX_PINS}
-          onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
-        >
-          {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
-        </button>
-      </div>
-
-      <ul className="grid gap-2 sm:grid-cols-2">
-        {(Object.keys(c) as (keyof typeof c)[]).map((k) => (
-          <li key={k} className="flex items-start gap-2 rounded-lg bg-space/50 p-3">
-            <span aria-hidden="true" className={STYLE[c[k]].color}>
-              {STYLE[c[k]].icon}
-            </span>
-            <span>
+      <div className={`rounded-lg border p-3 ${VERDICT_BOX[verdict]}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={`font-display text-lg font-semibold ${verdictStyle.color}`} aria-live="polite">
+            <span aria-hidden="true">{verdictStyle.icon} </span>
+            {t(`report.verdict.${verdict}`)}
+          </p>
+          <button
+            type="button"
+            className={smallButton}
+            disabled={!pinned && pins.length >= MAX_PINS}
+            onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
+          >
+            {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
+          </button>
+        </div>
+        <ul className="mt-2 flex flex-wrap gap-1.5">
+          {(Object.keys(c) as (keyof typeof c)[]).map((k) => (
+            <li key={k} className={`rounded-pill border px-2.5 py-0.5 text-[12.5px] ${CHIP[c[k]]}`}>
+              <span aria-hidden="true">{STYLE[c[k]].icon} </span>
               {t(`report.${k}`)}:{' '}
-              <strong className={STYLE[c[k]].color}>
+              <strong className="font-semibold">
                 {c[k] === 'unknown' && k === 'slope' ? slopeText : t(`report.${c[k]}`)}
               </strong>
-            </span>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      <dl className="grid grid-cols-2 gap-2 text-sm">
-        <dt className="text-quiet">{t('report.sunMin')}</dt>
-        <dd>{pct(result.sunFractionMin * 100)}</dd>
-        <dt className="text-quiet">{t('report.earthPct')}</dt>
-        <dd>{pct(result.earthVisiblePct)}</dd>
-        {terrain && (
-          <>
-            <dt className="text-quiet">{t('report.groundHeight')}</dt>
-            <dd>{formatNumber(terrain.groundHeightM, 0)} m</dd>
-          </>
-        )}
+      <dl className="grid grid-cols-2 gap-2">
+        <StatTile label={t('report.sunMin')} edge="sun">
+          {pct(result.sunFractionMin * 100)}
+        </StatTile>
+        <StatTile label={t('report.earthPct')} edge="earth">
+          {pct(result.earthVisiblePct)}
+        </StatTile>
+        {terrain && <StatTile label={t('report.groundHeight')}>{formatNumber(terrain.groundHeightM, 0)} m</StatTile>}
         {longTerm && (
           <>
-            <dt className="text-quiet">{t('report.longTermSun')}</dt>
-            <dd>{formatNumber(longTerm.sunPct, 0)}%</dd>
-            <dt className="text-quiet">{t('report.longTermEarth')}</dt>
-            <dd>{formatNumber(longTerm.earthPct, 0)}%</dd>
-            <dt className="text-quiet">{t('report.shadowed')}</dt>
-            <dd>{longTerm.shadowed ? t('report.yes') : t('report.no')}</dd>
+            <StatTile label={t('report.longTermSun')} edge="sun">
+              {formatNumber(longTerm.sunPct, 0)}%
+            </StatTile>
+            <StatTile label={t('report.longTermEarth')} edge="earth">
+              {formatNumber(longTerm.earthPct, 0)}%
+            </StatTile>
+            <StatTile label={t('report.shadowed')}>{longTerm.shadowed ? t('report.yes') : t('report.no')}</StatTile>
           </>
         )}
       </dl>
@@ -131,7 +138,7 @@ export function SiteReport() {
         </ul>
       )}
 
-      <p className="rounded-lg border border-warn/40 p-3 text-sm text-warn">
+      <p className="rounded-lg border border-warn/50 bg-warn/8 p-3 text-sm text-warn">
         <span aria-hidden="true">⚠ </span>
         {terrain
           ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
@@ -141,13 +148,12 @@ export function SiteReport() {
       </p>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold">{t('report.events')}</h3>
-        <dl className="grid grid-cols-2 gap-1 text-sm">
+        <h3 className="mb-2 text-base">{t('report.events')}</h3>
+        <dl className="grid grid-cols-2 gap-2">
           {events.map(([k, at]) => (
-            <div key={k} className="contents">
-              <dt className="text-quiet">{t(`report.${k}`)}</dt>
-              <dd>{at ? formatUtc(at) : t('report.none')}</dd>
-            </div>
+            <StatTile key={k} label={t(`report.${k}`)} edge={k.startsWith('sun') ? 'sun' : 'earth'} text>
+              {at ? formatUtc(at) : t('report.none')}
+            </StatTile>
           ))}
         </dl>
       </div>

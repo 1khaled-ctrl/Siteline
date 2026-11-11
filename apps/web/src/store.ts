@@ -44,6 +44,9 @@ interface AppState extends View {
   marsCommand: { id: number; type: 'home' | 'feature' } | null;
   setMarsPlace: (place: MarsPlace | null) => void;
   commandMars: (type: 'home' | 'feature') => void;
+  /** A flight the Worlds list asks the solar-system view for, to a body that has its own view. Not saved in the link. */
+  solarCommand: { id: number; body: 'earth' | 'mars' | 'moon' } | null;
+  commandSolar: (body: 'earth' | 'mars' | 'moon') => void;
   /** Which landers the list shows, and a counter that asks the camera to fly to the open lander. Not saved in the link. */
   missionFilter: MissionFilter;
   missionFlySeq: number;
@@ -152,6 +155,8 @@ export const useApp = create<AppState>((set) => ({
   marsCommand: null,
   setMarsPlace: (marsPlace) => set({ marsPlace }),
   commandMars: (type) => set((s) => ({ marsCommand: { id: (s.marsCommand?.id ?? 0) + 1, type } })),
+  solarCommand: null,
+  commandSolar: (body) => set((s) => ({ solarCommand: { id: (s.solarCommand?.id ?? 0) + 1, body } })),
   missionFilter: 'all',
   // A link that names a lander flies to it once its planet is on screen.
   missionFlySeq: initial.missionId ? 1 : 0,

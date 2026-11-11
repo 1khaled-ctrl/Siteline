@@ -17,16 +17,13 @@ import { COLOUR_URL, findLander, MISSIONS, patchImageUrl } from '../landers';
 import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
 import { LanderPins } from './LanderPins';
+import { hintBox, ViewPills, viewButton } from './ViewPills';
 
 const GLD100 = 'https://wms.lroc.asu.edu/lroc/view_rdr/WAC_GLD100';
 const MEGDR = 'https://pds-geosciences.wustl.edu/missions/mgs/megdr.html';
 const SSS = 'https://www.solarsystemscope.com/textures/';
 const CC_BY = 'https://creativecommons.org/licenses/by/4.0/';
 const DEFAULT_RELIEF = 3;
-
-const buttonBase = 'min-h-9 rounded-lg px-3 text-sm backdrop-blur-md';
-const toggle = (on: boolean) =>
-  `${buttonBase} border ${on ? 'border-accent bg-accent/20' : 'border-white/15 bg-panel/80'}`;
 
 /** Read a close-up height patch: the PNG decoded through a canvas, then the heights unpacked from red and green. */
 async function readPatch(url: string, meta: SitePatchMeta): Promise<SitePatch> {
@@ -123,30 +120,28 @@ export function SiteMap() {
     sunny && meta && subsolar && sunHeightDeg(meta.latDeg, meta.lonDeg, subsolar.latDeg, subsolar.lonDeg) < 0;
 
   return (
-    <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
+    <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="site-map" />
       <LanderPins host={view} missions={onGround} tracks={tracks} atUtcMs={shownMs} />
-      <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
-        {state === 'loading' ? t('siteView.loading') : state === 'failed' ? t('siteView.failed') : t('siteView.hint')}
-      </p>
-      <button
-        type="button"
-        className={`${buttonBase} absolute inset-e-3 top-3 border border-white/15 bg-panel/80`}
-        onClick={closeSite}
+      <ViewPills
+        below={
+          night && (
+            <p role="status" className="rounded-md bg-panel-raised/92 px-2 py-1 text-xs text-warn">
+              {t('siteView.sunBelow')}
+            </p>
+          )
+        }
       >
-        {t('siteView.back')}
-      </button>
-      <div className="absolute inset-e-28 inset-s-3 bottom-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           aria-pressed={sunny}
           title={t('siteView.realSunHint')}
-          className={toggle(sunny)}
+          className={viewButton}
           onClick={() => setSunny((v) => !v)}
         >
           {t('siteView.realSun')}
         </button>
-        <label className={`${buttonBase} flex items-center gap-2 border border-white/15 bg-panel/80`}>
+        <label className={`${viewButton} flex items-center gap-2`}>
           <span>{t('siteView.relief')}</span>
           <input
             type="range"
@@ -154,30 +149,20 @@ export function SiteMap() {
             max={8}
             step={1}
             value={relief}
+            className="w-24 accent-sun"
             onChange={(e) => setRelief(Number(e.currentTarget.value))}
           />
           <output dir="ltr" className="w-6 text-end tabular-nums">
             {t('siteView.reliefValue', { n: relief })}
           </output>
         </label>
-        {night && (
-          <p role="status" className="rounded-lg bg-panel/80 px-2 py-1 text-xs text-warn">
-            {t('siteView.sunBelow')}
-          </p>
-        )}
-      </div>
-      <div className="absolute inset-e-3 bottom-3 flex flex-col gap-1">
-        <button
-          type="button"
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => view?.home()}
-        >
+        <button type="button" className={viewButton} onClick={() => view?.home()}>
           {t('siteView.home')}
         </button>
         <button
           type="button"
           aria-label={t('siteView.zoomIn')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
+          className={viewButton}
           onClick={() => view?.zoomBy(0.6)}
         >
           +
@@ -185,24 +170,32 @@ export function SiteMap() {
         <button
           type="button"
           aria-label={t('siteView.zoomOut')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
+          className={viewButton}
           onClick={() => view?.zoomBy(1.7)}
         >
           −
         </button>
+      </ViewPills>
+      <button type="button" className={`${viewButton} absolute inset-e-3 top-3`} onClick={closeSite}>
+        {t('siteView.back')}
+      </button>
+      <div className="pointer-events-none absolute inset-x-3 bottom-3.5 flex flex-col items-center gap-1.5">
+        <p className="pointer-events-auto max-w-2xl rounded-md bg-bar/80 px-2.5 py-1 text-center text-[11px] text-quiet">
+          {metresPerPixel !== undefined && `${t('siteView.resolution', { m: formatNumber(metresPerPixel, 0) })} `}
+          <Trans
+            i18nKey={`siteView.credit.${mission.body}`}
+            components={{
+              gld: <Ext href={GLD100} />,
+              megdr: <Ext href={MEGDR} />,
+              sss: <Ext href={SSS} />,
+              ccby: <Ext href={CC_BY} />,
+            }}
+          />
+        </p>
+        <p className={hintBox}>
+          {state === 'loading' ? t('siteView.loading') : state === 'failed' ? t('siteView.failed') : t('siteView.hint')}
+        </p>
       </div>
-      <p className="pointer-events-none absolute inset-e-28 inset-s-3 bottom-14 w-fit max-w-2xl rounded-lg bg-panel/72 px-3 py-1 text-[11px] text-quiet backdrop-blur-md">
-        {metresPerPixel !== undefined && `${t('siteView.resolution', { m: formatNumber(metresPerPixel, 0) })} `}
-        <Trans
-          i18nKey={`siteView.credit.${mission.body}`}
-          components={{
-            gld: <Ext href={GLD100} />,
-            megdr: <Ext href={MEGDR} />,
-            sss: <Ext href={SSS} />,
-            ccby: <Ext href={CC_BY} />,
-          }}
-        />
-      </p>
     </section>
   );
 }

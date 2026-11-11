@@ -10,6 +10,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
+import { ViewHint, ViewPills, viewButton } from './ViewPills';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const EARTH_ASSETS: EarthAssets = {
@@ -48,8 +49,6 @@ export function findCountry(countries: readonly EarthCountry[], query: string): 
     countries.find((c) => c.name.toLowerCase().includes(q))
   );
 }
-
-const buttonBase = 'min-h-9 rounded-lg px-3 text-sm backdrop-blur-md';
 
 export function EarthMap() {
   const { t } = useTranslation();
@@ -125,11 +124,53 @@ export function EarthMap() {
   };
 
   return (
-    <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
+    <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="earth-map" />
-      <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
-        {t('earth.hint')}
-      </p>
+      <ViewPills wide>
+        <fieldset className="flex gap-1.5">
+          <legend className="sr-only">{t('earth.style')}</legend>
+          {STYLES.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={style === s.id}
+              className={viewButton}
+              onClick={() => setStyle(s.id)}
+            >
+              {t(s.label)}
+            </button>
+          ))}
+        </fieldset>
+        <button
+          type="button"
+          aria-pressed={realLight}
+          title={t('earth.dayNightHint')}
+          className={viewButton}
+          onClick={() => setRealLight((v) => !v)}
+        >
+          {t('earth.dayNight')}
+        </button>
+        <button type="button" className={viewButton} onClick={() => void globe?.flyHome(ms(1400))}>
+          {t('earth.home')}
+        </button>
+        <button
+          type="button"
+          aria-label={t('earth.zoomIn')}
+          className={viewButton}
+          onClick={() => void globe?.zoomBy(0.55, ms(300))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label={t('earth.zoomOut')}
+          className={viewButton}
+          onClick={() => void globe?.zoomBy(1.8, ms(300))}
+        >
+          −
+        </button>
+      </ViewPills>
+      <ViewHint>{t('earth.hint')}</ViewHint>
       <search className="absolute inset-e-3 top-3">
         <form onSubmit={search} className="flex flex-col items-end gap-1">
           <input
@@ -138,7 +179,7 @@ export function EarthMap() {
             value={query}
             aria-label={t('earth.search')}
             placeholder={t('earth.searchPlaceholder')}
-            className="min-h-9 w-52 rounded-lg border border-white/15 bg-panel/80 px-3 text-sm backdrop-blur-md"
+            className="min-h-8 w-52 rounded-md border border-line bg-panel-raised/92 px-2.5 text-[12.5px]"
             onChange={(e) => {
               setQuery(e.currentTarget.value);
               setNotFound(false);
@@ -150,62 +191,12 @@ export function EarthMap() {
             ))}
           </datalist>
           {notFound && (
-            <p role="status" className="rounded-lg bg-panel/80 px-2 py-1 text-xs text-quiet">
+            <p role="status" className="rounded-md bg-panel-raised/92 px-2 py-1 text-xs text-quiet">
               {t('earth.searchNone', { query })}
             </p>
           )}
         </form>
       </search>
-      <div className="absolute inset-s-3 bottom-3 flex flex-wrap items-center gap-2">
-        <fieldset className="flex gap-1">
-          <legend className="sr-only">{t('earth.style')}</legend>
-          {STYLES.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              aria-pressed={style === s.id}
-              className={`${buttonBase} border ${style === s.id ? 'border-accent bg-accent/20' : 'border-white/15 bg-panel/80'}`}
-              onClick={() => setStyle(s.id)}
-            >
-              {t(s.label)}
-            </button>
-          ))}
-        </fieldset>
-        <button
-          type="button"
-          aria-pressed={realLight}
-          title={t('earth.dayNightHint')}
-          className={`${buttonBase} border ${realLight ? 'border-accent bg-accent/20' : 'border-white/15 bg-panel/80'}`}
-          onClick={() => setRealLight((v) => !v)}
-        >
-          {t('earth.dayNight')}
-        </button>
-      </div>
-      <div className="absolute inset-e-3 bottom-3 flex flex-col gap-1">
-        <button
-          type="button"
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.flyHome(ms(1400))}
-        >
-          {t('earth.home')}
-        </button>
-        <button
-          type="button"
-          aria-label={t('earth.zoomIn')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.zoomBy(0.55, ms(300))}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label={t('earth.zoomOut')}
-          className={`${buttonBase} border border-white/15 bg-panel/80`}
-          onClick={() => void globe?.zoomBy(1.8, ms(300))}
-        >
-          −
-        </button>
-      </div>
     </section>
   );
 }

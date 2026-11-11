@@ -36,7 +36,7 @@ export function MarsPanel() {
           <p className="text-sm text-quiet">{t('mars.panel.empty')}</p>
         ) : (
           <div className="flex flex-col gap-3">
-            <p className="text-lg font-semibold" data-testid="mars-feature">
+            <p className="font-display text-xl font-semibold" data-testid="mars-feature">
               {place.feature?.name ?? t('mars.panel.open')}
             </p>
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
@@ -52,7 +52,7 @@ export function MarsPanel() {
                   : t('mars.panel.elevationValue', { m: formatNumber(place.elevationM, 0) })}
               </dd>
               <dt className="text-quiet">{t('mars.panel.feature')}</dt>
-              <dd className="text-end">
+              <dd className="text-end" data-text>
                 {place.feature
                   ? `${kindLine(place.feature.type)} · ${
                       place.inside

@@ -1,4 +1,5 @@
 import { DEFAULT_STAY, type StayQuery } from '@siteline/contracts';
+import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 import { useEffect, useMemo, useState } from 'react';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
@@ -97,4 +98,25 @@ export function useLightingUtcMs(): number {
   const slipDays = useApp((s) => s.slipDays);
   const playOffsetH = useApp((s) => s.playOffsetH);
   return Date.parse(landingUtc) + slipDays * DAY_MS + playOffsetH * HOUR_MS;
+}
+
+/**
+ * Where every planet and the Moon are (km, from the planets table) at the whole hour the views are lit for; undefined
+ * until they arrive or if the table cannot be read. Whole hours: in one the Moon moves about 270 km, 0.001 s of signal,
+ * so the time-lapse need not ask the worker on every frame.
+ */
+export function usePlanetsAtHour(): Readonly<Record<SolarBodyKey, Vec3>> | undefined {
+  const hourMs = Math.floor(useLightingUtcMs() / HOUR_MS) * HOUR_MS;
+  const [positions, setPositions] = useState<Readonly<Record<SolarBodyKey, Vec3>>>();
+  useEffect(() => {
+    let live = true;
+    physics.planetsAt(hourMs, URLS.data).then(
+      (p) => live && setPositions(p),
+      () => live && setPositions(undefined),
+    );
+    return () => {
+      live = false;
+    };
+  }, [hourMs]);
+  return positions;
 }

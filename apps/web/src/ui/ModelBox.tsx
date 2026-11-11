@@ -45,7 +45,7 @@ export function ModelBox({ url, body, sun }: Props) {
 
   const night = sun !== undefined && sun.heightDeg < 0;
   return (
-    <figure className="mt-3 overflow-hidden rounded-lg border border-white/10 bg-space/60">
+    <figure className="mt-3 overflow-hidden rounded-lg border border-line bg-panel-sunk">
       <div ref={setHost} className="h-56 w-full" data-testid="model-box" />
       <figcaption className="px-3 py-2 text-xs text-quiet">
         {state === 'loading'

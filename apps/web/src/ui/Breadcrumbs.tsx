@@ -63,22 +63,22 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label={t('crumbs.label')}>
-      <ol className="flex flex-wrap items-center gap-1 text-sm">
+      <ol className="flex flex-wrap items-center gap-0.5 text-[13px]">
         {trail.map((c, i) => {
           const last = i === trail.length - 1;
           return (
             <li key={c.id} className="flex items-center gap-1">
               {i > 0 && (
-                <span aria-hidden="true" className="text-quiet">
+                <span aria-hidden="true" className="text-quiet/50">
                   ›
                 </span>
               )}
               {last ? (
-                <span aria-current="page" className="px-2 font-semibold">
+                <span aria-current="page" className="px-1.5">
                   {c.text}
                 </span>
               ) : (
-                <button type="button" className="min-h-9 rounded-lg px-2 text-accent hover:bg-white/5" onClick={c.go}>
+                <button type="button" className="min-h-9 rounded-md px-1.5 text-quiet hover:text-ink" onClick={c.go}>
                   {c.text}
                 </button>
               )}

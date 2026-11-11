@@ -28,12 +28,24 @@ function usePlayClock() {
   }, [playing]);
 }
 
-export function MoonView() {
+function CurrentView() {
   const view = useApp((s) => s.view);
-  usePlayClock();
   if (view === 'solar') return <SolarMap />;
   if (view === 'earth') return <EarthMap />;
   if (view === 'mars') return <MarsMap />;
   if (view === 'site') return <SiteMap />;
   return view === 'globe' ? <GlobeMap /> : <PoleMap />;
+}
+
+/**
+ * The 3D view. On a wide screen it fills the window up to the floating panel (410 px and its 12 px margin), so the
+ * world sits in the middle of the part you can see, as the demo does by shifting its camera.
+ */
+export function MoonView() {
+  usePlayClock();
+  return (
+    <div className="relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
+      <CurrentView />
+    </div>
+  );
 }

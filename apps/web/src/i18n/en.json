@@ -1,6 +1,15 @@
 {
   "app": {
-    "tagline": "Moon south-pole landing check"
+    "tagline": "Fly down to a landing site and see if you can land there."
+  },
+  "header": {
+    "dateLabel": "Date and time (UTC)",
+    "utc": "UTC",
+    "dayBack": "−1 d",
+    "dayOn": "+1 d",
+    "earlier": "One day earlier",
+    "later": "One day later",
+    "now": "Now"
   },
   "site": {
     "heading": "Landing site",
@@ -23,9 +32,57 @@
     "lightingAt": "The 3D view is lit for {{days}} days after landing."
   },
   "clock": {
-    "label": "Date shown (UTC)",
-    "litFor": "Showing {{when}}.",
+    "litFor": "With the Moon's launch slip and time-lapse, the views show {{when}}.",
     "reset": "Back to the set date"
+  },
+  "worlds": {
+    "heading": "Worlds",
+    "world": "World",
+    "fromSun": "From the Sun",
+    "signal": "Signal from Earth",
+    "au": "{{n}} AU",
+    "none": "–",
+    "note": "Distances are for the date shown, from NASA JPL's DE440 ephemeris; AU is the Earth's average distance from the Sun. The signal time is how long light or radio takes to get there from Earth. Click Earth, the Moon or Mars to fly there."
+  },
+  "facts": {
+    "heading": {
+      "Moon": "About the Moon",
+      "Earth": "About Earth",
+      "Mars": "About Mars"
+    },
+    "gravity": "Gravity",
+    "escape": "Escape speed",
+    "rotation": "One rotation",
+    "solarDay": "Sunrise to sunrise",
+    "sunlight": "Sunlight strength",
+    "signal": "Signal delay from Earth",
+    "temperature": "Temperature",
+    "surface": "Surface",
+    "pending": "–",
+    "units": {
+      "gravity": "{{n}} m/s²",
+      "escape": "{{n}} km/s",
+      "sunlight": "{{n}} W/m²",
+      "h": "{{n}} h",
+      "d": "{{n}} d",
+      "s": "{{n}} s",
+      "min": "{{n}} min"
+    },
+    "temp": {
+      "Moon": "{{low}} to {{high}} °C at the equator from night to day; about {{coldest}} °C in some polar craters",
+      "Earth": "{{mean}} °C on average",
+      "Mars": "{{mean}} °C on average; {{low}} to {{high}} °C from night to day at the Viking 1 landing site"
+    },
+    "surfaceKind": {
+      "Moon": "Solid rock, almost no air",
+      "Earth": "Land and ocean, with air at {{mbar}} mbar",
+      "Mars": "Solid ground, with thin air at {{mbar}} mbar"
+    },
+    "sources": {
+      "Moon": "Sources: <fact>NASA Moon fact sheet</fact>, NAIF's <gm>gravitational parameters</gm> and, for the coldest craters, <paige>Paige et al. 2010</paige>. Sunlight and signal delay are for the date shown. Details in CREDITS.md.",
+      "Earth": "Sources: <fact>NASA Earth fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight is for the date shown. Details in CREDITS.md.",
+      "Mars": "Sources: <fact>NASA Mars fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md."
+    }
   },
   "compare": {
     "heading_one": "{{count}} pinned site",
@@ -229,6 +286,7 @@
   },
   "map": {
     "backToGlobe": "Whole Moon",
+    "display": "What the view shows",
     "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date.",
     "loading": "Loading south-pole terrain…",
     "error": "Could not load the terrain: {{message}}"

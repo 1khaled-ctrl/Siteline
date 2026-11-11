@@ -21,7 +21,7 @@ import { formatDate, formatNumber } from '../format';
 import { findLander, MISSION_SOURCES, MISSIONS, modelUrl, statusKey, textOf } from '../landers';
 import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
-import { panel, smallButton } from './Controls';
+import { chipButton, panel, smallButton } from './Controls';
 import { ModelBox } from './ModelBox';
 
 const NASA_3D = 'https://github.com/nasa/NASA-3D-Resources';
@@ -46,7 +46,7 @@ const TONE_CLASS = {
   good: 'border-pass text-pass',
   warn: 'border-warn text-warn',
   bad: 'border-fail text-fail',
-  plain: 'border-white/20 text-ink',
+  plain: 'border-line text-ink',
 } as const;
 
 function Ext({ href, children }: { href: string; children?: ReactNode }) {
@@ -63,7 +63,7 @@ function Dot({ style }: { style: PinStyle }) {
   return (
     <span
       aria-hidden="true"
-      className="mt-1 block size-3 shrink-0 rounded-full"
+      className="block size-2.5 shrink-0 rounded-full"
       style={style === 'future' ? { border: `2px dashed ${colour}` } : { background: colour }}
     />
   );
@@ -93,9 +93,9 @@ function Timeline({
       viewBox="0 0 320 46"
       role="img"
       aria-label={t('landers.timeline', { from: YEAR_FROM, to: YEAR_TO })}
-      className="mt-2 w-full"
+      className="mt-2 w-full rounded-lg border border-line bg-panel-sunk px-1 pt-1"
     >
-      <line x1="10" x2="310" y1="20.5" y2="20.5" stroke="currentColor" className="text-white/20" />
+      <line x1="10" x2="310" y1="20.5" y2="20.5" stroke="currentColor" className="text-line" />
       {decades.map((y) => (
         <g key={y}>
           <line
@@ -149,24 +149,23 @@ function MissionList({ body }: { body: LanderBody }) {
       <h2 className="font-semibold">{t('landers.title', { name: t(`bodies.${body.toLowerCase()}`) })}</h2>
       <p className="mt-1 text-xs text-quiet">{t('landers.key')}</p>
       {next && (
-        <button type="button" className={`${smallButton} mt-3 w-full text-start`} onClick={() => select(next.id)}>
-          <b>{t(next.status === 'onway' ? 'landers.status.onway' : 'landers.nextUp')}:</b> {next.name} ·{' '}
+        <button
+          type="button"
+          className="mt-3 w-full rounded-lg border border-sun/50 bg-sun/10 px-3 py-2 text-start text-sm hover:border-sun"
+          onClick={() => select(next.id)}
+        >
+          <b className="text-sun-ink">{t(next.status === 'onway' ? 'landers.status.onway' : 'landers.nextUp')}:</b>{' '}
+          {next.name} ·{' '}
           <span className="text-quiet">
             {next.dateLabel ? textOf(next.dateLabel, i18n.language) : formatDate(next.tUtcMs)}
           </span>
         </button>
       )}
       <Timeline missions={all} shownMs={shownMs} selectedId={selectedId} />
-      <fieldset className="mt-2 flex flex-wrap gap-1">
+      <fieldset className="mt-2 flex flex-wrap gap-1.5">
         <legend className="sr-only">{t('landers.filtersLabel')}</legend>
         {MISSION_FILTERS.map((k) => (
-          <button
-            key={k}
-            type="button"
-            aria-pressed={filter === k}
-            className={`${smallButton} ${filter === k ? 'border-accent bg-accent/20' : ''}`}
-            onClick={() => setFilter(k)}
-          >
+          <button key={k} type="button" aria-pressed={filter === k} className={chipButton} onClick={() => setFilter(k)}>
             {t(`landers.filters.${k}`)}
           </button>
         ))}
@@ -174,13 +173,13 @@ function MissionList({ body }: { body: LanderBody }) {
       {shown.length === 0 ? (
         <p className="mt-3 text-sm text-quiet">{t('landers.empty')}</p>
       ) : (
-        <ul className="mt-2 flex max-h-96 flex-col gap-1 overflow-y-auto">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {shown.map((m) => (
             <li key={m.id}>
               <button
                 type="button"
                 data-testid={`mission-${m.id}`}
-                className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-start hover:bg-white/5"
+                className="flex w-full items-center gap-2.5 rounded-lg border border-line bg-panel-raised px-2.5 py-1.5 text-start hover:border-line-hover"
                 onClick={() => select(m.id)}
               >
                 <Dot style={pinStyleOf(m, shownMs)} />
@@ -188,7 +187,7 @@ function MissionList({ body }: { body: LanderBody }) {
                   <span className="block text-sm">{m.name}</span>
                   <span className="block text-xs text-quiet">{textOf(m.site, i18n.language)}</span>
                 </span>
-                <span className="text-xs text-quiet">
+                <span className="font-mono text-xs text-quiet">
                   {m.dateLabel && pinStyleOf(m, shownMs) === 'future'
                     ? textOf(m.dateLabel, i18n.language)
                     : new Date(m.tUtcMs).getUTCFullYear()}
@@ -206,11 +205,22 @@ function MissionList({ body }: { body: LanderBody }) {
   );
 }
 
-function Stat({ label, children, testId }: { label: string; children: ReactNode; testId?: string }) {
+function Stat({
+  label,
+  children,
+  testId,
+  text,
+}: {
+  label: string;
+  children: ReactNode;
+  testId?: string;
+  /** A name or a sentence rather than a reading: set in the body face, not mono. */
+  text?: boolean;
+}) {
   return (
     <>
       <dt className="text-quiet">{label}</dt>
-      <dd className="text-end" data-testid={testId}>
+      <dd className="text-end" data-text={text || undefined} data-testid={testId}>
         {children}
       </dd>
     </>
@@ -257,13 +267,11 @@ function MissionCard({ mission: m }: { mission: Mission }) {
         <span className={`rounded-full border px-2 py-0.5 ${TONE_CLASS[toneOf(m)]}`}>
           {t(`landers.status.${statusKey(m, shownMs)}`)}
         </span>
-        {m.approximate && (
-          <span className="rounded-full border border-white/20 px-2 py-0.5">{t('landers.approx')}</span>
-        )}
+        {m.approximate && <span className="rounded-full border border-line px-2 py-0.5">{t('landers.approx')}</span>}
       </div>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         {future ? (
-          <Stat label={t(m.status === 'onway' ? 'landers.launchedOn' : 'landers.plannedFor')}>
+          <Stat label={t(m.status === 'onway' ? 'landers.launchedOn' : 'landers.plannedFor')} text={!!m.dateLabel}>
             {m.dateLabel ? textOf(m.dateLabel, i18n.language) : formatDate(m.tUtcMs)}
           </Stat>
         ) : (
@@ -271,7 +279,9 @@ function MissionCard({ mission: m }: { mission: Mission }) {
             {formatDate(m.tUtcMs)}
           </Stat>
         )}
-        <Stat label={t('landers.siteLabel')}>{textOf(m.site, i18n.language)}</Stat>
+        <Stat label={t('landers.siteLabel')} text>
+          {textOf(m.site, i18n.language)}
+        </Stat>
         {at && (
           <Stat label={t('landers.coords')} testId="mission-coords">
             <span dir="ltr">

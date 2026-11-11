@@ -7,6 +7,7 @@ import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
+import { ViewHint, ViewPills } from './ViewPills';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 // The loaded terrain reaches about 76°S; anything south of this opens in the south-pole view.
@@ -77,20 +78,21 @@ export function GlobeMap() {
   }, [globe, lightingUtcMs]);
 
   return (
-    <section className="fade-in relative min-h-[60vh] overflow-hidden rounded-xl border border-white/10 lg:min-h-0">
+    <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="globe-map" />
       <LanderPins host={globe} missions={PINNED.Moon} tracks={undefined} atUtcMs={shownMs} />
-      <p className="pointer-events-none absolute inset-s-3 top-3 max-w-md rounded-lg bg-panel/72 px-3 py-2 text-xs text-quiet backdrop-blur-md">
-        {t('globe.hint')}
-      </p>
-      <button
-        type="button"
-        disabled={!globe || flying}
-        onClick={() => globe && void flyToPole(globe, setFlying)}
-        className="absolute inset-x-0 bottom-4 mx-auto min-h-11 w-fit rounded-full bg-accent px-6 font-semibold text-space shadow-lg disabled:opacity-60"
-      >
-        {flying ? t('globe.flying') : t('globe.flyToPole')}
-      </button>
+      <ViewPills>
+        {/* The demo's gold call to action: the way down to where the landing sites are. */}
+        <button
+          type="button"
+          disabled={!globe || flying}
+          onClick={() => globe && void flyToPole(globe, setFlying)}
+          className="min-h-9 rounded-md border border-sun/60 bg-sun/15 px-3 text-sm text-sun-ink hover:border-sun disabled:opacity-60"
+        >
+          {flying ? t('globe.flying') : t('globe.flyToPole')}
+        </button>
+      </ViewPills>
+      <ViewHint>{t('globe.hint')}</ViewHint>
     </section>
   );
 }
