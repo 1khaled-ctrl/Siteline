@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { type MoonView, useApp } from '../store';
 
-/** Bodies with a view to fly into. Mars joins when its view is built. */
-const NAVIGABLE: ReadonlySet<SolarBodyKey> = new Set(['earth', 'moon']);
-const VIEW_OF: Partial<Record<SolarBodyKey, MoonView>> = { earth: 'earth', moon: 'globe' };
+/** Bodies with a view to fly into. */
+const NAVIGABLE: ReadonlySet<SolarBodyKey> = new Set(['earth', 'mars', 'moon']);
+const VIEW_OF: Partial<Record<SolarBodyKey, MoonView>> = { earth: 'earth', mars: 'mars', moon: 'globe' };
 const KEYS: SolarLabelKey[] = [
   'sun',
   'mercury',

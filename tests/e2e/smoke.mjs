@@ -1,4 +1,4 @@
-// Smoke test against a running app (default http://localhost:5173): the Earth globe names a country and a city, the Moon globe draws, the fly-to reaches the
+// Smoke test against a running app (default http://localhost:5173): the Earth globe names a country and a city, the Mars globe finds Olympus Mons at its real height, the Moon globe draws, the fly-to reaches the
 // south-pole view, a site report appears, and clicking the terrain picks a new site.
 // Usage: node tests/e2e/smoke.mjs [url] [screenshot-prefix]
 import { chromium } from 'playwright';
@@ -42,6 +42,37 @@ await page.getByRole('button', { name: 'Day and night' }).click();
 await page.getByRole('button', { name: 'Whole Earth' }).click();
 await page.waitForTimeout(2200);
 if (shots) await page.screenshot({ path: `${shots}-earth-night.png` });
+await page.getByRole('button', { name: 'Solar system' }).click();
+await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
+await page.waitForTimeout(1500);
+// Mars: the relief globe, a volcano by search with its real height, a landing-site crater, then the real-Sun line.
+await page.getByRole('button', { name: 'Mars', exact: true }).first().click();
+await page.waitForSelector('[data-testid="mars-map"] canvas', { timeout: 60_000 });
+await page.getByText('Valles Marineris', { exact: true }).first().waitFor({ timeout: 60_000 });
+await page.waitForTimeout(3500);
+if (shots) await page.screenshot({ path: `${shots}-mars.png` });
+await page.getByRole('combobox', { name: 'Find a feature' }).fill('Olympus Mons');
+await page.keyboard.press('Enter');
+await page.getByTestId('mars-feature').getByText('Olympus Mons').waitFor({ timeout: 10_000 });
+await page
+  .getByTestId('mars-elevation')
+  .getByText(/m above the areoid/)
+  .waitFor({ timeout: 30_000 });
+const elevationText = await page.getByTestId('mars-elevation').textContent();
+const olympusM = Number(elevationText.match(/-?[\d,]+/)[0].replace(/,/g, ''));
+if (!(olympusM > 18_000 && olympusM < 22_000)) throw new Error(`Olympus Mons reads ${olympusM} m`);
+await page.waitForTimeout(2500);
+if (shots) await page.screenshot({ path: `${shots}-mars-olympus.png` });
+await page.getByRole('combobox', { name: 'Find a feature' }).fill('Jezero');
+await page.keyboard.press('Enter');
+await page.getByTestId('mars-feature').getByText('Jezero').waitFor({ timeout: 10_000 });
+await page.getByRole('navigation').getByText('Jezero').waitFor({ timeout: 5_000 });
+await page.waitForTimeout(2500);
+if (shots) await page.screenshot({ path: `${shots}-mars-jezero.png` });
+await page.getByRole('button', { name: 'Day and night' }).click();
+await page.getByRole('button', { name: 'Whole Mars' }).click();
+await page.waitForTimeout(2500);
+if (shots) await page.screenshot({ path: `${shots}-mars-night.png` });
 await page.getByRole('button', { name: 'Solar system' }).click();
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.waitForTimeout(1500);

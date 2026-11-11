@@ -11,6 +11,7 @@ import {
   horizonFromDem,
   mapsAtSite,
   mapsFromBytes,
+  marsSubsolarPoint,
   PLANET_NAMES,
   type PlanetName,
   type PlanetTable,
@@ -157,6 +158,14 @@ const api = {
     const [x, y, z] = table.positionKm('earth', t);
     // The table holds the Earth as seen from the Sun; the Sun seen from the Earth is the opposite direction.
     return subsolarPoint([-x, -y, -z], t);
+  },
+
+  /** Where the Sun is overhead on Mars (degrees, east-positive), from the planets table. */
+  async marsSun(tUtcMs: number, dataUrl: string): Promise<{ latDeg: number; lonDeg: number }> {
+    const table = await loadPlanets(dataUrl);
+    const t = Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs));
+    const [x, y, z] = table.positionKm('mars', t);
+    return marsSubsolarPoint([-x, -y, -z], t);
   },
 
   async stay(query: StayQuery, urls: DataUrls): Promise<StayResponse> {

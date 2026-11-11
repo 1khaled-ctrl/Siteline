@@ -146,11 +146,17 @@ export function countryAt(
   return byId.get(ids.data[k] + ids.data[k + 1] * 256);
 }
 
-export function greatCircleKm(latADeg: number, lonADeg: number, latBDeg: number, lonBDeg: number): number {
+export function greatCircleKm(
+  latADeg: number,
+  lonADeg: number,
+  latBDeg: number,
+  lonBDeg: number,
+  radiusKm = EARTH_MEAN_RADIUS_KM,
+): number {
   const dLat = (latBDeg - latADeg) * DEG;
   const dLon = (lonBDeg - lonADeg) * DEG;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(latADeg * DEG) * Math.cos(latBDeg * DEG) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_MEAN_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+  return 2 * radiusKm * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
 export function nearestCity(

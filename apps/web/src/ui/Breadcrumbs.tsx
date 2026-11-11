@@ -14,6 +14,7 @@ export function Breadcrumbs() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
   const place = useApp((s) => s.earthPlace);
+  const marsPlace = useApp((s) => s.marsPlace);
 
   const solar: Crumb = { id: 'solar', text: t('crumbs.solar'), go: to('solar') };
   const trail: Crumb[] = [solar];
@@ -30,6 +31,22 @@ export function Breadcrumbs() {
     if (place?.country) {
       trail.push({ id: 'country', text: place.country.name, go: () => useApp.getState().commandEarth('country') });
       if (place.city) trail.push({ id: 'city', text: place.city.name, go: () => {} });
+    }
+  } else if (view === 'mars') {
+    trail.push({
+      id: 'mars',
+      text: t('crumbs.mars'),
+      go: () => {
+        useApp.getState().setMarsPlace(null);
+        useApp.getState().commandMars('home');
+      },
+    });
+    if (marsPlace?.feature) {
+      trail.push({
+        id: 'feature',
+        text: marsPlace.feature.name,
+        go: () => useApp.getState().commandMars('feature'),
+      });
     }
   } else if (view === 'globe' || view === 'pole') {
     trail.push({ id: 'moon', text: t('crumbs.moon'), go: to('globe') });

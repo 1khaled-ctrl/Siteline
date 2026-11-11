@@ -6,6 +6,7 @@ export * from './ephemeris';
 export * from './frames';
 export * from './horizon';
 export * from './maps';
+export * from './marsSun';
 export * from './planets';
 export * from './slope';
 export * from './stay';

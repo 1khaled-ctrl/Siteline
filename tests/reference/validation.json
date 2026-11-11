@@ -4,7 +4,7 @@
   "worstDeg": 0.00013479352802476619,
   "toleranceDeg": 0.001,
   "reference": "SPICE spkcpo, MOON_ME, LT+S, from the site",
-  "recordedUtc": "2026-11-11T14:50:51.774Z"
+  "recordedUtc": "2026-11-11T15:27:45.030Z"
  },
  "sunlight": {
   "terrain": "LOLA LDEM_75S_240M at 1.2 km per pixel",
@@ -33,7 +33,7 @@
     "oursPct": 83.91295737982092
    }
   ],
-  "recordedUtc": "2026-11-11T15:09:33.488Z"
+  "recordedUtc": "2026-11-11T15:27:45.269Z"
  },
  "planets": {
   "cases": 40,
@@ -43,13 +43,20 @@
   "worstMoonRelativeError": 0.002029956786136809,
   "toleranceDeg": 0.01,
   "reference": "SPICE spkpos, ECLIPJ2000, geometric; Mars and the outer planets are system barycentres",
-  "recordedUtc": "2026-11-11T15:09:33.292Z"
+  "recordedUtc": "2026-11-11T15:27:45.014Z"
  },
  "earthSun": {
   "cases": 40,
   "worstDeg": 0.005730358682082035,
   "toleranceDeg": 0.03,
   "reference": "SPICE spkpos SUN from EARTH in ITRF93, geometric; precession and obliquity of date, no nutation",
-  "recordedUtc": "2026-11-11T15:09:33.320Z"
+  "recordedUtc": "2026-11-11T15:27:45.068Z"
+ },
+ "marsSun": {
+  "cases": 40,
+  "worstDeg": 0.0000065976355361199995,
+  "toleranceDeg": 0.001,
+  "reference": "SPICE spkpos SUN from MARS BARYCENTER in IAU_MARS (pck00011.tpc), geometric, 2026 to 2036",
+  "recordedUtc": "2026-11-11T15:27:45.355Z"
  }
 }

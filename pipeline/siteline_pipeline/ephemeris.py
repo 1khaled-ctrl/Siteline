@@ -95,6 +95,7 @@ def build_golden(kernels: list[str], n_sites: int = 25, n_dates: int = 40, seed:
 PLANETS_PATH = TABLE_PATH.with_name("planets.bin")
 PLANETS_GOLDEN_PATH = REPO / "tests" / "reference" / "planets_golden.json"
 EARTH_SUN_GOLDEN_PATH = REPO / "tests" / "reference" / "earth_sun_golden.json"
+MARS_SUN_GOLDEN_PATH = REPO / "tests" / "reference" / "mars_sun_golden.json"
 # earth_latest_high_prec.bpc measures the Earth's rotation up to about now, so the golden stays inside 2026.
 EARTH_FIXED_START_UTC = "2026-01-05T00:00:00Z"
 EARTH_FIXED_END_UTC = "2026-10-15T00:00:00Z"
@@ -194,6 +195,29 @@ def build_earth_sun_golden(kernels: list[str], n_dates: int = 40, seed: int = 77
     return len(cases)
 
 
+def build_mars_sun_golden(kernels: list[str], n_dates: int = 40, seed: int = 99) -> int:
+    """Where SPICE puts the Sun overhead on Mars (IAU_MARS from pck00011.tpc), with Mars's heliocentric position."""
+    rng = np.random.default_rng(seed)
+    times = np.sort(rng.integers(utc_ms(START_UTC), utc_ms(END_UTC), n_dates)) // 1000 * 1000
+    ets = [et_at(int(t)) for t in times]
+    mars = PLANET_TARGETS["mars"]
+    mars_from_sun = np.asarray(sp.spkpos(mars, ets, PLANETS_FRAME, "NONE", "SUN")[0])
+    sun_fixed = np.asarray(sp.spkpos("SUN", ets, "IAU_MARS", "NONE", mars)[0])
+    cases = []
+    for t, pos, fixed in zip(times, mars_from_sun, sun_fixed, strict=True):
+        _, lon, lat = sp.reclat(fixed.tolist())
+        cases.append(
+            {
+                "tUtcMs": int(t),
+                "marsFromSunKm": [float(v) for v in pos],
+                "subsolar": {"latDeg": math.degrees(lat), "lonDeg": math.degrees(lon)},
+            }
+        )
+    meta = {"frame": "IAU_MARS", "abcorr": "NONE", "target": mars, "kernels": kernels, "seed": seed}
+    MARS_SUN_GOLDEN_PATH.write_text(json.dumps({"generated": meta, "cases": cases}, indent=1) + "\n")
+    return len(cases)
+
+
 def main() -> None:
     kernels = load_kernels()
     if sp.namfrm(FRAME) == 0:
@@ -206,6 +230,7 @@ def main() -> None:
     print(f"planets: {planets['count']} samples, {PLANETS_PATH.stat().st_size / 1e6:.1f} MB -> {PLANETS_PATH}")
     print(f"planets golden: {build_planets_golden(kernels)} cases -> {PLANETS_GOLDEN_PATH}")
     print(f"earth sun golden: {build_earth_sun_golden(kernels)} cases -> {EARTH_SUN_GOLDEN_PATH}")
+    print(f"mars sun golden: {build_mars_sun_golden(kernels)} cases -> {MARS_SUN_GOLDEN_PATH}")
 
 
 if __name__ == "__main__":

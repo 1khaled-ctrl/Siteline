@@ -1,9 +1,9 @@
-import type { EarthPlace } from '@siteline/engine';
+import type { EarthPlace, MarsPlace } from '@siteline/engine';
 import { create } from 'zustand';
 
-/** Where the camera is: the solar system, the Earth, the Moon as a globe, or the Moon's south pole. */
-export type MoonView = 'solar' | 'earth' | 'globe' | 'pole';
-export const VIEWS: MoonView[] = ['solar', 'earth', 'globe', 'pole'];
+/** Where the camera is: the solar system, the Earth, Mars, the Moon as a globe, or the Moon's south pole. */
+export type MoonView = 'solar' | 'earth' | 'mars' | 'globe' | 'pole';
+export const VIEWS: MoonView[] = ['solar', 'earth', 'mars', 'globe', 'pole'];
 export type Layer = 'none' | 'sun' | 'earth' | 'shadow';
 export const LAYERS: Layer[] = ['none', 'sun', 'earth', 'shadow'];
 export const MAX_PINS = 4;
@@ -31,6 +31,11 @@ interface AppState extends View {
   earthCommand: { id: number; type: 'home' | 'country' } | null;
   setEarthPlace: (place: EarthPlace | null) => void;
   commandEarth: (type: 'home' | 'country') => void;
+  /** The same for Mars: the place last picked, and the camera move the breadcrumbs ask for. */
+  marsPlace: MarsPlace | null;
+  marsCommand: { id: number; type: 'home' | 'feature' } | null;
+  setMarsPlace: (place: MarsPlace | null) => void;
+  commandMars: (type: 'home' | 'feature') => void;
   /** Time-lapse: lighting time offset from landing, in hours, and the play speed in hours per second. */
   playOffsetH: number;
   playing: boolean;
@@ -112,6 +117,10 @@ export const useApp = create<AppState>((set) => ({
   earthCommand: null,
   setEarthPlace: (earthPlace) => set({ earthPlace }),
   commandEarth: (type) => set((s) => ({ earthCommand: { id: (s.earthCommand?.id ?? 0) + 1, type } })),
+  marsPlace: null,
+  marsCommand: null,
+  setMarsPlace: (marsPlace) => set({ marsPlace }),
+  commandMars: (type) => set((s) => ({ marsCommand: { id: (s.marsCommand?.id ?? 0) + 1, type } })),
   playOffsetH: 0,
   playing: false,
   speedHPerS: PLAY_SPEEDS_H_PER_S[1],

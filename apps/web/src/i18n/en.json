@@ -116,7 +116,8 @@
     "solar": "Solar system",
     "moon": "Moon",
     "pole": "South pole",
-    "earth": "Earth"
+    "earth": "Earth",
+    "mars": "Mars"
   },
   "bodies": {
     "sun": "Sun",
@@ -131,7 +132,7 @@
     "neptune": "Neptune"
   },
   "solar": {
-    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth or Moon to fly there.",
+    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there.",
     "flying": "Flying there…",
     "error": "Could not load the planets: {{message}}"
   },
@@ -191,6 +192,48 @@
       "noCity": "No city within {{km}} km.",
       "zoomCountry": "Zoom to the country",
       "sources": "Borders, names and cities: Natural Earth (public domain). Night lights: NASA Black Marble. Details in CREDITS.md."
+    }
+  },
+  "mars": {
+    "hint": "Drag to turn Mars, scroll to zoom, click a place to read its height and name. Heights are stretched, so mountains look taller than they are.",
+    "search": "Find a feature",
+    "searchPlaceholder": "Find a crater, volcano or valley",
+    "searchNone": "No feature called \"{{query}}\".",
+    "realSun": "Day and night",
+    "realSunHint": "Lit by the real Sun for the landing date, as Mars turns.",
+    "names": "Names",
+    "relief": "Relief",
+    "reliefValue": "×{{n}}",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "home": "Whole Mars",
+    "kinds": {
+      "crater": "Crater",
+      "vallis": "Valley",
+      "rima": "Fissure",
+      "mons": "Mountain",
+      "plain": "Plain",
+      "mare": "Dark region"
+    },
+    "panel": {
+      "heading": "Mars",
+      "empty": "Click anywhere on the planet, or search for a feature, to see what is there.",
+      "open": "Open ground",
+      "coords": "Coordinates",
+      "north": "N",
+      "south": "S",
+      "east": "E",
+      "west": "W",
+      "elevation": "Height",
+      "elevationValue": "{{m}} m above the areoid",
+      "elevationPending": "Loading the heights…",
+      "feature": "Feature",
+      "inside": "Inside {{name}}",
+      "near": "{{km}} km from the centre of {{name}}",
+      "nothing": "No named feature within {{km}} km.",
+      "across": "across",
+      "zoomFeature": "Zoom to {{name}}",
+      "sources": "Heights: NASA MGS MOLA, on a grid about 21 km wide, so peaks and floors can read a few hundred metres off. Colour: Solar System Scope map from NASA Viking and MGS images (CC BY 4.0). Names: IAU Gazetteer of Planetary Nomenclature (USGS). Details in CREDITS.md."
     }
   }
 }

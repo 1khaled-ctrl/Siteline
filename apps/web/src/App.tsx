@@ -3,6 +3,7 @@ import { useApp } from './store';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { Controls } from './ui/Controls';
 import { EarthPanel } from './ui/EarthPanel';
+import { MarsPanel } from './ui/MarsPanel';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
 
@@ -23,7 +24,9 @@ export function App() {
           <Controls />
         </div>
         <MoonView />
-        <div className="lg:overflow-y-auto">{view === 'earth' ? <EarthPanel /> : <SiteReport />}</div>
+        <div className="lg:overflow-y-auto">
+          {view === 'earth' ? <EarthPanel /> : view === 'mars' ? <MarsPanel /> : <SiteReport />}
+        </div>
       </main>
     </div>
   );
