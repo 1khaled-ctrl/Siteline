@@ -14,6 +14,8 @@ export interface SolarViewOptions {
   labels: Record<SolarLabelKey, string>;
   /** Bodies that can be flown into; the rest are labelled but not clickable. */
   navigable: ReadonlySet<SolarBodyKey>;
+  /** Colour maps for the bodies that have one; the rest stay a flat colour. */
+  textures?: Partial<Record<SolarBodyKey, string>>;
   onSelect?: (body: SolarBodyKey) => void;
 }
 
@@ -46,6 +48,22 @@ function toScene(km: Vec3, out = new THREE.Vector3()): THREE.Vector3 {
 
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 
+/** A soft white disc that fades out to its edge; each sprite's colour tints it. */
+function glowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext('2d');
+  if (g) {
+    const fade = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    fade.addColorStop(0, 'rgba(255,255,255,1)');
+    fade.addColorStop(0.2, 'rgba(255,255,255,0.45)');
+    fade.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = fade;
+    g.fillRect(0, 0, 128, 128);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
 export class SolarView {
   private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
   private readonly scene = new THREE.Scene();
@@ -55,6 +73,8 @@ export class SolarView {
   private readonly labelLayer = document.createElement('div');
   private readonly labels = new Map<SolarLabelKey, HTMLElement>();
   private readonly orbitLines = new THREE.Group();
+  private readonly glow = glowTexture();
+  private readonly textures: THREE.Texture[] = [this.glow];
   private readonly resize: ResizeObserver;
   private flying = false;
   private frame = 0;
@@ -157,8 +177,9 @@ export class SolarView {
         (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
           m.dispose();
         });
-      }
+      } else if (o instanceof THREE.Sprite) o.material.dispose();
     });
+    for (const texture of this.textures) texture.dispose();
     this.renderer.dispose();
     this.labelLayer.remove();
     this.renderer.domElement.remove();
@@ -174,6 +195,21 @@ export class SolarView {
     const { size, color } = LOOK[key];
     const material = key === 'sun' ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 40, 24), material);
+    const url = key === 'sun' ? undefined : this.opts.textures?.[key];
+    if (url) {
+      new THREE.TextureLoader().load(url, (map) => {
+        map.colorSpace = THREE.SRGBColorSpace;
+        this.textures.push(map);
+        material.map = map;
+        material.color.set(0xffffff);
+        material.needsUpdate = true;
+        this.requestRender();
+      });
+    }
+    // The Sun gets a bright core and a wide faint bloom; each planet a faint halo in its own colour.
+    if (key === 'sun') {
+      mesh.add(this.halo(0xffe2a0, size * 4, 1), this.halo(0xffa040, size * 10, 0.45));
+    } else mesh.add(this.halo(color, size * 3.6, 0.55));
     if (key === 'saturn') {
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(size * 1.35, size * 2.2, 64),
@@ -186,19 +222,34 @@ export class SolarView {
     this.scene.add(mesh);
   }
 
+  private halo(color: number, width: number, opacity: number): THREE.Sprite {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: this.glow,
+        color,
+        opacity,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    sprite.scale.set(width, width, 1);
+    return sprite;
+  }
+
   private addLabel(key: SolarLabelKey): void {
     const go = key !== 'sun' && this.opts.navigable.has(key);
     const el = document.createElement(go ? 'button' : 'span');
     el.textContent = this.opts.labels[key];
+    // Every name sits on a small dark chip; the ones you can fly into are brighter and take the pointer.
     Object.assign(el.style, {
       position: 'absolute',
       transform: 'translate(-50%, 0)',
-      padding: go ? '6px 10px' : '2px 6px',
+      padding: go ? '4px 8px' : '2px 7px',
       font: '500 12px "IBM Plex Sans", system-ui, sans-serif',
-      color: go ? '#05070a' : '#9aa7b4',
-      background: go ? '#5aa9ff' : 'transparent',
-      border: '0',
-      borderRadius: '999px',
+      color: go ? '#e8edf7' : '#8e9ab5',
+      background: 'rgba(8, 13, 26, 0.8)',
+      border: `1px solid ${go ? '#3a4c80' : '#22304f'}`,
+      borderRadius: '6px',
       whiteSpace: 'nowrap',
       pointerEvents: go ? 'auto' : 'none',
       cursor: go ? 'pointer' : 'default',
