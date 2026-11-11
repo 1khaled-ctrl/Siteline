@@ -1,11 +1,27 @@
 import { NEAR_FEATURE_KM } from '@siteline/engine';
-import { useTranslation } from 'react-i18next';
+import type { ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { useApp } from '../store';
 import { panel, smallButton } from './Controls';
 
+const CC_BY = 'https://creativecommons.org/licenses/by/4.0/';
+
+function Ext({ href, children }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink">
+      {children}
+    </a>
+  );
+}
+
 export function MarsPanel() {
   const { t } = useTranslation();
+  // The IAU's descriptor term and its own definition, for example "Mons (Mountain)".
+  const kindLine = (type: string) => {
+    const meaning = t(`mars.kinds.${type.replace(/\s/g, '')}`, { defaultValue: '' });
+    return meaning ? `${type} (${meaning})` : type;
+  };
   const place = useApp((s) => s.marsPlace);
   const commandMars = useApp((s) => s.commandMars);
 
@@ -38,7 +54,7 @@ export function MarsPanel() {
               <dt className="text-quiet">{t('mars.panel.feature')}</dt>
               <dd className="text-end">
                 {place.feature
-                  ? `${t(`mars.kinds.${place.feature.kind}`)} · ${
+                  ? `${kindLine(place.feature.type)} · ${
                       place.inside
                         ? t('mars.panel.inside', { name: place.feature.name })
                         : t('mars.panel.near', {
@@ -65,7 +81,18 @@ export function MarsPanel() {
           </div>
         )}
       </section>
-      <p className="px-1 text-xs text-quiet">{t('mars.panel.sources')}</p>
+      <p className="px-1 text-xs text-quiet">
+        <Trans
+          i18nKey="mars.panel.sources"
+          components={{
+            megdr: <Ext href="https://pds-geosciences.wustl.edu/missions/mgs/megdr.html" />,
+            jaanga: <Ext href="https://github.com/jaanga/mars-heightmaps-128p" />,
+            sss: <Ext href="https://www.solarsystemscope.com/textures/" />,
+            gaz: <Ext href="https://planetarynames.wr.usgs.gov/" />,
+            ccby: <Ext href={CC_BY} />,
+          }}
+        />
+      </p>
     </aside>
   );
 }

@@ -6,21 +6,22 @@ import {
   featureAt,
   type HeightGrid,
   heightAtM,
+  labelStyleOf,
   MARS_RADIUS_KM,
   type MarsFeature,
-  type MarsFeatureRow,
+  type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
 
 export interface MarsAssets {
-  /** Small colour map shown at once. */
-  preview: string;
+  /** Optional small colour map shown while the full one loads. */
+  preview?: string;
   color: string;
   /** East and north slopes in red and green, as on the Moon globe. */
   normal: string;
   /** Elevation in metres as a 16-bit number in red and green (see `decodeHeights`). */
   height: string;
-  /** IAU gazetteer JSON with a `Mars` list of [name, latDeg, lonDeg, diameterKm, kind]. */
+  /** The Mars names file (`MarsNamesJson`) built from the IAU Gazetteer. */
   names: string;
 }
 
@@ -198,7 +199,7 @@ export class MarsView {
     container.appendChild(this.labelLayer);
     for (let i = 0; i < LABEL_POOL; i++) this.pool.push(this.makeLabel());
 
-    this.loadTexture(opts.assets.preview, 'map', 0);
+    if (opts.assets.preview) this.loadTexture(opts.assets.preview, 'map', 0);
     this.loadTexture(opts.assets.color, 'map', 1);
     this.loadTexture(opts.assets.normal, 'slopes', 1);
     void this.loadHeights(opts.assets.height);
@@ -418,9 +419,9 @@ export class MarsView {
 
   private async loadNames(url: string): Promise<void> {
     try {
-      const json = (await (await fetch(url)).json()) as { Mars: MarsFeatureRow[] };
+      const json = (await (await fetch(url)).json()) as MarsNamesJson;
       if (this.disposed) return;
-      this.features = parseMarsFeatures(json.Mars);
+      this.features = parseMarsFeatures(json.features);
       this.featureDirs = this.features.map((f) => dirOf(f.latDeg, f.lonDeg));
       this.opts.onFeatures?.(this.features);
       this.requestRender();
@@ -449,12 +450,13 @@ export class MarsView {
     const s = el.style;
     s.fontStyle = 'normal';
     s.letterSpacing = '0';
-    if (f.kind === 'plain' || f.kind === 'mare') {
+    const style = labelStyleOf(f.type);
+    if (style === 'region') {
       s.font = `400 13px ${FONT}`;
       s.fontStyle = 'italic';
       s.letterSpacing = '.14em';
-    } else if (f.kind === 'mons') s.font = `600 12.5px ${FONT}`;
-    else if (f.kind === 'vallis' || f.kind === 'rima') {
+    } else if (style === 'peak') s.font = `600 12.5px ${FONT}`;
+    else if (style === 'linear') {
       s.font = `400 12px ${FONT}`;
       s.fontStyle = 'italic';
     } else s.font = `500 11.5px ${FONT}`;

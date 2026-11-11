@@ -8,15 +8,17 @@ import {
   featureAt,
   findFeature,
   heightAtM,
+  labelStyleOf,
   MARS_RADIUS_KM,
   type MarsFeatureRow,
+  type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
 
 const rows: MarsFeatureRow[] = [
-  ['Small crater', 10, 20, 20, 'crater'],
-  ['Big plain', 10, 20, 3000, 'plain'],
-  ['Far mons', -40, 100, 600, 'mons'],
+  ['Small crater', 10, 20, 20, 'Crater'],
+  ['Big plain', 10, 20, 3000, 'Planitia'],
+  ['Far mons', -40, 100, 600, 'Mons'],
 ];
 
 describe('named features', () => {
@@ -35,7 +37,7 @@ describe('named features', () => {
   it('falls back to the nearest centre within 250 km and otherwise names nothing', () => {
     // 600 km wide, so its edge is 300 km out: 4 degrees (236 km) south of the centre is inside it.
     expect(featureAt(features, -44, 100)?.inside).toBe(true);
-    const lone = parseMarsFeatures([['Lone crater', 0, 0, 20, 'crater']]);
+    const lone = parseMarsFeatures([['Lone crater', 0, 0, 20, 'Crater']]);
     expect(featureAt(lone, 2, 0)).toMatchObject({ inside: false });
     expect(featureAt(lone, 2, 0)?.distKm).toBeCloseTo((2 * Math.PI * MARS_RADIUS_KM) / 180, 3);
     expect(featureAt(lone, 6, 0)).toBeUndefined();
@@ -108,15 +110,14 @@ function readPngRgb(path: string) {
 }
 
 const imgDir = fileURLToPath(new URL('../../../pipeline/raw/landfall/img/', import.meta.url));
-const dataDir = fileURLToPath(new URL('../../../pipeline/raw/landfall/data/', import.meta.url));
-const haveMars = existsSync(`${imgDir}mars_height.png`) && existsSync(`${dataDir}names.json`);
+const namesPath = fileURLToPath(new URL('../../../pipeline/out/names/mars_names.json', import.meta.url));
+const haveMars = existsSync(`${imgDir}mars_height.png`) && existsSync(namesPath);
 
 describe.skipIf(!haveMars)('the Landfall Mars data', () => {
   const png = haveMars ? readPngRgb(`${imgDir}mars_height.png`) : undefined;
   const grid = png ? decodeHeights(png.rgba, png.width, png.height) : undefined;
-  const names = haveMars
-    ? (JSON.parse(readFileSync(`${dataDir}names.json`, 'utf8')) as { Mars: MarsFeatureRow[] }).Mars
-    : [];
+  const namesFile = haveMars ? (JSON.parse(readFileSync(namesPath, 'utf8')) as MarsNamesJson) : undefined;
+  const names: MarsFeatureRow[] = namesFile?.features ?? [];
 
   it('has MOLA heights that agree with the well-known elevations of Mars', () => {
     if (!grid) throw new Error('no grid');
@@ -147,12 +148,50 @@ describe.skipIf(!haveMars)('the Landfall Mars data', () => {
 
   it('names the landing sites and the big volcano where the gazetteer puts them', () => {
     const features = parseMarsFeatures(names);
-    expect(features.length).toBe(1515);
-    expect(featureAt(features, 18.65, -133.8)?.feature.name).toBe('Olympus Mons');
-    expect(featureAt(features, 18.44, 77.45)?.feature.name).toBe('Jezero');
+    expect(features.length).toBeGreaterThan(2000);
+    // The summit sits inside Hera Patera, a caldera feature; a point on the flank is inside Olympus Mons alone.
+    expect(findFeature(features, 'olympus mons')).toMatchObject({
+      name: 'Olympus Mons',
+      type: 'Mons',
+      diameterKm: 610.13,
+    });
+    expect(featureAt(features, 18.65, -133.8)?.feature.name).toBe('Hera Patera');
+    expect(featureAt(features, 20.65, -133.8)?.feature.name).toBe('Olympus Mons');
+    expect(featureAt(features, 18.44, 77.45)?.feature).toMatchObject({ name: 'Jezero', type: 'Crater' });
     // Curiosity is on the flank of Mount Sharp, the smallest named feature inside Gale crater.
     expect(featureAt(features, -4.59, 137.44)?.feature.name).toBe('Aeolis Mons');
     expect(findFeature(features, 'gale')?.name).toBe('Gale');
     expect(findFeature(features, 'valles')?.name).toBe('Valles Marineris');
+  });
+
+  it('holds only names the IAU has adopted, from a file that says it is public domain', () => {
+    expect(namesFile?.source.useConstraints).toMatch(/public domain/i);
+    expect(names.some(([name]) => name.startsWith('['))).toBe(false);
+    // The Gazetteer gives no size for a few old features (albedo regions mostly), and 0 stands for that.
+    expect(names.filter((n) => n[3] === 0).length).toBeLessThan(names.length / 10);
+    // Every feature has a plausible place on the planet and a descriptor term we know how to draw.
+    for (const [, latDeg, lonDeg, diameterKm, type] of names) {
+      expect(Math.abs(latDeg)).toBeLessThanOrEqual(90);
+      expect(Math.abs(lonDeg)).toBeLessThanOrEqual(180);
+      expect(diameterKm).toBeGreaterThanOrEqual(0);
+      expect(['region', 'peak', 'linear', 'crater']).toContain(labelStyleOf(type));
+    }
+  });
+});
+
+describe('searching names', () => {
+  it('ignores accents and case', () => {
+    const features = parseMarsFeatures([
+      ['Köppen', 1, 1, 10, 'Crater'],
+      ['Hephaestus Rupēs', 2, 2, 100, 'Rupes'],
+    ]);
+    expect(findFeature(features, 'koppen')?.name).toBe('Köppen');
+    expect(findFeature(features, 'HEPHAESTUS RUPES')?.name).toBe('Hephaestus Rupēs');
+  });
+});
+
+describe('label styles', () => {
+  it('give regions, mountains, long features and craters their own look', () => {
+    expect(['Planitia', 'Mons', 'Vallis', 'Crater'].map(labelStyleOf)).toEqual(['region', 'peak', 'linear', 'crater']);
   });
 });

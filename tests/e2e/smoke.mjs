@@ -34,6 +34,8 @@ if (
   (await page.getByText('Play a lunar day').count())
 )
   throw new Error('Moon controls are showing on the Earth view');
+for (const name of ['Natural Earth', 'Blue Marble: Next Generation', 'Black Marble 2016'])
+  await page.getByRole('link', { name }).first().waitFor({ timeout: 5_000 });
 await page.waitForTimeout(1500);
 if (shots) await page.screenshot({ path: `${shots}-earth.png` });
 await page.getByRole('combobox', { name: 'Find a country' }).fill('Lebanon');
@@ -68,6 +70,8 @@ if (
   (await page.getByText('Play a lunar day').count())
 )
   throw new Error('Moon controls are showing on the Mars view');
+for (const name of ['Solar System Scope', 'MEGDR', 'IAU Gazetteer of Planetary Nomenclature'])
+  await page.getByRole('link', { name }).first().waitFor({ timeout: 5_000 });
 await page.waitForTimeout(3500);
 if (shots) await page.screenshot({ path: `${shots}-mars.png` });
 await page.getByRole('combobox', { name: 'Find a feature' }).fill('Olympus Mons');

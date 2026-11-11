@@ -3,30 +3,41 @@ import { greatCircleKm } from './earthData';
 /** Volumetric mean radius of Mars (IAU), the sphere the globe is drawn on. MOLA heights are measured from the areoid. */
 export const MARS_RADIUS_KM = 3389.5;
 
-export type MarsFeatureKind = 'crater' | 'vallis' | 'rima' | 'mons' | 'plain' | 'mare';
-
 /** A named feature from the IAU Gazetteer of Planetary Nomenclature; longitude is east-positive. */
 export interface MarsFeature {
   name: string;
   latDeg: number;
   lonDeg: number;
   diameterKm: number;
-  kind: MarsFeatureKind;
+  /** The IAU descriptor term: Crater, Mons, Vallis, Planitia, Albedo Feature and so on. */
+  type: string;
 }
 
-export type MarsFeatureRow = [name: string, latDeg: number, lonDeg: number, diameterKm: number, kind: string];
+export type MarsFeatureRow = [name: string, latDeg: number, lonDeg: number, diameterKm: number, type: string];
+
+/** `pipeline/out/names/mars_names.json`, built by `siteline_pipeline.mars_names` from USGS's own download. */
+export interface MarsNamesJson {
+  format: 'siteline-mars-names-1';
+  source: { name: string; url: string; accessedUtc: string; sha256: string; useConstraints: string; citation: string };
+  columns: ['name', 'latDeg', 'lonDeg', 'diameterKm', 'type'];
+  features: MarsFeatureRow[];
+}
 
 /** Largest first, so labels can be drawn in order of importance and a search finds the famous one. */
 export function parseMarsFeatures(rows: readonly MarsFeatureRow[]): MarsFeature[] {
   return rows
-    .map(([name, latDeg, lonDeg, diameterKm, kind]) => ({
-      name,
-      latDeg,
-      lonDeg,
-      diameterKm,
-      kind: kind as MarsFeatureKind,
-    }))
+    .map(([name, latDeg, lonDeg, diameterKm, type]) => ({ name, latDeg, lonDeg, diameterKm, type }))
     .sort((a, b) => b.diameterKm - a.diameterKm);
+}
+
+export type MarsLabelStyle = 'region' | 'peak' | 'linear' | 'crater';
+
+/** How a label is drawn: wide italic for regions, bold for mountains, italic for long features, plain for craters. */
+export function labelStyleOf(type: string): MarsLabelStyle {
+  if (['Terra', 'Planitia', 'Planum', 'Vastitas', 'Albedo Feature', 'Palus', 'Lingula'].includes(type)) return 'region';
+  if (['Mons', 'Tholus', 'Patera', 'Fluctus'].includes(type)) return 'peak';
+  if (type === 'Crater' || type === 'Collis') return 'crater';
+  return 'linear';
 }
 
 /** Elevation in metres on an equirectangular grid whose corner pixels sit on the edges: −180° to 180°, 90° to −90°. */
@@ -81,13 +92,16 @@ export function featureAt(
   return inside ?? near;
 }
 
+/** Lower case, without accents, so "Koppen" finds "Köppen". */
+const plain = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /** An exact name first, then names that start with the text, then names that contain it; bigger features win. */
 export function findFeature(features: readonly MarsFeature[], query: string): MarsFeature | undefined {
-  const q = query.trim().toLowerCase();
+  const q = plain(query.trim());
   if (!q) return undefined;
   return (
-    features.find((f) => f.name.toLowerCase() === q) ??
-    features.find((f) => f.name.toLowerCase().startsWith(q)) ??
-    features.find((f) => f.name.toLowerCase().includes(q))
+    features.find((f) => plain(f.name) === q) ??
+    features.find((f) => plain(f.name).startsWith(q)) ??
+    features.find((f) => plain(f.name).includes(q))
   );
 }

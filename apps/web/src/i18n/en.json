@@ -196,7 +196,7 @@
       "population": "Population {{count}}",
       "noCity": "No city within {{km}} km.",
       "zoomCountry": "Zoom to the country",
-      "sources": "Borders, names and cities: Natural Earth (public domain). Night lights: NASA Black Marble. Details in CREDITS.md."
+      "sources": "Borders, names and cities: <ne>Natural Earth</ne> (public domain). Imagery: <bmng>Blue Marble: Next Generation</bmng>, NASA Earth Observatory (Reto Stöckli), resampled; the map style recolours its land and fills the sea. Night lights: <bm>Black Marble 2016</bm>, NASA Earth Observatory images by Joshua Stevens, using Suomi NPP VIIRS data from Miguel Román, NASA GSFC, resampled. Details in CREDITS.md."
     }
   },
   "mars": {
@@ -213,12 +213,35 @@
     "zoomOut": "Zoom out",
     "home": "Whole Mars",
     "kinds": {
-      "crater": "Crater",
-      "vallis": "Valley",
-      "rima": "Fissure",
-      "mons": "Mountain",
-      "plain": "Plain",
-      "mare": "Dark region"
+      "AlbedoFeature": "Geographic area distinguished by amount of reflected light",
+      "Catena": "Chain of craters",
+      "Cavus": "Hollows, irregular steep-sided depressions usually in arrays or clusters",
+      "Chaos": "Distinctive area of broken terrain",
+      "Chasma": "A deep, elongated, steep-sided depression",
+      "Collis": "Small hills or knobs",
+      "Crater": "A circular depression",
+      "Dorsum": "Ridge",
+      "Fluctus": "Flow terrain",
+      "Fossa": "Long, narrow depression",
+      "Labes": "Landslide",
+      "Labyrinthus": "Complex of intersecting valleys or ridges.",
+      "Lingula": "Extension of plateau having rounded lobate or tongue-like boundaries",
+      "Macula": "Dark spot, may be irregular",
+      "Mensa": "A flat-topped prominence with cliff-like edges",
+      "Mons": "Mountain",
+      "Palus": "\"Swamp\"; small plain",
+      "Patera": "An irregular crater, or a complex one with scalloped edges",
+      "Planitia": "Low plain",
+      "Planum": "Plateau or high plain",
+      "Rupes": "Scarp",
+      "Scopulus": "Lobate or irregular scarp",
+      "Serpens": "Sinuous feature with segments of positive and negative relief along its length",
+      "Sulcus": "Subparallel furrows and ridges",
+      "Terra": "Extensive land mass",
+      "Tholus": "Small domical mountain or hill",
+      "Unda": "Dunes",
+      "Vallis": "Valley",
+      "Vastitas": "Extensive plain"
     },
     "panel": {
       "heading": "Mars",
@@ -238,7 +261,7 @@
       "nothing": "No named feature within {{km}} km.",
       "across": "across",
       "zoomFeature": "Zoom to {{name}}",
-      "sources": "Heights: NASA MGS MOLA, on a grid about 21 km wide, so peaks and floors can read a few hundred metres off. Colour: Solar System Scope map from NASA Viking and MGS images (CC BY 4.0). Names: IAU Gazetteer of Planetary Nomenclature (USGS). Details in CREDITS.md."
+      "sources": "Heights: NASA MGS MOLA (<megdr>MEGDR</megdr>, made by the MOLA Science Team and archived by the PDS Geosciences Node at Washington University in St. Louis) through <jaanga>Jaanga’s height-map tiles</jaanga>, © 2015 Jaanga authors, <ccby>CC BY 4.0</ccby>, resampled to a coarser grid (about 21 km), so peaks and floors can read a few hundred metres off. Slope shading is computed from these heights, so it has no finer detail than they do. Colour: <sss>Solar System Scope</sss> Mars map, <ccby>CC BY 4.0</ccby>, based on NASA elevation and imagery data and recompressed; the site notes that unmapped gaps in its maps are filled with fictional terrain. Names and feature types: <gaz>IAU Gazetteer of Planetary Nomenclature</gaz> (USGS), public domain. Details in CREDITS.md."
     }
   }
 }

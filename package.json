@@ -13,7 +13,8 @@
     "e2e": "node tests/e2e/smoke.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
-    "ephemeris": "cd pipeline && uv run python -m siteline_pipeline.ephemeris"
+    "ephemeris": "cd pipeline && uv run python -m siteline_pipeline.ephemeris",
+    "mars-data": "cd pipeline && uv run python -m siteline_pipeline.mars_names && uv run python -m siteline_pipeline.mars_normal"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

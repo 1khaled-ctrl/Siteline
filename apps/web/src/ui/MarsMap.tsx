@@ -6,11 +6,11 @@ import { useApp } from '../store';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const MARS_ASSETS = {
-  preview: `${ASSETS}/img/mars.jpg`,
   color: `${ASSETS}/img/mars_color.jpg`,
-  normal: `${ASSETS}/img/mars_normal.jpg`,
   height: `${ASSETS}/img/mars_height.png`,
-  names: `${ASSETS}/data/names.json`,
+  // Built from the height map and from USGS's Gazetteer download by `pnpm mars-data` (see CREDITS.md).
+  normal: `${URLS.data}/mars/mars_normal.png`,
+  names: `${URLS.data}/names/mars_names.json`,
 };
 const DEFAULT_RELIEF = 3;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -90,7 +90,10 @@ export function MarsMap() {
     const f = findFeature(features, query);
     setNotFound(!f);
     if (!globe || !f) return;
-    useApp.getState().setMarsPlace(globe.describe(f.latDeg, f.lonDeg));
+    // The feature that was asked for, not whichever smaller one sits at its centre (Hera Patera is inside Olympus Mons).
+    useApp
+      .getState()
+      .setMarsPlace({ ...globe.describe(f.latDeg, f.lonDeg), feature: f, featureDistKm: 0, inside: true });
     void globe.flyToFeature(f, ms(1400));
   };
 

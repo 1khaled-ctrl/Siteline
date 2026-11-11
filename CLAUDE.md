@@ -68,3 +68,4 @@ pnpm 12 runs through corepack, and the pipeline uses uv with Python 3.13.
 - `corepack pnpm test`, `corepack pnpm typecheck` and `corepack pnpm lint` run Vitest, tsc and Biome. The tests also rewrite `tests/reference/validation.json`, which the app's "How we checked it" panel shows.
 - `corepack pnpm e2e` runs the Playwright smoke test against a running dev server (run `corepack pnpm exec playwright install chromium` once).
 - `corepack pnpm ephemeris` downloads the SPICE kernels into `pipeline/raw/spice`, writes `pipeline/out/ephemeris/moon_sun_earth.bin`, and regenerates `tests/reference/sun_earth_golden.json`.
+- `corepack pnpm mars-data` downloads USGS's Mars nomenclature into `pipeline/raw/usgs`, writes the names to `pipeline/out/names/mars_names.json`, and computes the globe's slope map `pipeline/out/mars/mars_normal.png` from the MOLA height map. Run it once before the Mars view.

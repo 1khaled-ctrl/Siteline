@@ -1,8 +1,17 @@
 import { PICK_CITY_KM } from '@siteline/engine';
-import { useTranslation } from 'react-i18next';
+import type { ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { useApp } from '../store';
 import { panel, smallButton } from './Controls';
+
+function Ext({ href, children }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink">
+      {children}
+    </a>
+  );
+}
 
 export function EarthPanel() {
   const { t } = useTranslation();
@@ -52,7 +61,16 @@ export function EarthPanel() {
           </div>
         )}
       </section>
-      <p className="px-1 text-xs text-quiet">{t('earth.panel.sources')}</p>
+      <p className="px-1 text-xs text-quiet">
+        <Trans
+          i18nKey="earth.panel.sources"
+          components={{
+            ne: <Ext href="https://www.naturalearthdata.com/" />,
+            bmng: <Ext href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/" />,
+            bm: <Ext href="https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/" />,
+          }}
+        />
+      </p>
     </aside>
   );
 }
