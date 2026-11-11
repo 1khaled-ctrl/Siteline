@@ -11,8 +11,13 @@ import {
   horizonFromDem,
   mapsAtSite,
   mapsFromBytes,
+  PLANET_NAMES,
+  type PlanetName,
+  type PlanetTable,
   type PolarMaps,
   parseEphemeris,
+  parsePlanets,
+  type SolarBodyKey,
   stayTest,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
@@ -86,6 +91,11 @@ const loadEphemeris = (base: string): Promise<EphemerisTable> =>
     parseEphemeris(await (await fetchOk(`${base}/ephemeris/moon_sun_earth.bin`)).arrayBuffer()),
   );
 
+const loadPlanets = (base: string): Promise<PlanetTable> =>
+  memo(`planets:${base}`, async () =>
+    parsePlanets(await (await fetchOk(`${base}/ephemeris/planets.bin`)).arrayBuffer()),
+  );
+
 const loadDem = (url: string): Promise<Dem> =>
   memo(`dem:${url}`, async () => {
     const bytes = await fetchChecked(url);
@@ -125,6 +135,18 @@ const api = {
   async sunKm(tUtcMs: number, dataUrl: string): Promise<readonly [number, number, number]> {
     const table = await loadEphemeris(dataUrl);
     return table.positionKm('sun', Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs)));
+  },
+
+  /** One full orbit per planet, in km, for drawing the solar-system overview. */
+  async planetOrbits(dataUrl: string): Promise<Record<PlanetName, Float32Array>> {
+    const table = await loadPlanets(dataUrl);
+    return Object.fromEntries(PLANET_NAMES.map((p) => [p, table.orbitKm(p)])) as Record<PlanetName, Float32Array>;
+  },
+
+  /** Planet positions from the Sun and the Moon's from the Earth (km, ECLIPJ2000), clamped to the table. */
+  async planetsAt(tUtcMs: number, dataUrl: string): Promise<Record<SolarBodyKey, readonly [number, number, number]>> {
+    const table = await loadPlanets(dataUrl);
+    return table.snapshot(Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs)));
   },
 
   async stay(query: StayQuery, urls: DataUrls): Promise<StayResponse> {

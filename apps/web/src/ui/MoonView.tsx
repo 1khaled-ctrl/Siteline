@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useApp } from '../store';
 import { GlobeMap } from './GlobeMap';
 import { PoleMap } from './PoleMap';
+import { SolarMap } from './SolarMap';
 
 const LOOP_HOURS = 30 * 24;
 
@@ -27,5 +28,6 @@ function usePlayClock() {
 export function MoonView() {
   const view = useApp((s) => s.view);
   usePlayClock();
+  if (view === 'solar') return <SolarMap />;
   return view === 'globe' ? <GlobeMap /> : <PoleMap />;
 }

@@ -5,6 +5,7 @@ export * from './ephemeris';
 export * from './frames';
 export * from './horizon';
 export * from './maps';
+export * from './planets';
 export * from './slope';
 export * from './stay';
 export * from './vec';

@@ -4,7 +4,7 @@
   "worstDeg": 0.00013479352802476619,
   "toleranceDeg": 0.001,
   "reference": "SPICE spkcpo, MOON_ME, LT+S, from the site",
-  "recordedUtc": "2026-11-10T21:13:50.767Z"
+  "recordedUtc": "2026-11-11T14:50:51.774Z"
  },
  "sunlight": {
   "terrain": "LOLA LDEM_75S_240M at 1.2 km per pixel",
@@ -33,6 +33,16 @@
     "oursPct": 83.91295737982092
    }
   ],
-  "recordedUtc": "2026-11-10T21:13:50.952Z"
+  "recordedUtc": "2026-11-11T14:50:51.988Z"
+ },
+ "planets": {
+  "cases": 40,
+  "bodies": 9,
+  "worstDeg": 0.0021117562595743874,
+  "worstPlanetRelativeError": 0.000268799334916646,
+  "worstMoonRelativeError": 0.002029956786136809,
+  "toleranceDeg": 0.01,
+  "reference": "SPICE spkpos, ECLIPJ2000, geometric; Mars and the outer planets are system barycentres",
+  "recordedUtc": "2026-11-11T14:48:56.573Z"
  }
 }

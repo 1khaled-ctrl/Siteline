@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
-export type MoonView = 'globe' | 'pole';
+/** Where the camera is: the whole solar system, the Moon as a globe, or the Moon's south pole. */
+export type MoonView = 'solar' | 'globe' | 'pole';
+export const VIEWS: MoonView[] = ['solar', 'globe', 'pole'];
 export type Layer = 'none' | 'sun' | 'earth' | 'shadow';
 export const LAYERS: Layer[] = ['none', 'sun', 'earth', 'shadow'];
 export const MAX_PINS = 4;
@@ -39,7 +41,7 @@ const DEFAULTS: View = {
   slipDays: 0,
   latDeg: -90,
   lonDeg: 0,
-  view: 'globe',
+  view: 'solar',
   layer: 'none',
   pins: [],
 };
@@ -68,7 +70,7 @@ function clean(patch: Partial<View>): Partial<View> {
   }
   if (patch.latDeg !== undefined && Number.isFinite(patch.latDeg)) out.latDeg = clamp(patch.latDeg, -90, 90);
   if (patch.lonDeg !== undefined && Number.isFinite(patch.lonDeg)) out.lonDeg = wrapLon(patch.lonDeg);
-  if (patch.view === 'globe' || patch.view === 'pole') out.view = patch.view;
+  if (patch.view && VIEWS.includes(patch.view)) out.view = patch.view;
   if (patch.layer && LAYERS.includes(patch.layer)) out.layer = patch.layer;
   if (Array.isArray(patch.pins)) {
     out.pins = patch.pins.map(cleanPin).filter((p): p is Pin => p !== undefined);

@@ -23,7 +23,7 @@ MOON_RADIUS_KM = 1737.4
 
 
 def utc_ms(iso: str) -> int:
-    return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+    return int(datetime.fromisoformat(iso).timestamp() * 1000)
 
 
 def et_at(t_utc_ms: int) -> float:
@@ -91,6 +91,83 @@ def build_golden(kernels: list[str], n_sites: int = 25, n_dates: int = 40, seed:
     return len(cases)
 
 
+# ---- Solar-system overview: the eight planets (Sun-centred) and the Moon (Earth-centred) in ECLIPJ2000 ----
+PLANETS_PATH = TABLE_PATH.with_name("planets.bin")
+PLANETS_GOLDEN_PATH = REPO / "tests" / "reference" / "planets_golden.json"
+PLANETS_FRAME = "ECLIPJ2000"
+# de440s has Mercury, Venus and Earth as bodies, and Mars and the outer planets only as system barycentres.
+PLANET_TARGETS = {
+    "mercury": "MERCURY",
+    "venus": "VENUS",
+    "earth": "EARTH",
+    "mars": "MARS BARYCENTER",
+    "jupiter": "JUPITER BARYCENTER",
+    "saturn": "SATURN BARYCENTER",
+    "uranus": "URANUS BARYCENTER",
+    "neptune": "NEPTUNE BARYCENTER",
+}
+PLANET_PERIODS_DAYS = [87.97, 224.70, 365.26, 686.98, 4332.59, 10759.22, 30688.5, 60182.0]
+PLANET_STEP_MS = 12 * HOUR_MS
+ORBIT_POINTS = 180
+ORBIT_CENTRE_UTC = "2031-01-01T00:00:00Z"
+
+
+def planet_positions(utc_ms_list: list[int]) -> np.ndarray:
+    """Shape (len, 9, 3) in km: eight planets from the Sun, then the Moon from the Earth."""
+    ets = [et_at(t) for t in utc_ms_list]
+    parts = [np.asarray(sp.spkpos(target, ets, PLANETS_FRAME, "NONE", "SUN")[0]) for target in PLANET_TARGETS.values()]
+    parts.append(np.asarray(sp.spkpos("MOON", ets, PLANETS_FRAME, "NONE", "EARTH")[0]))
+    return np.stack(parts, axis=1)
+
+
+def build_planets(kernels: list[str]) -> dict:
+    t0 = utc_ms(START_UTC)
+    count = (utc_ms(END_UTC) - t0) // PLANET_STEP_MS + 1
+    samples = planet_positions([t0 + k * PLANET_STEP_MS for k in range(count)]).astype("<f4")
+    # One full orbit of each planet, centred on the middle of the table so Neptune stays inside de440s (to 2150).
+    et_mid = et_at(utc_ms(ORBIT_CENTRE_UTC))
+    orbits = []
+    for target, period in zip(PLANET_TARGETS.values(), PLANET_PERIODS_DAYS, strict=True):
+        ets = (et_mid + (np.arange(ORBIT_POINTS) / ORBIT_POINTS - 0.5) * period * 86400).tolist()
+        orbits.append(np.asarray(sp.spkpos(target, ets, PLANETS_FRAME, "NONE", "SUN")[0]))
+    data = samples.tobytes() + np.stack(orbits).astype("<f4").tobytes()
+    header = {
+        "format": "siteline-planets-1",
+        "frame": PLANETS_FRAME,
+        "centre": "SUN (the Moon is relative to the Earth)",
+        "abcorr": "NONE",
+        "bodies": [*PLANET_TARGETS, "moon"],
+        "units": "km",
+        "startUtc": START_UTC,
+        "startUtcMs": t0,
+        "stepMs": PLANET_STEP_MS,
+        "count": count,
+        "orbitPoints": ORBIT_POINTS,
+        "orbitPeriodsDays": PLANET_PERIODS_DAYS,
+        "kernels": kernels,
+        "dataSha256": hashlib.sha256(data).hexdigest(),
+    }
+    head = json.dumps(header, separators=(",", ":")).encode()
+    pad = b" " * ((-(4 + len(head))) % 4)
+    PLANETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PLANETS_PATH.write_bytes(struct.pack("<I", len(head)) + head + pad + data)
+    return header
+
+
+def build_planets_golden(kernels: list[str], n_dates: int = 40, seed: int = 4242) -> int:
+    rng = np.random.default_rng(seed)
+    times = np.sort(rng.integers(utc_ms(START_UTC), utc_ms(END_UTC) - HOUR_MS, n_dates)) // 1000 * 1000
+    positions = planet_positions([int(t) for t in times])
+    names = [*PLANET_TARGETS, "moon"]
+    cases = [
+        {"tUtcMs": int(t), "positionsKm": {n: [float(v) for v in positions[i, j]] for j, n in enumerate(names)}}
+        for i, t in enumerate(times)
+    ]
+    meta = {"frame": PLANETS_FRAME, "abcorr": "NONE", "targets": PLANET_TARGETS, "kernels": kernels, "seed": seed}
+    PLANETS_GOLDEN_PATH.write_text(json.dumps({"generated": meta, "cases": cases}, indent=1) + "\n")
+    return len(cases)
+
+
 def main() -> None:
     kernels = load_kernels()
     if sp.namfrm(FRAME) == 0:
@@ -99,6 +176,9 @@ def main() -> None:
     size_mb = TABLE_PATH.stat().st_size / 1e6
     print(f"table: {header['count']} hourly samples, {size_mb:.1f} MB -> {TABLE_PATH}")
     print(f"golden: {build_golden(kernels)} cases -> {GOLDEN_PATH}")
+    planets = build_planets(kernels)
+    print(f"planets: {planets['count']} samples, {PLANETS_PATH.stat().st_size / 1e6:.1f} MB -> {PLANETS_PATH}")
+    print(f"planets golden: {build_planets_golden(kernels)} cases -> {PLANETS_GOLDEN_PATH}")
 
 
 if __name__ == "__main__":

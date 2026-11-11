@@ -99,6 +99,24 @@
   },
   "timeline": { "heading": "Next 30 days", "sun": "Sun visible", "earth": "Earth visible" },
   "regions": { "heading": "NASA's Artemis regions" },
+  "crumbs": { "label": "Where you are", "solar": "Solar system", "moon": "Moon", "pole": "South pole" },
+  "bodies": {
+    "sun": "Sun",
+    "mercury": "Mercury",
+    "venus": "Venus",
+    "earth": "Earth",
+    "moon": "Moon",
+    "mars": "Mars",
+    "jupiter": "Jupiter",
+    "saturn": "Saturn",
+    "uranus": "Uranus",
+    "neptune": "Neptune"
+  },
+  "solar": {
+    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Moon to fly there.",
+    "flying": "Flying to the Moon…",
+    "error": "Could not load the planets: {{message}}"
+  },
   "globe": {
     "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
     "flyToPole": "Fly to the south pole",
