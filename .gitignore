@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+*.local
+.env
+.env.*
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Pipeline inputs and outputs live on R2, never in git
+pipeline/raw/
+pipeline/out/

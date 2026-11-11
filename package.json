@@ -1,0 +1,25 @@
+{
+  "name": "siteline",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @siteline/web dev",
+    "build": "pnpm --filter @siteline/web build",
+    "test": "vitest run",
+    "e2e": "node tests/e2e/smoke.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
+    "ephemeris": "cd pipeline && uv run python -m siteline_pipeline.ephemeris"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "@types/node": "24.19.2",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "note": "Extracted from the Landfall concept demo (4 Nov 2026); verify against the cited sources before relying on a value. Centres per nasanow.org (NASA, Oct 2024).",
+  "regions": [
+    {
+      "name": "Peak near Cabeus B",
+      "lat": -83.6,
+      "lon": -68.7,
+      "sizeKm": 11
+    },
+    {
+      "name": "Haworth",
+      "lat": -86.8,
+      "lon": -22.8,
+      "sizeKm": 17
+    },
+    {
+      "name": "Malapert Massif",
+      "lat": -86,
+      "lon": -0.2,
+      "sizeKm": 12
+    },
+    {
+      "name": "Mons Mouton Plateau",
+      "lat": -84.3,
+      "lon": 30.6,
+      "sizeKm": 38
+    },
+    {
+      "name": "Mons Mouton",
+      "lat": -85.4,
+      "lon": 31.7,
+      "sizeKm": 9
+    },
+    {
+      "name": "Nobile Rim 1",
+      "lat": -85.4,
+      "lon": 37.3,
+      "sizeKm": 11
+    },
+    {
+      "name": "Nobile Rim 2",
+      "lat": -84,
+      "lon": 58.8,
+      "sizeKm": 11
+    },
+    {
+      "name": "de Gerlache Rim 2",
+      "lat": -88.2,
+      "lon": -64.6,
+      "sizeKm": 11
+    },
+    {
+      "name": "Slater Plain",
+      "lat": -87.2,
+      "lon": 125.5,
+      "sizeKm": 11
+    }
+  ]
+}

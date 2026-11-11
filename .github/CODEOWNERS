@@ -1,0 +1,23 @@
+# Replace each placeholder with the reviewer's GitHub username before the first commit.
+# Placeholders contain "_", which GitHub usernames can't, so none of them can match a real person.
+# The last matching line wins, so general paths come first and specific paths last.
+
+*                                        @QUALITY_REVIEWER
+
+/packages/engine/                        @WORLD_REVIEWER
+/packages/physics/orbits/                @ORBITS_REVIEWER
+/packages/physics/light/                 @LIGHT_REVIEWER
+/packages/data-client/                   @DATA_REVIEWER
+/packages/contracts/                     @QUALITY_REVIEWER
+
+/apps/web/                               @UI_REVIEWER
+/apps/api/                               @LIGHT_REVIEWER
+/apps/copilot-worker/                    @QUALITY_REVIEWER
+
+/pipeline/                               @DATA_REVIEWER
+/pipeline/siteline_pipeline/ephemeris.py @ORBITS_REVIEWER
+/pipeline/siteline_pipeline/horizon.py   @LIGHT_REVIEWER
+/data/                                   @DATA_REVIEWER
+
+# Every role adds its datasets to CREDITS.md in the same PR, so it has no single owner.
+/CREDITS.md

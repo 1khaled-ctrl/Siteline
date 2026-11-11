@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-space: #05070a;
+  --color-panel: #10141c;
+  --color-ink: #e8edf2;
+  --color-quiet: #9aa7b4;
+  --color-accent: #5aa9ff;
+  --color-pass: #3ccf7f;
+  --color-fail: #ff5c5c;
+  --color-warn: #ffb547;
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+}
+
+body {
+  background: var(--color-space);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.fade-in {
+  animation: fade-in 700ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in {
+    animation: none;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

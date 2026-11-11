@@ -1,0 +1,113 @@
+{
+  "app": { "tagline": "Moon south-pole landing check" },
+  "site": {
+    "heading": "Landing site",
+    "lat": "Latitude (°)",
+    "lon": "Longitude (° east)",
+    "hint": "South pole: −90. NASA's Artemis zone is south of −84."
+  },
+  "time": {
+    "landing": "Landing date (UTC)",
+    "slip": "Launch slip",
+    "slipDays_one": "{{count}} day",
+    "slipDays_other": "{{count}} days",
+    "stay": "Stay: {{days}} days from landing",
+    "play": "▶ Play a lunar day",
+    "pause": "❚❚ Pause",
+    "reset": "Back to landing",
+    "speed": "Play speed",
+    "speedOption": "{{hours}} h per second",
+    "lightingLanding": "The 3D view is lit for the landing time.",
+    "lightingAt": "The 3D view is lit for {{days}} days after landing."
+  },
+  "compare": {
+    "heading_one": "{{count}} pinned site",
+    "heading_other": "{{count}} pinned sites",
+    "site": "Site",
+    "sun": "Least Sun",
+    "earth": "Earth up",
+    "verdict": "Stay",
+    "unpin": "Unpin"
+  },
+  "best": {
+    "button": "Best spot",
+    "find": "Find the best spots in {{region}}",
+    "sun": "Sun ≥ {{pct}}%",
+    "none": "No spots inside the loaded terrain."
+  },
+  "layers": {
+    "heading": "Map layer",
+    "none": "Sunlight now",
+    "sun": "Long-term Sun",
+    "earth": "Earth in view",
+    "shadow": "Never lit",
+    "sunLegend": "Share of time the Sun is up, averaged over 19 years at 2.4 km. Dark blue 0% to yellow 92%.",
+    "earthLegend": "Share of time Earth is above the horizon, averaged over 19 years at 2.4 km. Dark blue 0% to yellow 100%.",
+    "shadowLegend": "Blue ground never sees the Sun over 19 years, where ice can survive."
+  },
+  "checks": {
+    "heading": "How we checked it",
+    "spice": "Sun and Earth directions match NASA's SPICE toolkit at {{cases}} site-and-date cases: worst difference {{worst}} arcseconds, limit {{tol}}.",
+    "sunlight": "Long-term sunlight on {{terrain}} against published values (limit {{tol}} points):",
+    "point": "Point",
+    "published": "Published",
+    "ours": "SiteLine",
+    "ridgeNote": "△ Point A sits on a ridge narrower than one terrain pixel; finer terrain should close that gap.",
+    "recorded": "Recorded by the test suite on {{date}}."
+  },
+  "report": {
+    "heading": "Site report",
+    "landing": "Landing {{date}}",
+    "verdict": { "pass": "Pass", "fail": "Fail", "undecided": "Not decided yet" },
+    "sun": "Sun up for the whole stay",
+    "earth": "Earth in view (direct-to-Earth radio)",
+    "slope": "Landing slope under 10°",
+    "zone": "Within 6° of the south pole",
+    "yes": "yes",
+    "no": "no",
+    "unknown": "unknown",
+    "noTerrain": "no terrain loaded yet",
+    "needsFinerTerrain": "needs terrain finer than 100 m",
+    "groundHeight": "Ground height",
+    "longTermSun": "Sunlight over 19 years",
+    "longTermEarth": "Earth in view over 19 years",
+    "shadowed": "Never sunlit",
+    "pin": "Pin to compare (up to {{max}})",
+    "unpin": "Unpin",
+    "sunMin": "Least of the Sun visible",
+    "earthPct": "Time Earth is in view",
+    "events": "Next events",
+    "sunset": "Sunset",
+    "sunrise": "Sunrise",
+    "earthset": "Earthset",
+    "earthrise": "Earthrise",
+    "none": "none in 30 days",
+    "terrainCoarse": "Terrain: NASA LOLA at {{km}} km per pixel. Narrow ridges and small hills are smoothed out, so treat this as a first pass.",
+    "flatWarning": "Terrain is not loaded, so the horizon is treated as flat. Hills can hide the Sun and Earth earlier than shown here.",
+    "offTerrain": "This spot is outside the loaded terrain, so the horizon is treated as flat.",
+    "sources": "Sources",
+    "loading": "Checking the site…",
+    "error": "Could not run the check: {{message}}"
+  },
+  "reason": {
+    "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",
+    "EARTH_BELOW_HORIZON": "Earth drops below the horizon on <d>{{at}}</d>.",
+    "SLOPE_TOO_STEEP": "The ground is too steep: <d>{{slope}}°</d> over 100 m.",
+    "OUTSIDE_ZONE": "This spot is more than 6° from the pole, outside NASA's Artemis zone.",
+    "NO_DATA_ephemeris": "No Sun and Earth data for these dates. SiteLine covers 2026 to 2035.",
+    "NO_DATA_slope": "The 100 m landing-slope rule needs terrain finer than what is loaded."
+  },
+  "timeline": { "heading": "Next 30 days", "sun": "Sun visible", "earth": "Earth visible" },
+  "regions": { "heading": "NASA's Artemis regions" },
+  "globe": {
+    "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
+    "flyToPole": "Fly to the south pole",
+    "flying": "Flying to the south pole…"
+  },
+  "map": {
+    "backToGlobe": "Whole Moon",
+    "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date.",
+    "loading": "Loading south-pole terrain…",
+    "error": "Could not load the terrain: {{message}}"
+  }
+}

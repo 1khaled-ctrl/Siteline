@@ -1,0 +1,31 @@
+{
+  "name": "@siteline/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@siteline/contracts": "workspace:*",
+    "@siteline/engine": "workspace:*",
+    "@siteline/physics": "workspace:*",
+    "comlink": "4.4.2",
+    "i18next": "26.7.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-i18next": "17.1.12",
+    "uplot": "1.6.32",
+    "zustand": "5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "tailwindcss": "4.3.5",
+    "vite": "8.3.6"
+  }
+}

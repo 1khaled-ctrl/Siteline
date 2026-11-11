@@ -1,0 +1,38 @@
+{
+ "spice": {
+  "cases": 1000,
+  "worstDeg": 0.00013479352802476619,
+  "toleranceDeg": 0.001,
+  "reference": "SPICE spkcpo, MOON_ME, LT+S, from the site",
+  "recordedUtc": "2026-11-10T21:13:50.767Z"
+ },
+ "sunlight": {
+  "terrain": "LOLA LDEM_75S_240M at 1.2 km per pixel",
+  "reference": "Bussey et al. 2010, Icarus 208",
+  "toleranceBusseyPct": 5,
+  "rows": [
+   {
+    "point": "A, Shackleton ridge",
+    "latDeg": -89.68,
+    "lonDeg": -166,
+    "busseyPct": 81,
+    "oursPct": 67.95053347442416
+   },
+   {
+    "point": "B, peak near the ridge",
+    "latDeg": -89.44,
+    "lonDeg": -141.8,
+    "busseyPct": 82,
+    "oursPct": 80.57497432762256
+   },
+   {
+    "point": "D, near Shackleton rim",
+    "latDeg": -88.79,
+    "lonDeg": 124.5,
+    "busseyPct": 86,
+    "oursPct": 83.91295737982092
+   }
+  ],
+  "recordedUtc": "2026-11-10T21:13:50.952Z"
+ }
+}

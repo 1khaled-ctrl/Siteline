@@ -1,0 +1,15 @@
+{
+  "note": "Extracted from the Landfall concept demo (4 Nov 2026); verify against the cited sources before relying on a value.",
+  "columns": ["name", "latDeg", "lonDeg"],
+  "craters": [
+    ["Shackleton", -89.67, 129.78],
+    ["Haworth crater", -87.45, -5.2],
+    ["Shoemaker", -88.1, 44.9],
+    ["Faustini", -87.3, 77],
+    ["Cabeus", -85.33, -42.1],
+    ["de Gerlache", -88.5, -87.1],
+    ["Sverdrup", -88.5, -152],
+    ["Nobile", -85.28, 53.27],
+    ["Amundsen", -84.5, 82.8]
+  ]
+}

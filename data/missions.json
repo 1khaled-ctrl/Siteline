@@ -1,0 +1,841 @@
+{
+  "note": "Extracted from the Landfall concept demo (4 Nov 2026); verify against the cited sources before relying on a value.",
+  "sources": {
+    "moonObj": [
+      "Wikipedia: List of artificial objects on the Moon",
+      "https://en.wikipedia.org/wiki/List_of_artificial_objects_on_the_Moon"
+    ],
+    "clps": [
+      "NASA Science: CLPS deliveries (updated 23 Oct 2026)",
+      "https://science.nasa.gov/lunar-science/clps-deliveries/"
+    ],
+    "atlas": ["Space Atlas: CLPS status (checked 7 Oct 2026)", "https://thespaceatlas.org/read/clps/"],
+    "im1": ["Wikipedia: IM-1 (LRO-confirmed site 80.13°S, 1.44°E)", "https://en.wikipedia.org/wiki/IM-1"],
+    "griffin": ["Wikipedia: Griffin Mission One", "https://en.wikipedia.org/wiki/Griffin_Mission_One"],
+    "im4": [
+      "NASA: Moon Base, Intuitive Machines IM-4",
+      "https://www.nasa.gov/event/clps-flight-intuitive-machines-im-4-2/"
+    ],
+    "bg2": ["Wikipedia: Blue Ghost Mission 2", "https://en.wikipedia.org/wiki/Blue_Ghost_Mission_2"],
+    "viper": ["Wikipedia: VIPER (rover)", "https://en.wikipedia.org/wiki/VIPER_(rover)"],
+    "art": [
+      "NASA (via ScienceDaily): Artemis III will test both landers, 23 Jul 2026",
+      "https://www.sciencedaily.com/releases/2026/07/260722032113.htm"
+    ],
+    "art4": ["Wikipedia: Artemis IV", "https://en.wikipedia.org/wiki/Artemis_IV"],
+    "m20map": [
+      "NASA/JPL: Perseverance location map",
+      "https://science.nasa.gov/mission/mars-2020-perseverance/location-map/"
+    ],
+    "mslmap": [
+      "NASA/JPL: Curiosity position data",
+      "https://mars.nasa.gov/mmgis-maps/MSL/Layers/json/MSL_waypoints_current.json"
+    ],
+    "msr": [
+      "CNN: Mars Sample Return cancelled, 12 Oct 2026",
+      "https://www.cnn.com/2026/10/12/science/nasa-mars-sample-return-sapphire-canyon-china"
+    ],
+    "rfm": ["Wikipedia: Rosalind Franklin (rover)", "https://en.wikipedia.org/wiki/Rosalind_Franklin_(rover)"],
+    "mmx": [
+      "ESA: MMX lifts off to Phobos, Oct 2026",
+      "https://www.esa.int/ESA_Multimedia/Images/2026/10/MMX_lifts_off_to_Mars_s_moon_Phobos"
+    ]
+  },
+  "missions": [
+    {
+      "id": "ranger7",
+      "b": "Moon",
+      "n": "Ranger 7",
+      "by": "NASA / JPL",
+      "st": "impact",
+      "d": "1964-07-31",
+      "lat": -10.63,
+      "lon": -20.6,
+      "site": ["Mare Cognitum", "بحر المعرفة"],
+      "patch": "ranger7",
+      "src": ["moonObj"],
+      "note": [
+        "Sent back 4,316 close-up photos, the first from a US probe, before a planned impact.",
+        "أرسل 4,316 صورة قريبة، الأولى من مسبار أمريكي، قبل اصطدام مخطط."
+      ]
+    },
+    {
+      "id": "ranger9",
+      "b": "Moon",
+      "n": "Ranger 9",
+      "by": "NASA / JPL",
+      "st": "impact",
+      "d": "1965-03-24",
+      "lat": -12.828,
+      "lon": -2.387,
+      "site": ["Alphonsus crater", "فوهة ألفونسوس"],
+      "patch": "ranger9",
+      "src": ["moonObj"],
+      "note": [
+        "Its pictures were shown live on US television as it fell into Alphonsus crater.",
+        "بُثّت صوره مباشرةً على التلفزيون الأمريكي وهو يسقط في فوهة ألفونسوس."
+      ]
+    },
+    {
+      "id": "surveyor1",
+      "b": "Moon",
+      "n": "Surveyor 1",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1966-06-02",
+      "lat": -2.474,
+      "lon": -43.339,
+      "site": ["Oceanus Procellarum", "محيط العواصف"],
+      "patch": "surveyor1",
+      "src": ["moonObj"],
+      "note": [
+        "First US soft landing on the Moon; sent back more than 11,000 photos.",
+        "أول هبوط أمريكي سلس على القمر؛ أرسل أكثر من 11,000 صورة."
+      ]
+    },
+    {
+      "id": "surveyor2",
+      "b": "Moon",
+      "n": "Surveyor 2",
+      "by": "NASA / JPL",
+      "st": "crashed",
+      "d": "1966-09-23",
+      "lat": 5.5,
+      "lon": -12,
+      "ap": true,
+      "site": ["Southeast of Copernicus", "جنوب شرق كوبرنيكوس"],
+      "src": ["moonObj"],
+      "note": [
+        "One engine failed during a course correction; it tumbled and crashed.",
+        "تعطّل أحد محركاته أثناء تصحيح المسار فدار حول نفسه وتحطّم."
+      ]
+    },
+    {
+      "id": "surveyor3",
+      "b": "Moon",
+      "n": "Surveyor 3",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1967-04-20",
+      "lat": -3.015,
+      "lon": -23.418,
+      "site": ["Oceanus Procellarum", "محيط العواصف"],
+      "patch": "apollo12",
+      "src": ["moonObj"],
+      "note": [
+        "Bounced twice on landing. Apollo 12 astronauts walked to it in 1969 and brought its camera home.",
+        "ارتدّ مرتين عند الهبوط. وصل إليه رواد أبولو 12 سيراً عام 1969 وأعادوا كاميرته إلى الأرض."
+      ]
+    },
+    {
+      "id": "surveyor4",
+      "b": "Moon",
+      "n": "Surveyor 4",
+      "by": "NASA / JPL",
+      "st": "lost",
+      "d": "1967-07-17",
+      "lat": 0.4,
+      "lon": -1.33,
+      "ap": true,
+      "site": ["Sinus Medii", "الخليج الأوسط"],
+      "src": ["moonObj"],
+      "note": ["Contact was lost 2.5 minutes before touchdown.", "انقطع الاتصال به قبل دقيقتين ونصف من الهبوط."]
+    },
+    {
+      "id": "surveyor5",
+      "b": "Moon",
+      "n": "Surveyor 5",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1967-09-11",
+      "lat": 1.461,
+      "lon": 23.195,
+      "site": ["Mare Tranquillitatis", "بحر السكون"],
+      "patch": "surveyor5",
+      "src": ["moonObj"],
+      "note": ["Made the first chemical analysis of lunar soil.", "أجرى أول تحليل كيميائي لتربة القمر."]
+    },
+    {
+      "id": "surveyor6",
+      "b": "Moon",
+      "n": "Surveyor 6",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1967-11-10",
+      "lat": 0.4743,
+      "lon": -1.4275,
+      "site": ["Sinus Medii", "الخليج الأوسط"],
+      "patch": "surveyor6",
+      "src": ["moonObj"],
+      "note": [
+        "Fired its engines, rose a few metres and set down again: the first liftoff from the Moon.",
+        "شغّل محركاته فارتفع بضعة أمتار ثم هبط من جديد: أول إقلاع من سطح القمر."
+      ]
+    },
+    {
+      "id": "surveyor7",
+      "b": "Moon",
+      "n": "Surveyor 7",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1968-01-10",
+      "lat": -40.98,
+      "lon": -11.514,
+      "site": ["Rim of Tycho crater", "حافة فوهة تايكو"],
+      "patch": "surveyor7",
+      "src": ["moonObj"],
+      "note": [
+        "Landed in the rough highlands on the rim of the young crater Tycho.",
+        "هبط في المرتفعات الوعرة على حافة فوهة تايكو الحديثة."
+      ]
+    },
+    {
+      "id": "apollo11",
+      "b": "Moon",
+      "n": "Apollo 11 · Eagle",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1969-07-20",
+      "lat": 0.6741,
+      "lon": 23.473,
+      "site": ["Mare Tranquillitatis", "بحر السكون"],
+      "patch": "apollo11",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Armstrong and Aldrin, the first people on the Moon: 21.5 hours on the surface.",
+        "آرمسترونغ وألدرين أول إنسانين على القمر: 21.5 ساعة على السطح."
+      ]
+    },
+    {
+      "id": "apollo12",
+      "b": "Moon",
+      "n": "Apollo 12 · Intrepid",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1969-11-19",
+      "lat": -3.0124,
+      "lon": -23.4216,
+      "site": ["Oceanus Procellarum", "محيط العواصف"],
+      "patch": "apollo12",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Conrad and Bean made a pinpoint landing within walking distance of Surveyor 3.",
+        "نفّذ كونراد وبين هبوطاً دقيقاً على مسافة سير من Surveyor 3."
+      ]
+    },
+    {
+      "id": "apollo14",
+      "b": "Moon",
+      "n": "Apollo 14 · Antares",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1971-02-05",
+      "lat": -3.6453,
+      "lon": -17.4714,
+      "site": ["Fra Mauro", "فرا ماورو"],
+      "patch": "apollo14",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Shepard and Mitchell explored the Fra Mauro highlands for 33.5 hours.",
+        "استكشف شيبرد وميتشل مرتفعات فرا ماورو لمدة 33.5 ساعة."
+      ]
+    },
+    {
+      "id": "apollo15",
+      "b": "Moon",
+      "n": "Apollo 15 · Falcon",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1971-07-30",
+      "lat": 26.1322,
+      "lon": 3.6339,
+      "site": ["Hadley–Apennine", "هادلي - الأبينين"],
+      "patch": "apollo15",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Scott and Irwin drove the first lunar rover, 28 km beside Hadley Rille and the Apennine mountains.",
+        "قاد سكوت وإروين أول عربة قمرية مسافة 28 كم بجوار أخدود هادلي وجبال الأبينين."
+      ]
+    },
+    {
+      "id": "apollo16",
+      "b": "Moon",
+      "n": "Apollo 16 · Orion",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1972-04-21",
+      "lat": -8.973,
+      "lon": 15.5002,
+      "site": ["Descartes Highlands", "مرتفعات ديكارت"],
+      "patch": "apollo16",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Young and Duke drove 26.7 km across the central highlands.",
+        "قاد يونغ وديوك مسافة 26.7 كم عبر المرتفعات الوسطى."
+      ]
+    },
+    {
+      "id": "apollo17",
+      "b": "Moon",
+      "n": "Apollo 17 · Challenger",
+      "by": "NASA",
+      "st": "crew",
+      "d": "1972-12-11",
+      "lat": 20.1908,
+      "lon": 30.7717,
+      "site": ["Taurus–Littrow valley", "وادي توروس - ليترو"],
+      "patch": "apollo17",
+      "model": "apollo_lm",
+      "src": ["moonObj"],
+      "note": [
+        "Cernan and Schmitt, the last people on the Moon: 3 days and 35.7 km by rover.",
+        "سيرنان وشميت آخر من مشى على القمر: 3 أيام و35.7 كم بالعربة."
+      ]
+    },
+    {
+      "id": "prospector",
+      "b": "Moon",
+      "n": "Lunar Prospector",
+      "by": "NASA",
+      "st": "impact",
+      "d": "1999-07-31",
+      "lat": -87.7,
+      "lon": 42.35,
+      "site": ["Shoemaker crater", "فوهة شوميكر"],
+      "pole": true,
+      "src": ["moonObj"],
+      "note": [
+        "Steered into a shadowed polar crater at the end of its mission to look for water vapour.",
+        "وُجّه في نهاية مهمته إلى فوهة قطبية مظلمة بحثاً عن بخار الماء."
+      ]
+    },
+    {
+      "id": "lcross",
+      "b": "Moon",
+      "n": "LCROSS",
+      "by": "NASA",
+      "st": "impact",
+      "d": "2009-10-09",
+      "lat": -84.678,
+      "lon": -48.693,
+      "site": ["Cabeus crater", "فوهة كابيوس"],
+      "pole": true,
+      "src": ["moonObj"],
+      "note": [
+        "Its impact plume showed water ice inside a crater the Sun never reaches.",
+        "أظهرت سحابة اصطدامه جليد الماء داخل فوهة لا تصلها الشمس."
+      ]
+    },
+    {
+      "id": "grail",
+      "b": "Moon",
+      "n": "GRAIL Ebb and Flow",
+      "by": "NASA",
+      "st": "impact",
+      "d": "2012-12-17",
+      "lat": 75.62,
+      "lon": -26.63,
+      "site": ["Sally Ride impact site", "موقع اصطدام سالي رايد"],
+      "src": ["moonObj"],
+      "note": [
+        "Twin probes that mapped the Moon’s gravity; their impact site is named after Sally Ride.",
+        "مسباران توأمان رسما خريطة جاذبية القمر، وسُمّي موقع اصطدامهما باسم سالي رايد."
+      ]
+    },
+    {
+      "id": "peregrine",
+      "b": "Moon",
+      "n": "Peregrine Mission One",
+      "by": "Astrobotic for NASA CLPS",
+      "st": "failed",
+      "d": "2024-01-08",
+      "lat": null,
+      "lon": null,
+      "site": ["Aimed at Sinus Viscositatis", "كان يستهدف خليج اللزوجة"],
+      "src": ["clps", "atlas"],
+      "note": [
+        "A propellant leak after launch meant it never reached the Moon; it burned up over the Pacific.",
+        "تسرّب الوقود بعد الإطلاق فلم يصل إلى القمر واحترق فوق المحيط الهادئ."
+      ]
+    },
+    {
+      "id": "im1",
+      "b": "Moon",
+      "n": "IM-1 · Odysseus",
+      "by": "Intuitive Machines for NASA CLPS",
+      "st": "tipped",
+      "d": "2024-02-22",
+      "lat": -80.13,
+      "lon": 1.44,
+      "site": ["Near Malapert A, south pole region", "قرب Malapert A في منطقة القطب الجنوبي"],
+      "pole": true,
+      "src": ["im1", "clps"],
+      "note": [
+        "First commercial Moon landing. It came down on a 12° slope and tipped, but sent data for about a week.",
+        "أول هبوط تجاري على القمر. هبط على منحدر 12° ومال على جانبه، لكنه أرسل بيانات نحو أسبوع."
+      ]
+    },
+    {
+      "id": "blueghost1",
+      "b": "Moon",
+      "n": "Blue Ghost Mission 1",
+      "by": "Firefly for NASA CLPS",
+      "st": "landed",
+      "d": "2025-03-02",
+      "lat": 18.5623,
+      "lon": 61.8103,
+      "site": ["Mare Crisium, near Mons Latreille", "بحر الأزمات قرب جبل لاتري"],
+      "patch": "blueghost1",
+      "src": ["moonObj", "atlas"],
+      "note": [
+        "Landed upright; all 10 NASA payloads returned data over about 14 days.",
+        "هبط مستقيماً، وأرسلت كل حمولات ناسا العشر بياناتها خلال نحو 14 يوماً."
+      ]
+    },
+    {
+      "id": "im2",
+      "b": "Moon",
+      "n": "IM-2 · Athena",
+      "by": "Intuitive Machines for NASA CLPS",
+      "st": "tipped",
+      "d": "2025-03-06",
+      "lat": -84.7906,
+      "lon": 29.1957,
+      "site": ["Crater near Mons Mouton", "فوهة قرب جبل موتون"],
+      "pole": true,
+      "src": ["moonObj", "atlas"],
+      "note": [
+        "Landed on its side in a crater near Mons Mouton; the mission ended the next day.",
+        "هبط على جانبه في فوهة قرب جبل موتون، وانتهت المهمة في اليوم التالي."
+      ]
+    },
+    {
+      "id": "griffin1",
+      "b": "Moon",
+      "n": "Griffin Mission One",
+      "by": "Astrobotic for NASA (Moon Base II)",
+      "st": "next",
+      "d": "2026-11",
+      "dl": ["Launch no earlier than Nov 2026", "الإطلاق ليس قبل نوفمبر 2026"],
+      "lat": -85.3,
+      "lon": 34,
+      "ap": true,
+      "site": ["Mons Mouton and Nobile crater area", "منطقة جبل موتون وفوهة نوبيلي"],
+      "pole": true,
+      "src": ["griffin", "atlas"],
+      "note": [
+        "Carries Astrolab’s FLIP rover and five NASA payloads. The only lunar launch NASA expects in 2026.",
+        "يحمل عربة FLIP من Astrolab وخمس حمولات لناسا. الإطلاق القمري الوحيد الذي تتوقعه ناسا في 2026."
+      ]
+    },
+    {
+      "id": "mk1",
+      "b": "Moon",
+      "n": "Blue Moon MK1 · Endurance",
+      "by": "Blue Origin for NASA (Moon Base I)",
+      "st": "planned",
+      "d": "2027-03",
+      "dl": ["Early 2027", "أوائل 2027"],
+      "lat": -89.44,
+      "lon": -141.8,
+      "ap": true,
+      "site": ["Shackleton connecting ridge", "الحافة الموصلة لفوهة شاكلتون"],
+      "pole": true,
+      "src": ["atlas"],
+      "note": [
+        "Waiting for New Glenn to fly again after the May 2026 pad explosion. Carries NASA plume cameras and a laser reflector.",
+        "ينتظر عودة صاروخ New Glenn بعد انفجار منصة الإطلاق في مايو 2026. يحمل كاميرات ناسا لعمود العادم وعاكس ليزر."
+      ]
+    },
+    {
+      "id": "im3",
+      "b": "Moon",
+      "n": "IM-3 · Trinity",
+      "by": "Intuitive Machines for NASA (Moon Base III)",
+      "st": "planned",
+      "d": "2027-02",
+      "dl": ["First quarter of 2027", "الربع الأول من 2027"],
+      "lat": 7.5,
+      "lon": -59,
+      "ap": true,
+      "site": ["Reiner Gamma swirl", "دوامة راينر غاما"],
+      "patch": "im3",
+      "src": ["clps", "atlas"],
+      "note": [
+        "Will study Reiner Gamma, a bright swirl with its own small magnetic field.",
+        "ستدرس راينر غاما، دوامة لامعة لها مجال مغناطيسي صغير خاص بها."
+      ]
+    },
+    {
+      "id": "im4",
+      "b": "Moon",
+      "n": "IM-4",
+      "by": "Intuitive Machines for NASA (Moon Base)",
+      "st": "planned",
+      "d": "2027-09",
+      "dl": ["2027", "2027"],
+      "lat": -84.3,
+      "lon": 30.6,
+      "ap": true,
+      "site": ["Mons Mouton", "جبل موتون"],
+      "pole": true,
+      "src": ["im4", "clps"],
+      "note": [
+        "Six NASA payloads, including a European drill to look for ice under the surface.",
+        "ست حمولات لناسا، منها مثقاب أوروبي للبحث عن الجليد تحت السطح."
+      ]
+    },
+    {
+      "id": "bg2",
+      "b": "Moon",
+      "n": "Blue Ghost Mission 2",
+      "by": "Firefly for NASA CLPS",
+      "st": "planned",
+      "d": "2027-10",
+      "dl": ["Later in 2027", "أواخر 2027"],
+      "lat": null,
+      "lon": null,
+      "site": ["Far side (site not announced)", "الجانب البعيد (لم يُعلن الموقع)"],
+      "src": ["bg2", "atlas"],
+      "note": [
+        "First planned US landing on the far side, with the LuSEE-Night radio telescope.",
+        "أول هبوط أمريكي مخطط على الجانب البعيد، ومعه التلسكوب الراديوي LuSEE-Night."
+      ]
+    },
+    {
+      "id": "viper",
+      "b": "Moon",
+      "n": "VIPER rover on Blue Moon MK1",
+      "by": "NASA rover, Blue Origin lander",
+      "st": "planned",
+      "d": "2027-12",
+      "dl": ["Late 2027", "أواخر 2027"],
+      "lat": -85.4,
+      "lon": 31.7,
+      "ap": true,
+      "site": ["Mons Mouton", "جبل موتون"],
+      "pole": true,
+      "src": ["viper"],
+      "note": [
+        "NASA’s ice-hunting rover, cancelled in 2024, is now booked on a second Blue Moon MK1.",
+        "عربة ناسا للبحث عن الجليد، أُلغيت عام 2024، وهي الآن محجوزة على مركبة Blue Moon MK1 ثانية."
+      ]
+    },
+    {
+      "id": "artemis4",
+      "b": "Moon",
+      "n": "Artemis IV (crew)",
+      "by": "NASA with SpaceX or Blue Origin",
+      "st": "planned",
+      "d": "2028-03",
+      "dl": ["Early 2028", "أوائل 2028"],
+      "lat": -86,
+      "lon": 10,
+      "ap": true,
+      "site": ["South pole region (one of nine candidate regions)", "منطقة القطب الجنوبي (إحدى تسع مناطق مرشحة)"],
+      "pole": true,
+      "src": ["art", "art4"],
+      "note": [
+        "Planned first crewed landing since 1972. Artemis II flew around the Moon in April 2026; Artemis III (2027) is now an Earth-orbit docking test.",
+        "أول هبوط بطاقم منذ 1972. دار أرتميس 2 حول القمر في أبريل 2026، وأصبح أرتميس 3 (2027) اختبار التحام في مدار الأرض."
+      ]
+    },
+    {
+      "id": "bg3",
+      "b": "Moon",
+      "n": "Blue Ghost Mission 3",
+      "by": "Firefly for NASA CLPS",
+      "st": "planned",
+      "d": "2028-06",
+      "dl": ["2028", "2028"],
+      "lat": 36.3,
+      "lon": -40,
+      "ap": true,
+      "site": ["Gruithuisen Domes", "قباب غرويتويزن"],
+      "patch": "blueghost3",
+      "src": ["clps"],
+      "note": [
+        "Six NASA payloads to study rare silica-rich volcanic domes.",
+        "ست حمولات لناسا لدراسة قباب بركانية نادرة غنية بالسيليكا."
+      ]
+    },
+    {
+      "id": "schrodinger",
+      "b": "Moon",
+      "n": "Schrödinger basin delivery",
+      "by": "NASA CLPS, provider to be chosen",
+      "st": "planned",
+      "d": "2028-12",
+      "dl": ["Not scheduled", "غير مجدولة"],
+      "lat": -75,
+      "lon": 132.4,
+      "ap": true,
+      "site": ["Schrödinger basin, far side", "حوض شرودنغر، الجانب البعيد"],
+      "src": ["clps"],
+      "note": [
+        "Three NASA payloads for a far-side impact basin; NASA’s list has no provider yet.",
+        "ثلاث حمولات لناسا لحوض اصطدام في الجانب البعيد؛ لم تحدد ناسا المزوّد بعد."
+      ]
+    },
+    {
+      "id": "bg4",
+      "b": "Moon",
+      "n": "Blue Ghost Mission 4",
+      "by": "Firefly for NASA CLPS",
+      "st": "planned",
+      "d": "2029-06",
+      "dl": ["2029", "2029"],
+      "lat": null,
+      "lon": null,
+      "site": ["South pole (site not announced)", "القطب الجنوبي (لم يُعلن الموقع)"],
+      "src": ["clps", "atlas"],
+      "note": ["Four NASA payloads to the south pole region.", "أربع حمولات لناسا إلى منطقة القطب الجنوبي."]
+    },
+    {
+      "id": "im5",
+      "b": "Moon",
+      "n": "IM-5 · Nova-D",
+      "by": "Intuitive Machines for NASA",
+      "st": "planned",
+      "d": "2030-06",
+      "dl": ["2030", "2030"],
+      "lat": -86,
+      "lon": -0.2,
+      "ap": true,
+      "site": ["Mons Malapert", "جبل مالابير"],
+      "pole": true,
+      "src": ["clps"],
+      "note": [
+        "First flight of the larger Nova-D lander, awarded in March 2026.",
+        "أول رحلة لمركبة Nova-D الأكبر، مُنحت في مارس 2026."
+      ]
+    },
+    {
+      "id": "viking1",
+      "b": "Mars",
+      "n": "Viking 1",
+      "by": "NASA",
+      "st": "landed",
+      "d": "1976-07-20",
+      "lat": 22.27,
+      "lon": -47.95,
+      "site": ["Chryse Planitia", "سهل كريس"],
+      "patch": "viking1",
+      "model": "viking",
+      "note": [
+        "First successful US Mars landing; it worked for more than six years.",
+        "أول هبوط أمريكي ناجح على المريخ؛ عمل أكثر من ست سنوات."
+      ]
+    },
+    {
+      "id": "viking2",
+      "b": "Mars",
+      "n": "Viking 2",
+      "by": "NASA",
+      "st": "landed",
+      "d": "1976-09-03",
+      "lat": 47.64,
+      "lon": 134.29,
+      "site": ["Utopia Planitia", "سهل يوتوبيا"],
+      "patch": "viking2",
+      "model": "viking",
+      "note": [
+        "Photographed frost on the ground in the northern winter; worked until 1980.",
+        "صوّر الصقيع على الأرض في شتاء الشمال، وعمل حتى 1980."
+      ]
+    },
+    {
+      "id": "pathfinder",
+      "b": "Mars",
+      "n": "Mars Pathfinder · Sojourner",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "1997-07-04",
+      "lat": 19.13,
+      "lon": -33.22,
+      "site": ["Ares Vallis", "وادي آريس"],
+      "patch": "pathfinder",
+      "note": [
+        "Bounced down on airbags; Sojourner was the first rover on Mars.",
+        "هبط مرتداً على وسائد هوائية، وكانت Sojourner أول عربة على المريخ."
+      ]
+    },
+    {
+      "id": "mpl",
+      "b": "Mars",
+      "n": "Mars Polar Lander",
+      "by": "NASA / JPL",
+      "st": "lost",
+      "d": "1999-12-03",
+      "lat": -76,
+      "lon": 165,
+      "ap": true,
+      "site": ["Near the south polar layered terrain", "قرب التضاريس الطبقية للقطب الجنوبي"],
+      "patch": "mpl",
+      "note": [
+        "Lost during descent; the likely cause is that its engines shut off too early.",
+        "فُقد أثناء الهبوط، والسبب المرجّح توقف محركاته مبكراً."
+      ]
+    },
+    {
+      "id": "spirit",
+      "b": "Mars",
+      "n": "Spirit",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "2004-01-04",
+      "lat": -14.5684,
+      "lon": 175.4726,
+      "site": ["Gusev crater", "فوهة غوسيف"],
+      "patch": "spirit",
+      "model": "mer",
+      "note": [
+        "Drove 7.7 km; it got stuck in soft sand in 2009 and last called home in 2010.",
+        "قطعت 7.7 كم، ثم علقت في رمل ناعم عام 2009 وكان آخر اتصال بها عام 2010."
+      ]
+    },
+    {
+      "id": "opportunity",
+      "b": "Mars",
+      "n": "Opportunity",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "2004-01-25",
+      "lat": -1.9462,
+      "lon": -5.5266,
+      "site": ["Meridiani Planum", "هضبة ميريدياني"],
+      "patch": "opportunity",
+      "model": "mer",
+      "note": [
+        "Planned for 90 days, it drove 45 km over 14 years until a 2018 dust storm.",
+        "صُممت لتعمل 90 يوماً، فقطعت 45 كم خلال 14 سنة حتى عاصفة غبار عام 2018."
+      ]
+    },
+    {
+      "id": "phoenix",
+      "b": "Mars",
+      "n": "Phoenix",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "2008-05-25",
+      "lat": 68.2188,
+      "lon": -125.7492,
+      "site": ["Vastitas Borealis", "السهل الشمالي العظيم"],
+      "patch": "phoenix",
+      "note": [
+        "Dug into the arctic soil and found water ice just below the surface.",
+        "حفرت في تربة القطب الشمالي ووجدت جليد الماء تحت السطح مباشرة."
+      ]
+    },
+    {
+      "id": "curiosity",
+      "b": "Mars",
+      "n": "Curiosity",
+      "by": "NASA / JPL",
+      "st": "active",
+      "d": "2012-08-06",
+      "lat": -4.5895,
+      "lon": 137.4417,
+      "site": ["Gale crater, climbing Mount Sharp", "فوهة غيل، صعوداً على جبل شارب"],
+      "patch": "curiosity",
+      "track": "msl",
+      "src": ["mslmap"],
+      "note": [
+        "Still climbing Mount Sharp, reading the rock layers of an ancient lake.",
+        "لا تزال تصعد جبل شارب وتقرأ طبقات صخور بحيرة قديمة."
+      ]
+    },
+    {
+      "id": "insight",
+      "b": "Mars",
+      "n": "InSight",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "2018-11-26",
+      "lat": 4.502,
+      "lon": 135.623,
+      "site": ["Elysium Planitia", "سهل إليزيوم"],
+      "patch": "insight",
+      "note": [
+        "Recorded more than 1,300 marsquakes; it ended in December 2022 when dust covered its solar panels.",
+        "سجّل أكثر من 1,300 زلزال مريخي، وانتهى في ديسمبر 2022 حين غطى الغبار ألواحه الشمسية."
+      ]
+    },
+    {
+      "id": "perseverance",
+      "b": "Mars",
+      "n": "Perseverance",
+      "by": "NASA / JPL",
+      "st": "active",
+      "d": "2021-02-18",
+      "lat": 18.4447,
+      "lon": 77.4508,
+      "site": ["Jezero crater and rim", "فوهة جيزيرو وحافتها"],
+      "patch": "perseverance",
+      "track": "m20",
+      "model": "perseverance",
+      "src": ["m20map", "msr"],
+      "note": [
+        "Drilling and sealing rock samples. The Mars Sample Return plan to bring them to Earth was cancelled in January 2026.",
+        "تحفر عيّنات صخرية وتحفظها. أُلغيت خطة إعادة العيّنات إلى الأرض في يناير 2026."
+      ]
+    },
+    {
+      "id": "ingenuity",
+      "b": "Mars",
+      "n": "Ingenuity helicopter",
+      "by": "NASA / JPL",
+      "st": "landed",
+      "d": "2021-04-19",
+      "lat": 18.497269,
+      "lon": 77.322534,
+      "site": ["Jezero crater, Airfield Chi", "فوهة جيزيرو، مطار تشي"],
+      "patch": "perseverance",
+      "track": "heli",
+      "model": "ingenuity",
+      "src": ["m20map"],
+      "note": [
+        "First powered flight on another planet: 72 flights and about 18 km until rotor damage in January 2024.",
+        "أول طيران بمحرك على كوكب آخر: 72 رحلة ونحو 18 كم حتى تضرر شفراتها في يناير 2024."
+      ]
+    },
+    {
+      "id": "mmx",
+      "b": "Mars",
+      "n": "MMX (to Phobos)",
+      "by": "JAXA, with NASA’s MEGANE instrument",
+      "st": "onway",
+      "d": "2026-10-19",
+      "dl": ["Launched 19 Oct 2026", "أُطلق في 19 أكتوبر 2026"],
+      "lat": null,
+      "lon": null,
+      "site": ["Phobos, a moon of Mars", "فوبوس، أحد قمري المريخ"],
+      "src": ["mmx"],
+      "note": [
+        "On its way to Mars’s moon Phobos: it will land there, collect a sample and bring it to Earth by 2031.",
+        "في طريقه إلى فوبوس قمر المريخ: سيهبط عليه ويجمع عيّنة ويعيدها إلى الأرض بحلول 2031."
+      ]
+    },
+    {
+      "id": "rosalind",
+      "b": "Mars",
+      "n": "Rosalind Franklin rover",
+      "by": "ESA, with NASA engines, heaters and launch",
+      "st": "planned",
+      "d": "2030-10",
+      "dl": ["Launch late 2028, landing 2030", "إطلاق أواخر 2028، وهبوط 2030"],
+      "lat": 18.2,
+      "lon": -24.55,
+      "ap": true,
+      "site": ["Oxia Planum", "هضبة أوكسيا"],
+      "patch": "rosalind",
+      "src": ["rfm"],
+      "note": ["Will drill 2 m down to look for signs of past life.", "ستحفر حتى عمق مترين بحثاً عن آثار حياة سابقة."]
+    }
+  ]
+}
