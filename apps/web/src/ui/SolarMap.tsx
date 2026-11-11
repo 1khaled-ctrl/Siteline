@@ -3,10 +3,11 @@ import type { SolarBodyKey } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useApp } from '../store';
+import { type MoonView, useApp } from '../store';
 
-/** Bodies with a view to fly into. Earth and Mars join as their views are built. */
-const NAVIGABLE: ReadonlySet<SolarBodyKey> = new Set(['moon']);
+/** Bodies with a view to fly into. Mars joins when its view is built. */
+const NAVIGABLE: ReadonlySet<SolarBodyKey> = new Set(['earth', 'moon']);
+const VIEW_OF: Partial<Record<SolarBodyKey, MoonView>> = { earth: 'earth', moon: 'globe' };
 const KEYS: SolarLabelKey[] = [
   'sun',
   'mercury',
@@ -38,7 +39,8 @@ export function SolarMap() {
       onSelect: (body) => {
         setFlying(true);
         void created.flyTo(body, reducedMotion() ? 0 : 1800).then(() => {
-          if (body === 'moon') useApp.getState().set({ view: 'globe' });
+          const next = VIEW_OF[body];
+          if (next) useApp.getState().set({ view: next });
         });
       },
     });

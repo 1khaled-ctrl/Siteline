@@ -1,5 +1,7 @@
 {
-  "app": { "tagline": "Moon south-pole landing check" },
+  "app": {
+    "tagline": "Moon south-pole landing check"
+  },
   "site": {
     "heading": "Landing site",
     "lat": "Latitude (°)",
@@ -58,7 +60,11 @@
   "report": {
     "heading": "Site report",
     "landing": "Landing {{date}}",
-    "verdict": { "pass": "Pass", "fail": "Fail", "undecided": "Not decided yet" },
+    "verdict": {
+      "pass": "Pass",
+      "fail": "Fail",
+      "undecided": "Not decided yet"
+    },
     "sun": "Sun up for the whole stay",
     "earth": "Earth in view (direct-to-Earth radio)",
     "slope": "Landing slope under 10°",
@@ -97,9 +103,21 @@
     "NO_DATA_ephemeris": "No Sun and Earth data for these dates. SiteLine covers 2026 to 2035.",
     "NO_DATA_slope": "The 100 m landing-slope rule needs terrain finer than what is loaded."
   },
-  "timeline": { "heading": "Next 30 days", "sun": "Sun visible", "earth": "Earth visible" },
-  "regions": { "heading": "NASA's Artemis regions" },
-  "crumbs": { "label": "Where you are", "solar": "Solar system", "moon": "Moon", "pole": "South pole" },
+  "timeline": {
+    "heading": "Next 30 days",
+    "sun": "Sun visible",
+    "earth": "Earth visible"
+  },
+  "regions": {
+    "heading": "NASA's Artemis regions"
+  },
+  "crumbs": {
+    "label": "Where you are",
+    "solar": "Solar system",
+    "moon": "Moon",
+    "pole": "South pole",
+    "earth": "Earth"
+  },
   "bodies": {
     "sun": "Sun",
     "mercury": "Mercury",
@@ -113,8 +131,8 @@
     "neptune": "Neptune"
   },
   "solar": {
-    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Moon to fly there.",
-    "flying": "Flying to the Moon…",
+    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth or Moon to fly there.",
+    "flying": "Flying there…",
     "error": "Could not load the planets: {{message}}"
   },
   "globe": {
@@ -127,5 +145,52 @@
     "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date.",
     "loading": "Loading south-pole terrain…",
     "error": "Could not load the terrain: {{message}}"
+  },
+  "earth": {
+    "hint": "Drag to turn the Earth, scroll to zoom, click a place to name it. Zoom in for provinces, roads and cities.",
+    "search": "Find a country",
+    "searchPlaceholder": "Find a country",
+    "searchNone": "No country called \"{{query}}\".",
+    "style": "Map style",
+    "styleMap": "Map",
+    "styleSatellite": "Satellite",
+    "styleNight": "Night lights",
+    "dayNight": "Day and night",
+    "dayNightHint": "Lit by the real Sun for the landing date.",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "home": "Whole Earth",
+    "continents": {
+      "africa": "AFRICA",
+      "europe": "EUROPE",
+      "asia": "ASIA",
+      "northAmerica": "NORTH AMERICA",
+      "southAmerica": "SOUTH AMERICA",
+      "oceania": "OCEANIA",
+      "antarctica": "ANTARCTICA"
+    },
+    "oceans": {
+      "pacific": "Pacific Ocean",
+      "atlantic": "Atlantic Ocean",
+      "indian": "Indian Ocean",
+      "arctic": "Arctic Ocean",
+      "southern": "Southern Ocean"
+    },
+    "panel": {
+      "heading": "Earth",
+      "empty": "Click anywhere on the globe, or search for a country, to see what is there.",
+      "sea": "Open water",
+      "coords": "Coordinates",
+      "north": "N",
+      "south": "S",
+      "east": "E",
+      "west": "W",
+      "nearestCity": "Nearest city",
+      "cityAway": "{{km}} km away",
+      "population": "Population {{count}}",
+      "noCity": "No city within {{km}} km.",
+      "zoomCountry": "Zoom to the country",
+      "sources": "Borders, names and cities: Natural Earth (public domain). Night lights: NASA Black Marble. Details in CREDITS.md."
+    }
   }
 }

@@ -1,6 +1,7 @@
 export * from './best';
 export * from './dem';
 export * from './disc';
+export * from './earthSun';
 export * from './ephemeris';
 export * from './frames';
 export * from './horizon';

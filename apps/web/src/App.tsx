@@ -1,11 +1,14 @@
 import { useTranslation } from 'react-i18next';
+import { useApp } from './store';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { Controls } from './ui/Controls';
+import { EarthPanel } from './ui/EarthPanel';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
 
 export function App() {
   const { t } = useTranslation();
+  const view = useApp((s) => s.view);
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
@@ -20,9 +23,7 @@ export function App() {
           <Controls />
         </div>
         <MoonView />
-        <div className="lg:overflow-y-auto">
-          <SiteReport />
-        </div>
+        <div className="lg:overflow-y-auto">{view === 'earth' ? <EarthPanel /> : <SiteReport />}</div>
       </main>
     </div>
   );

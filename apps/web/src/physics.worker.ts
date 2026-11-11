@@ -19,6 +19,7 @@ import {
   parsePlanets,
   type SolarBodyKey,
   stayTest,
+  subsolarPoint,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 
@@ -147,6 +148,15 @@ const api = {
   async planetsAt(tUtcMs: number, dataUrl: string): Promise<Record<SolarBodyKey, readonly [number, number, number]>> {
     const table = await loadPlanets(dataUrl);
     return table.snapshot(Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs)));
+  },
+
+  /** Where the Sun is overhead on Earth (degrees, east-positive), from the planets table. */
+  async earthSun(tUtcMs: number, dataUrl: string): Promise<{ latDeg: number; lonDeg: number }> {
+    const table = await loadPlanets(dataUrl);
+    const t = Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs));
+    const [x, y, z] = table.positionKm('earth', t);
+    // The table holds the Earth as seen from the Sun; the Sun seen from the Earth is the opposite direction.
+    return subsolarPoint([-x, -y, -z], t);
   },
 
   async stay(query: StayQuery, urls: DataUrls): Promise<StayResponse> {

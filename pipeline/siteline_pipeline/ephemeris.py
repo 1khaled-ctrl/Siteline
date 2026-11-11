@@ -94,6 +94,10 @@ def build_golden(kernels: list[str], n_sites: int = 25, n_dates: int = 40, seed:
 # ---- Solar-system overview: the eight planets (Sun-centred) and the Moon (Earth-centred) in ECLIPJ2000 ----
 PLANETS_PATH = TABLE_PATH.with_name("planets.bin")
 PLANETS_GOLDEN_PATH = REPO / "tests" / "reference" / "planets_golden.json"
+EARTH_SUN_GOLDEN_PATH = REPO / "tests" / "reference" / "earth_sun_golden.json"
+# earth_latest_high_prec.bpc measures the Earth's rotation up to about now, so the golden stays inside 2026.
+EARTH_FIXED_START_UTC = "2026-01-05T00:00:00Z"
+EARTH_FIXED_END_UTC = "2026-10-15T00:00:00Z"
 PLANETS_FRAME = "ECLIPJ2000"
 # de440s has Mercury, Venus and Earth as bodies, and Mars and the outer planets only as system barycentres.
 PLANET_TARGETS = {
@@ -168,6 +172,28 @@ def build_planets_golden(kernels: list[str], n_dates: int = 40, seed: int = 4242
     return len(cases)
 
 
+def build_earth_sun_golden(kernels: list[str], n_dates: int = 40, seed: int = 77) -> int:
+    """Where SPICE puts the Sun overhead on Earth (ITRF93), with the Earth's heliocentric ECLIPJ2000 position."""
+    rng = np.random.default_rng(seed)
+    times = np.sort(rng.integers(utc_ms(EARTH_FIXED_START_UTC), utc_ms(EARTH_FIXED_END_UTC), n_dates)) // 1000 * 1000
+    ets = [et_at(int(t)) for t in times]
+    earth_from_sun = np.asarray(sp.spkpos("EARTH", ets, PLANETS_FRAME, "NONE", "SUN")[0])
+    sun_fixed = np.asarray(sp.spkpos("SUN", ets, "ITRF93", "NONE", "EARTH")[0])
+    cases = []
+    for t, earth, fixed in zip(times, earth_from_sun, sun_fixed, strict=True):
+        _, lon, lat = sp.reclat(fixed.tolist())
+        cases.append(
+            {
+                "tUtcMs": int(t),
+                "earthFromSunKm": [float(v) for v in earth],
+                "subsolar": {"latDeg": math.degrees(lat), "lonDeg": math.degrees(lon)},
+            }
+        )
+    meta = {"frame": "ITRF93", "abcorr": "NONE", "kernels": kernels, "seed": seed}
+    EARTH_SUN_GOLDEN_PATH.write_text(json.dumps({"generated": meta, "cases": cases}, indent=1) + "\n")
+    return len(cases)
+
+
 def main() -> None:
     kernels = load_kernels()
     if sp.namfrm(FRAME) == 0:
@@ -179,6 +205,7 @@ def main() -> None:
     planets = build_planets(kernels)
     print(f"planets: {planets['count']} samples, {PLANETS_PATH.stat().st_size / 1e6:.1f} MB -> {PLANETS_PATH}")
     print(f"planets golden: {build_planets_golden(kernels)} cases -> {PLANETS_GOLDEN_PATH}")
+    print(f"earth sun golden: {build_earth_sun_golden(kernels)} cases -> {EARTH_SUN_GOLDEN_PATH}")
 
 
 if __name__ == "__main__":

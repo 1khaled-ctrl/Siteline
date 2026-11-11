@@ -1,8 +1,9 @@
+import type { EarthPlace } from '@siteline/engine';
 import { create } from 'zustand';
 
-/** Where the camera is: the whole solar system, the Moon as a globe, or the Moon's south pole. */
-export type MoonView = 'solar' | 'globe' | 'pole';
-export const VIEWS: MoonView[] = ['solar', 'globe', 'pole'];
+/** Where the camera is: the solar system, the Earth, the Moon as a globe, or the Moon's south pole. */
+export type MoonView = 'solar' | 'earth' | 'globe' | 'pole';
+export const VIEWS: MoonView[] = ['solar', 'earth', 'globe', 'pole'];
 export type Layer = 'none' | 'sun' | 'earth' | 'shadow';
 export const LAYERS: Layer[] = ['none', 'sun', 'earth', 'shadow'];
 export const MAX_PINS = 4;
@@ -25,6 +26,11 @@ export interface View {
 interface AppState extends View {
   /** Bumped when the camera should fly to the current site (not saved in the link). */
   focusSeq: number;
+  /** The place last picked on the Earth globe, and the camera move the breadcrumbs ask for. Not saved in the link. */
+  earthPlace: EarthPlace | null;
+  earthCommand: { id: number; type: 'home' | 'country' } | null;
+  setEarthPlace: (place: EarthPlace | null) => void;
+  commandEarth: (type: 'home' | 'country') => void;
   /** Time-lapse: lighting time offset from landing, in hours, and the play speed in hours per second. */
   playOffsetH: number;
   playing: boolean;
@@ -102,6 +108,10 @@ export const useApp = create<AppState>((set) => ({
   ...DEFAULTS,
   ...fromUrl(),
   focusSeq: 0,
+  earthPlace: null,
+  earthCommand: null,
+  setEarthPlace: (earthPlace) => set({ earthPlace }),
+  commandEarth: (type) => set((s) => ({ earthCommand: { id: (s.earthCommand?.id ?? 0) + 1, type } })),
   playOffsetH: 0,
   playing: false,
   speedHPerS: PLAY_SPEEDS_H_PER_S[1],
