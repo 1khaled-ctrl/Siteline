@@ -1,5 +1,80 @@
 {
-  "note": "Extracted from the Landfall concept demo (4 Nov 2026); verify against the cited sources before relying on a value.",
+  "note": "Physical facts about the Moon, Earth and Mars for the body card (apps/web/src/bodyFacts.ts). Each value names the page or kernel it was read from (`sources`), read on 2026-11-11. Radii are NASA's volumetric mean radii; pck00011.tpc agrees (the Moon's 1737.4 km sphere; Earth and Mars as ellipsoids whose mean radii are 6371.01 km and 3389.53 km). The Moon's solarDayH is NASA's synodic period, 29.53 days, as hours. Gravity, escape speed, sunlight strength and signal delay are not stored: the app works them out from these numbers and the planets table. `text.ar` is the Landfall concept demo's Arabic text, not used yet, and it still carries the demo's older temperatures (the Moon at the equator, −173 to 127 °C, and Mars at −63 °C on average, against NASA's current 95 to 390 K and 214 K); redo it from the numbers here before the Arabic version.",
+  "sources": {
+    "nasaMoon": [
+      "NASA NSSDCA Moon Fact Sheet, updated 11 Jan 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+    ],
+    "nasaEarth": [
+      "NASA NSSDCA Earth Fact Sheet, updated 15 Nov 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html"
+    ],
+    "nasaMars": [
+      "NASA NSSDCA Mars Fact Sheet, updated 19 May 2025",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html"
+    ],
+    "spiceGm": [
+      "NAIF gm_de440.tpc, gravitational parameters",
+      "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/pck/gm_de440.tpc"
+    ],
+    "paige2010": [
+      "Paige et al. 2010, Science 330:479, Diviner cold traps (the LCROSS site is estimated at 38 K)",
+      "https://doi.org/10.1126/science.1187726"
+    ]
+  },
+  "solarConstant": { "wM2": 1361, "source": "nasaEarth" },
+  "bodies": {
+    "Moon": {
+      "factSheet": "nasaMoon",
+      "radiusKm": 1737.4,
+      "gmKm3PerS2": 4902.800118,
+      "rotationH": 655.72,
+      "solarDayH": 708.72,
+      "surfacePressureMbar": null,
+      "temperatureK": { "rangeK": [95, 390], "coldestK": 38 },
+      "sources": {
+        "radiusKm": ["nasaMoon"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaMoon"],
+        "solarDayH": ["nasaMoon"],
+        "temperatureK": ["nasaMoon", "paige2010"]
+      }
+    },
+    "Earth": {
+      "factSheet": "nasaEarth",
+      "radiusKm": 6371,
+      "gmKm3PerS2": 398600.435507,
+      "rotationH": 23.9345,
+      "solarDayH": 24,
+      "surfacePressureMbar": 1014,
+      "temperatureK": { "meanK": 288 },
+      "sources": {
+        "radiusKm": ["nasaEarth"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaEarth"],
+        "solarDayH": ["nasaEarth"],
+        "surfacePressureMbar": ["nasaEarth"],
+        "temperatureK": ["nasaEarth"]
+      }
+    },
+    "Mars": {
+      "factSheet": "nasaMars",
+      "radiusKm": 3389.5,
+      "gmKm3PerS2": 42828.373621,
+      "rotationH": 24.6229,
+      "solarDayH": 24.6597,
+      "surfacePressureMbar": 6.36,
+      "temperatureK": { "meanK": 214, "rangeK": [184, 242] },
+      "sources": {
+        "radiusKm": ["nasaMars"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaMars"],
+        "solarDayH": ["nasaMars"],
+        "surfacePressureMbar": ["nasaMars"],
+        "temperatureK": ["nasaMars"]
+      }
+    }
+  },
   "text": {
     "ar": {
       "Sun": ["نحو 5,500 °م عند السطح المرئي", "لا يوجد (بلازما)"],
