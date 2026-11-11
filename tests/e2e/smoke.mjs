@@ -15,12 +15,25 @@ page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 // Solar system first: the planets draw, then flying to the Moon lands on the globe. The Earth comes first.
 await page.goto(url.replace('view=globe', 'view=solar'), { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
+await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+if (
+  (await page.getByRole('heading', { name: 'Landing site' }).count()) +
+  (await page.getByText('Play a lunar day').count())
+)
+  throw new Error('Moon controls are showing on the solar-system view');
 await page.waitForTimeout(2500);
 if (shots) await page.screenshot({ path: `${shots}-solar.png` });
 // Earth: the globe, then a country by search, then a city by clicking its label.
 await page.getByRole('button', { name: 'Earth', exact: true }).first().click();
 await page.waitForSelector('[data-testid="earth-map"] canvas', { timeout: 60_000 });
 await page.getByText('Egypt', { exact: true }).first().waitFor({ timeout: 60_000 });
+// The Moon's landing controls stay with the Moon views; Earth and Mars show only the date for the Sun.
+await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+if (
+  (await page.getByRole('heading', { name: 'Landing site' }).count()) +
+  (await page.getByText('Play a lunar day').count())
+)
+  throw new Error('Moon controls are showing on the Earth view');
 await page.waitForTimeout(1500);
 if (shots) await page.screenshot({ path: `${shots}-earth.png` });
 await page.getByRole('combobox', { name: 'Find a country' }).fill('Lebanon');
@@ -49,6 +62,12 @@ await page.waitForTimeout(1500);
 await page.getByRole('button', { name: 'Mars', exact: true }).first().click();
 await page.waitForSelector('[data-testid="mars-map"] canvas', { timeout: 60_000 });
 await page.getByText('Valles Marineris', { exact: true }).first().waitFor({ timeout: 60_000 });
+await page.getByLabel('Date shown (UTC)').waitFor({ timeout: 5_000 });
+if (
+  (await page.getByRole('heading', { name: 'Landing site' }).count()) +
+  (await page.getByText('Play a lunar day').count())
+)
+  throw new Error('Moon controls are showing on the Mars view');
 await page.waitForTimeout(3500);
 if (shots) await page.screenshot({ path: `${shots}-mars.png` });
 await page.getByRole('combobox', { name: 'Find a feature' }).fill('Olympus Mons');
@@ -78,6 +97,7 @@ await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000
 await page.waitForTimeout(1500);
 await page.getByRole('button', { name: 'Moon', exact: true }).first().click();
 await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000 });
+await page.getByRole('heading', { name: 'Landing site' }).waitFor({ timeout: 5_000 });
 await page.waitForTimeout(3000);
 if (shots) await page.screenshot({ path: `${shots}-globe.png` });
 

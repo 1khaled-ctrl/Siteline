@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useApp } from './store';
+import { BodyClock } from './ui/BodyClock';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { Controls } from './ui/Controls';
 import { EarthPanel } from './ui/EarthPanel';
@@ -20,9 +21,7 @@ export function App() {
         <Breadcrumbs />
       </header>
       <main className="grid flex-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[18rem_1fr_26rem]">
-        <div className="lg:overflow-y-auto">
-          <Controls />
-        </div>
+        <div className="lg:overflow-y-auto">{view === 'globe' || view === 'pole' ? <Controls /> : <BodyClock />}</div>
         <MoonView />
         <div className="lg:overflow-y-auto">
           {view === 'earth' ? <EarthPanel /> : view === 'mars' ? <MarsPanel /> : <SiteReport />}

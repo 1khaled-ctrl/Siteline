@@ -22,6 +22,11 @@
     "lightingLanding": "The 3D view is lit for the landing time.",
     "lightingAt": "The 3D view is lit for {{days}} days after landing."
   },
+  "clock": {
+    "label": "Date shown (UTC)",
+    "litFor": "Showing {{when}}.",
+    "reset": "Back to the set date"
+  },
   "compare": {
     "heading_one": "{{count}} pinned site",
     "heading_other": "{{count}} pinned sites",
