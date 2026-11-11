@@ -3,9 +3,13 @@ import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
-/** URL prefix -> local folder. Deployed builds read the same paths from R2 via VITE_DATA_URL and VITE_TERRAIN_URL. */
+/**
+ * URL prefix -> local folder, for running with a local pipeline. With DATA_BASE_URL set to the R2 bucket's public URL
+ * the app reads the same files from there instead: the bucket holds pipeline/out under out/ and pipeline/raw/landfall
+ * under raw/landfall/ (see .github/workflows/pipeline.yml). VITE_DATA_URL and VITE_ASSETS_URL still override each one.
+ */
 const MOUNTS: [string, string][] = [
   ['/data', fileURLToPath(new URL('../../pipeline/out', import.meta.url))],
   ['/landfall', fileURLToPath(new URL('../../pipeline/raw/landfall', import.meta.url))],
@@ -27,6 +31,17 @@ function localData(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), localData()],
+export default defineConfig(({ mode }) => {
+  // Read from the shell or from apps/web/.env.local (git ignores it), with no prefix filter.
+  const env = loadEnv(mode, process.cwd(), '');
+  const base = env.DATA_BASE_URL?.replace(/\/+$/, '');
+  return {
+    plugins: [react(), tailwindcss(), localData()],
+    define: base
+      ? {
+          'import.meta.env.VITE_DATA_URL': JSON.stringify(env.VITE_DATA_URL || `${base}/out`),
+          'import.meta.env.VITE_ASSETS_URL': JSON.stringify(env.VITE_ASSETS_URL || `${base}/raw/landfall`),
+        }
+      : {},
+  };
 });

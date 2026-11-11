@@ -1,0 +1,76 @@
+name: Pipeline
+
+# Builds pipeline/out from the raw datasets and publishes it to R2, where deployed builds read it (DATA_BASE_URL).
+# The bucket mirrors the local folders: raw/landfall/ holds pipeline/raw/landfall (the demo's assets, which the app also
+# reads), and out/ holds pipeline/out. The SPICE kernels and the USGS names come straight from NAIF and USGS.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # R2 rejects the extra checksums that recent AWS CLI versions send by default.
+      AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+
+      - name: R2 endpoint
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          endpoint="${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}"
+          echo "R2_URL=${endpoint%/}" >> "$GITHUB_ENV"
+
+      # The kernels (about 50 MB) and the USGS names change rarely, so keep them between runs.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            pipeline/raw/spice
+            pipeline/raw/usgs
+          key: raw-${{ hashFiles('pipeline/siteline_pipeline/kernels.py', 'pipeline/siteline_pipeline/mars_names.py') }}
+
+      - name: Download the raw datasets from R2
+        run: |
+          aws s3 cp --endpoint-url "$R2_URL" \
+            "s3://$R2_BUCKET/raw/landfall/img/mars_height.png" pipeline/raw/landfall/img/mars_height.png
+
+      - name: Install the pipeline
+        working-directory: pipeline
+        run: uv sync --frozen
+
+      - name: Ephemeris
+        working-directory: pipeline
+        run: uv run python -m siteline_pipeline.ephemeris
+
+      - name: Mars data
+        working-directory: pipeline
+        run: |
+          uv run python -m siteline_pipeline.mars_names
+          uv run python -m siteline_pipeline.mars_normal
+
+      - name: Check the outputs
+        run: |
+          for f in ephemeris/moon_sun_earth.bin ephemeris/planets.bin names/mars_names.json \
+                   mars/mars_normal.png mars/mars_normal.manifest.json; do
+            test -s "pipeline/out/$f" || { echo "::error::missing pipeline/out/$f"; exit 1; }
+          done
+          ls -lR pipeline/out
+
+      - name: Upload pipeline/out to R2
+        run: aws s3 sync --endpoint-url "$R2_URL" --no-progress pipeline/out "s3://$R2_BUCKET/out"

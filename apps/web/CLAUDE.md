@@ -18,4 +18,5 @@ Owner: Interface.
   - Pass #41CF8F, fail #FF6F6F, warning #F0C050. Gold #F4B63F marks sunlight readings and whichever toggle is on (`pressedGold`); blue marks Earth readings.
   - Corners: the panel 14 px, tiles and boxes 10 px, buttons 8 px (`rounded-md`); filters and check chips are pills (`rounded-pill`).
   - Fonts: Saira Semi Condensed for titles (`h1` to `h3`, `font-display`), IBM Plex Sans and IBM Plex Sans Arabic for text, IBM Plex Mono for numbers and data values (every `dd` and `output`; add `data-text` to a `dd` that holds a name or a sentence). Tabular figures throughout.
+- Data: by default the dev server serves `pipeline/out` at `/data` and `pipeline/raw/landfall` at `/landfall`. Set `DATA_BASE_URL` (in the shell or `apps/web/.env.local`) to the R2 bucket's public URL to read both from R2 instead (`out/` and `raw/landfall/`), with no local pipeline; the Pipeline workflow fills `out/`.
 - Touch targets are at least 44 px. Panels never cover more than a third of the screen.
