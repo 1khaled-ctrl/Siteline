@@ -143,7 +143,7 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
         {t('share.button')}
       </button>
       {open && (
-        <div className="absolute inset-s-0 top-10 z-20 flex w-60 flex-col rounded-lg border border-line bg-panel p-1.5 shadow-xl">
+        <div className="absolute inset-s-0 top-10 z-20 flex w-60 flex-col rounded-lg border border-line bg-panel p-1.5 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-3 max-sm:w-auto">
           <button type="button" className={item} onClick={() => void copy()}>
             {t('share.copy')}
           </button>

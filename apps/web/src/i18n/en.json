@@ -64,6 +64,7 @@
   },
   "sources": {
     "open": "Sources & methods",
+    "openShort": "Sources",
     "title": "Sources and methods",
     "close": "Close",
     "intro": "Every number in SiteLine is worked out from published data by code in this project; none is typed in by hand. This page brings together how each check works, how we tested it, and every dataset with its licence and link.",

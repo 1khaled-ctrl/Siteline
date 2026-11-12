@@ -63,8 +63,11 @@ export function App() {
           <Tagline />
         </div>
         <Breadcrumbs />
-        <div className="ms-auto flex flex-wrap items-center gap-2">
+        {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
+        <div className="ms-auto">
           <SourcesButton />
+        </div>
+        <div className="max-sm:w-full">
           <DateStepper />
         </div>
       </header>

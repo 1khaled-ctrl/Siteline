@@ -62,3 +62,10 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - All three were exercised in a real browser: the download, the clipboard contents, and the print layout. Menu: [share-menu.png](screenshots/share-menu.png).
 - The check and verdict rules moved into `verdict.ts` so the report, the card and the compare table (item 12) use one definition. Tests: `verdict.test.ts` (7 tests).
 - The link uses whatever address the app is served from, so it reads `localhost` today and the real address once deployed.
+
+### 10. Phone and tablet pass
+
+- Measured every view at 390 × 844 (phone) and 820 × 1180 (tablet): no horizontal scroll anywhere (page width equals window width in all 12 cases). Composites: [mobile-phone-390.png](screenshots/mobile-phone-390.png), [mobile-tablet-820.png](screenshots/mobile-tablet-820.png).
+- The phone header shrank from four rows (about 190 px) to two on most views: "Sources" (short label) sits on the title row, and the date stepper gets one row of its own, without the "UTC" tag (the date field's label already says UTC).
+- On a phone the Share menu opens as a sheet along the bottom edge instead of a dropdown that could run off-screen, and the close-up view hides its long "drag to turn" hint as the other views already did.
+- Also fixed on the way: the sources dialog now builds its content only while open, so its text no longer duplicates the page's text for screen readers and tests (it broke the smoke test once; passing again).

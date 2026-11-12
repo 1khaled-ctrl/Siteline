@@ -61,7 +61,6 @@ function IdChip({ id }: { id: string }) {
  * and link, read straight from CREDITS.md so the two never disagree.
  */
 export function SourcesDialog() {
-  const { t } = useTranslation();
   const open = useApp((s) => s.sources);
   const setSources = useApp((s) => s.setSources);
   const ref = useRef<HTMLDialogElement>(null);
@@ -80,13 +79,6 @@ export function SourcesDialog() {
 
   // A click on the dimmed backdrop lands on the dialog itself; one inside lands on its content.
   const backdrop = (e: MouseEvent) => e.target === ref.current && setSources(false);
-  const values = {
-    days: formatNumber(DEFAULT_STAY.stayDays),
-    pct: formatNumber(DEFAULT_STAY.minSunFraction * 100, 0),
-    rule: t(`sources.earthRule.${DEFAULT_STAY.earthRule}`),
-    deg: formatNumber(MAX_LANDING_SLOPE_DEG, 0),
-    lat: formatNumber(ARTEMIS_ZONE_LAT_DEG, 0).replace('-', '−'),
-  };
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape already closes a modal dialog; the click is for the mouse.
@@ -97,90 +89,108 @@ export function SourcesDialog() {
       onClick={backdrop}
       className="m-auto max-h-[90dvh] w-[min(880px,calc(100%-24px))] overflow-hidden rounded-xl border border-line bg-panel p-0 text-ink backdrop:bg-black/65"
     >
-      <div className="flex max-h-[90dvh] flex-col">
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <h2 id="sources-title" className="text-2xl">
-            {t('sources.title')}
-          </h2>
-          <button
-            type="button"
-            onClick={() => setSources(false)}
-            className="min-h-9 rounded-md border border-line bg-panel-raised px-3 text-sm hover:border-line-hover"
-          >
-            {t('sources.close')}
-          </button>
-        </div>
-        <div className="flex flex-col gap-6 overflow-y-auto px-5 py-4 text-sm" data-testid="sources">
-          <p className="text-quiet">{t('sources.intro')}</p>
-
-          <section>
-            <h3 className="mb-2 text-lg">{t('sources.methodsHeading')}</h3>
-            <ol className="flex flex-col gap-2">
-              {METHODS.map((m) => (
-                <li key={m.key} className="rounded-lg border border-line bg-panel-raised px-3 py-2">
-                  <p>{t(`sources.methods.${m.key}`, values)}</p>
-                  {m.ids.length > 0 && (
-                    <p className="mt-1.5 flex flex-wrap gap-1.5" dir="ltr">
-                      {m.ids.map((id) => (
-                        <IdChip key={id} id={id} />
-                      ))}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <section>
-            <h3 className="mb-2 text-lg">{t('sources.checksHeading')}</h3>
-            <Checks open />
-          </section>
-
-          <section>
-            <h3 className="mb-2 text-lg">{t('sources.data', { n: CREDITS.length })}</h3>
-            <ul className="flex flex-col gap-2">
-              {CREDITS.map((c) => (
-                <li
-                  key={c.id}
-                  id={`src-${c.id}`}
-                  tabIndex={-1}
-                  className={`scroll-mt-4 rounded-lg border px-3 py-2 outline-none ${open === c.id ? 'border-accent' : 'border-line'}`}
-                >
-                  <p className="font-mono text-[12.5px] text-accent" dir="ltr">
-                    {c.id}
-                  </p>
-                  <p className="mt-1">
-                    <Markdown text={c.what} />
-                  </p>
-                  <dl className="mt-1.5 grid gap-x-3 gap-y-0.5 text-xs text-quiet sm:grid-cols-[auto_1fr]">
-                    <dt>{t('sources.licence')}</dt>
-                    <dd className="font-sans">
-                      <Markdown text={c.licence} />
-                    </dd>
-                    <dt>{t('sources.source')}</dt>
-                    <dd className="font-sans">
-                      <Markdown text={c.source} />
-                    </dd>
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="text-xs text-quiet">
-            <h3 className="mb-1 text-base text-ink">{t('sources.fonts')}</h3>
-            <p>
-              <Markdown text={FONTS_NOTE} />
-            </p>
-            <h3 className="mt-3 mb-1 text-base text-ink">{t('sources.libraries')}</h3>
-            <p>
-              <Markdown text={LIBRARIES_NOTE} />
-            </p>
-            <p className="mt-3">{t('sources.more')}</p>
-          </section>
-        </div>
-      </div>
+      {open && <SourcesBody />}
     </dialog>
+  );
+}
+
+/** The dialog's content, built only while it is open. */
+function SourcesBody() {
+  const { t } = useTranslation();
+  const open = useApp((s) => s.sources);
+  const setSources = useApp((s) => s.setSources);
+  const values = {
+    days: formatNumber(DEFAULT_STAY.stayDays),
+    pct: formatNumber(DEFAULT_STAY.minSunFraction * 100, 0),
+    rule: t(`sources.earthRule.${DEFAULT_STAY.earthRule}`),
+    deg: formatNumber(MAX_LANDING_SLOPE_DEG, 0),
+    lat: formatNumber(ARTEMIS_ZONE_LAT_DEG, 0).replace('-', '−'),
+  };
+
+  return (
+    <div className="flex max-h-[90dvh] flex-col">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <h2 id="sources-title" className="text-2xl">
+          {t('sources.title')}
+        </h2>
+        <button
+          type="button"
+          onClick={() => setSources(false)}
+          className="min-h-9 rounded-md border border-line bg-panel-raised px-3 text-sm hover:border-line-hover"
+        >
+          {t('sources.close')}
+        </button>
+      </div>
+      <div className="flex flex-col gap-6 overflow-y-auto px-5 py-4 text-sm" data-testid="sources">
+        <p className="text-quiet">{t('sources.intro')}</p>
+
+        <section>
+          <h3 className="mb-2 text-lg">{t('sources.methodsHeading')}</h3>
+          <ol className="flex flex-col gap-2">
+            {METHODS.map((m) => (
+              <li key={m.key} className="rounded-lg border border-line bg-panel-raised px-3 py-2">
+                <p>{t(`sources.methods.${m.key}`, values)}</p>
+                {m.ids.length > 0 && (
+                  <p className="mt-1.5 flex flex-wrap gap-1.5" dir="ltr">
+                    {m.ids.map((id) => (
+                      <IdChip key={id} id={id} />
+                    ))}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-lg">{t('sources.checksHeading')}</h3>
+          <Checks open />
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-lg">{t('sources.data', { n: CREDITS.length })}</h3>
+          <ul className="flex flex-col gap-2">
+            {CREDITS.map((c) => (
+              <li
+                key={c.id}
+                id={`src-${c.id}`}
+                tabIndex={-1}
+                className={`scroll-mt-4 rounded-lg border px-3 py-2 outline-none ${open === c.id ? 'border-accent' : 'border-line'}`}
+              >
+                <p className="font-mono text-[12.5px] text-accent" dir="ltr">
+                  {c.id}
+                </p>
+                <p className="mt-1">
+                  <Markdown text={c.what} />
+                </p>
+                <dl className="mt-1.5 grid gap-x-3 gap-y-0.5 text-xs text-quiet sm:grid-cols-[auto_1fr]">
+                  <dt>{t('sources.licence')}</dt>
+                  <dd className="font-sans">
+                    <Markdown text={c.licence} />
+                  </dd>
+                  <dt>{t('sources.source')}</dt>
+                  <dd className="font-sans">
+                    <Markdown text={c.source} />
+                  </dd>
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="text-xs text-quiet">
+          <h3 className="mb-1 text-base text-ink">{t('sources.fonts')}</h3>
+          <p>
+            <Markdown text={FONTS_NOTE} />
+          </p>
+          <h3 className="mt-3 mb-1 text-base text-ink">{t('sources.libraries')}</h3>
+          <p>
+            <Markdown text={LIBRARIES_NOTE} />
+          </p>
+          <p className="mt-3">{t('sources.more')}</p>
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -194,7 +204,8 @@ export function SourcesButton() {
       onClick={() => setSources(true)}
       className="min-h-8 rounded-md border border-line bg-panel-raised px-2.5 text-[12.5px] hover:border-line-hover"
     >
-      {t('sources.open')}
+      <span className="max-sm:hidden">{t('sources.open')}</span>
+      <span className="sm:hidden">{t('sources.openShort')}</span>
     </button>
   );
 }

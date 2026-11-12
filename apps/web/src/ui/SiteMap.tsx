@@ -194,7 +194,7 @@ export function SiteMap() {
             }}
           />
         </p>
-        <p className={hintBox}>{t('siteView.hint')}</p>
+        <p className={`${hintBox} max-sm:hidden`}>{t('siteView.hint')}</p>
       </div>
       <ViewStatus view="site" load={load} />
     </section>
