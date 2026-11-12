@@ -36,8 +36,14 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
 
   useEffect(() => {
     if (!open) return;
+    // Into the menu on opening; back to the Share button when Escape shuts it.
+    box.current?.querySelector<HTMLButtonElement>('[data-share-item]')?.focus();
     const away = (e: PointerEvent) => box.current?.contains(e.target as Node) || setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      box.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    };
     document.addEventListener('pointerdown', away);
     document.addEventListener('keydown', esc);
     return () => {
@@ -144,7 +150,7 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
       </button>
       {open && (
         <div className="absolute inset-s-0 top-10 z-20 flex w-60 flex-col rounded-lg border border-line bg-panel p-1.5 shadow-xl max-sm:fixed max-sm:inset-x-3 max-sm:top-auto max-sm:bottom-3 max-sm:w-auto">
-          <button type="button" className={item} onClick={() => void copy()}>
+          <button type="button" data-share-item className={item} onClick={() => void copy()}>
             {t('share.copy')}
           </button>
           <button type="button" className={item} onClick={() => void download()}>

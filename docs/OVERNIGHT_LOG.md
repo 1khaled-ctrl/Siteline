@@ -68,4 +68,12 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - Measured every view at 390 × 844 (phone) and 820 × 1180 (tablet): no horizontal scroll anywhere (page width equals window width in all 12 cases). Composites: [mobile-phone-390.png](screenshots/mobile-phone-390.png), [mobile-tablet-820.png](screenshots/mobile-tablet-820.png).
 - The phone header shrank from four rows (about 190 px) to two on most views: "Sources" (short label) sits on the title row, and the date stepper gets one row of its own, without the "UTC" tag (the date field's label already says UTC).
 - On a phone the Share menu opens as a sheet along the bottom edge instead of a dropdown that could run off-screen, and the close-up view hides its long "drag to turn" hint as the other views already did.
-- Also fixed on the way: the sources dialog now builds its content only while open, so its text no longer duplicates the page's text for screen readers and tests (it broke the smoke test once; passing again).
+- Also fixed on the way (item 10): the sources dialog now builds its content only while open, so its text no longer duplicates the page's text for screen readers and tests (it broke the smoke test once; passing again).
+
+### 11. Keyboard and accessibility pass
+
+- Ran an in-browser audit on nine screens (all six views, the pole view with pinned sites, the open Share menu and the sources dialog): every visible control has an accessible name, every field a label, every image alt text, and every text element meets WCAG AA contrast (4.5:1, or 3:1 for large text), with translucent backgrounds composited down to the page colour. **0 findings** after the fixes below. Labels drawn on top of the 3D imagery can't be measured that way and were checked by eye.
+- The zoom +/− buttons, the compare list's × and the other icon-only buttons already had labels. Fixed: the best-spots button kept saying "Find the best spots" while showing ×; it now says "Close…" and reports busy and expanded states.
+- New: a **Skip to the side panel** link appears on the first Tab, so keyboard users don't have to step through every map control first. The Share menu moves focus into itself when it opens and back to the Share button on Escape.
+- The breadcrumb arrows were the one contrast miss (2.5:1, decorative and hidden from screen readers anyway); now full grey.
+- Every control shows the blue focus ring (the global `:focus-visible` style); nothing overrides it. Screenshot of the keyboard walk: [keyboard-focus.png](screenshots/keyboard-focus.png).

@@ -1,5 +1,7 @@
 {
   "app": {
+    "skipToPanel": "Skip to the side panel",
+    "panel": "Details for this view",
     "tagline": {
       "solar": "Solar system on the landing date",
       "earth": "Earth map and places",
@@ -178,6 +180,7 @@
   "best": {
     "button": "Best spot",
     "find": "Find the best spots in {{region}}",
+    "close": "Close the best spots in {{region}}",
     "sun": "Sun ≥ {{pct}}%",
     "none": "No spots inside the loaded terrain."
   },

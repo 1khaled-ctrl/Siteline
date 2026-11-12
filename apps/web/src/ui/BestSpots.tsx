@@ -39,8 +39,10 @@ export function BestSpots({ region }: { region: Region }) {
       <button
         type="button"
         disabled={busy}
-        aria-label={t('best.find', { region: region.name })}
-        title={t('best.find', { region: region.name })}
+        aria-busy={busy}
+        aria-expanded={Boolean(spots || error)}
+        aria-label={spots ? t('best.close', { region: region.name }) : t('best.find', { region: region.name })}
+        title={spots ? t('best.close', { region: region.name }) : t('best.find', { region: region.name })}
         className="min-h-9 rounded-md border border-line bg-panel-raised px-2.5 text-xs hover:border-line-hover disabled:opacity-60"
         onClick={() => (spots ? setSpots(undefined) : void run())}
       >
