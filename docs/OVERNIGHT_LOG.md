@@ -153,3 +153,7 @@ Bug found on the way (item 14): newer Chromium makes `scrollIntoView()` return a
 ### P1. Phone check of tonight's additions
 
 The day strip, the compare table, the journey dialog and the copilot didn't exist during the item 10 pass, so I checked them at 390 px wide: no sideways scroll on any. Fixed two things: the compare table's verdict chips overlapped in four narrow columns (on a phone they now show just ✓, ✗ or ?, in colour, with the word kept for screen readers), and the journey map clipped labels near its edge (they now stay inside). Screenshot: [mobile-new-features.png](screenshots/mobile-new-features.png).
+
+### P2. The copilot answers "How sure is that?"
+
+Asking the copilot how sure, reliable or accurate a reading is now runs `analyze_site` with a "confidence" aspect and answers from the same rules as the item 17 badges, for example: "High confidence: the Artemis zone. First pass, from terrain coarser than LOLA's full detail, so worth checking with finer terrain: Sun up, Earth in view, ground height, the 19-year figures. Not measured yet: the landing slope." It's also one of the example chips. Screenshot: [copilot-how-sure.png](screenshots/copilot-how-sure.png). Tests: two more cases in `copilot.test.ts`.

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { type Confidence, confidenceOf, type Reading } from '../confidence';
 import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, type Target } from '../copilot';
 import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
@@ -19,7 +20,9 @@ interface Message {
 
 const NAMES = MISSIONS.map((m) => ({ id: m.id, name: m.name }));
 const VIEW_OF: Record<Target, MoonView> = { solar: 'solar', earth: 'earth', mars: 'mars', moon: 'globe', pole: 'pole' };
-const EXAMPLES = ['example1', 'example2', 'example3', 'example4', 'example5'];
+const EXAMPLES = ['example1', 'example2', 'example3', 'example6', 'example4', 'example5'];
+const READINGS: Reading[] = ['zone', 'sun', 'earth', 'height', 'longTerm', 'slope'];
+const CONFIDENCE_LEVELS: Confidence[] = ['high', 'firstPass', 'flatHorizon', 'notMeasured'];
 
 const callText = (intent: Intent) =>
   intent.tool === 'help'
@@ -72,7 +75,17 @@ export function Copilot() {
         : `${t(`compare.problem.${s.problem.key}`)}${s.problem.atUtc ? ` ${formatUtc(s.problem.atUtc)}` : ''}`
       : undefined;
     const when = (iso: string | undefined) => (iso ? formatUtc(iso) : t('report.none'));
+    // The site report's confidence marks, grouped: which readings are solid and which are a first pass.
+    const sure = {
+      terrainM: s.terrainKm !== undefined ? s.terrainKm * 1000 : undefined,
+      longTermM: s.longTerm?.resolutionM,
+    };
+    const confidence = CONFIDENCE_LEVELS.map((level) => {
+      const names = READINGS.filter((r) => confidenceOf(r, sure) === level).map((r) => t(`copilot.readingNames.${r}`));
+      return names.length ? t(`copilot.confidenceLevels.${level}`, { list: names.join(', ') }) : '';
+    }).filter(Boolean);
     const lines: Record<Aspect, string[]> = {
+      confidence: [head, ...confidence],
       verdict: [head, verdict],
       why: [head, problem ? t('copilot.firstProblem', { problem }) : t('copilot.noProblem'), verdict],
       sun: [head, t('copilot.sun', { pct: pct(s.sunMinPct) }), t('copilot.nextSunset', { at: when(s.next.sunset) })],

@@ -157,8 +157,23 @@
     "example3": "When does the Sun set?",
     "example4": "Fly to Mars",
     "example5": "Show me Apollo 11",
+    "example6": "How sure is that?",
+    "readingNames": {
+      "zone": "the Artemis zone",
+      "sun": "Sun up",
+      "earth": "Earth in view",
+      "height": "ground height",
+      "longTerm": "the 19-year figures",
+      "slope": "the landing slope"
+    },
+    "confidenceLevels": {
+      "high": "High confidence: {{list}}.",
+      "firstPass": "First pass, from terrain coarser than LOLA's full detail, so worth checking with finer terrain: {{list}}.",
+      "flatHorizon": "Horizon taken as flat, as this spot is off the loaded terrain: {{list}}.",
+      "notMeasured": "Not measured yet: {{list}}."
+    },
     "note": "Runs in your browser and understands a few kinds of request. It only reads data and moves the view: it changes nothing and calls no outside service. A Claude-powered copilot is planned.",
-    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight over 19 years?\").",
+    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight over 19 years?\", \"How sure is that?\").",
     "flying": "Flying to {{place}}.",
     "places": {
       "solar": "the solar system",

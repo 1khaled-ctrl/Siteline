@@ -35,6 +35,8 @@ describe('parseIntent', () => {
     expect(aspect('How much sunlight over 19 years?')).toBe('longTerm');
     expect(aspect('is the slope too steep')).toBe('slope');
     expect(aspect('give me the site report')).toBe('summary');
+    expect(aspect('How sure is that?')).toBe('confidence');
+    expect(aspect('how accurate is the 19 year sunlight?')).toBe('confidence');
   });
 
   it('falls back to help for anything else', () => {

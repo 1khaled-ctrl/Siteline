@@ -8,7 +8,17 @@ import { type Check, type CheckKey, checksOf, firstProblem, type Problem, type V
  */
 
 export type Target = 'solar' | 'earth' | 'mars' | 'moon' | 'pole';
-export type Aspect = 'summary' | 'verdict' | 'why' | 'sun' | 'earth' | 'slope' | 'height' | 'longTerm' | 'events';
+export type Aspect =
+  | 'summary'
+  | 'verdict'
+  | 'why'
+  | 'sun'
+  | 'earth'
+  | 'slope'
+  | 'height'
+  | 'longTerm'
+  | 'events'
+  | 'confidence';
 
 export type Intent =
   | { tool: 'fly_to'; input: { target: Target } }
@@ -46,6 +56,7 @@ const MOVE = / (fly|go|take me|travel|head|show me|open|back to|zoom to|switch t
 
 /** Site questions, most specific first: "sunset" must not read as "sun", nor "19 years of sun" as plain sunlight. */
 const ASPECTS: [Aspect, RegExp][] = [
+  ['confidence', / (sure|confidence|confident|reliable|accurate|accuracy|trust|certain|uncertain) /],
   ['events', / (when|sunset|sunrise|earthset|earthrise|next|until) /],
   ['longTerm', / (19|year|years|long term|always|permanent|shadow|shadowed|never) /],
   ['why', / (why|reason|reasons|problem|problems|wrong|fails because) /],
@@ -91,7 +102,7 @@ export interface SiteSummary {
   earthPct: number;
   groundHeightM?: number;
   terrainKm?: number;
-  longTerm?: { sunPct: number; earthPct: number; shadowed?: boolean };
+  longTerm?: { sunPct: number; earthPct: number; shadowed?: boolean; resolutionM?: number };
   problem?: Problem;
   next: { sunset?: string; sunrise?: string; earthset?: string; earthrise?: string };
   sources: string[];
@@ -108,7 +119,12 @@ export function summarize(r: StayResponse, site: { latDeg: number; lonDeg: numbe
     earthPct: r.result.earthVisiblePct,
     groundHeightM: r.terrain?.groundHeightM,
     terrainKm: r.terrain && r.terrain.resolutionM / 1000,
-    longTerm: r.longTerm && { sunPct: r.longTerm.sunPct, earthPct: r.longTerm.earthPct, shadowed: r.longTerm.shadowed },
+    longTerm: r.longTerm && {
+      sunPct: r.longTerm.sunPct,
+      earthPct: r.longTerm.earthPct,
+      shadowed: r.longTerm.shadowed,
+      resolutionM: r.longTerm.resolutionM,
+    },
     problem: firstProblem(r.result.reasons, Date.parse(landingUtc)),
     next: {
       sunset: r.result.nextSunsetUtc,
