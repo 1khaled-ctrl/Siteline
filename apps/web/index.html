@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
     <title>SiteLine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -10,9 +11,48 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Saira+Semi+Condensed:wght@500;600;700&display=swap"
     />
+    <!-- Dark from the first paint, and a splash until the app replaces it, so the page is never blank or white. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #060913;
+        color: #e8edf7;
+      }
+      .boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font: 700 21px "Saira Semi Condensed", system-ui, sans-serif;
+        letter-spacing: 0.03em;
+      }
+      .boot-ring {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgb(91 169 255 / 0.25);
+        border-top-color: #5ba9ff;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-ring {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status"><span class="boot-ring" aria-hidden="true"></span>SiteLine</div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

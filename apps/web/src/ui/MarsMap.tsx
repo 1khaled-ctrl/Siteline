@@ -7,6 +7,7 @@ import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
+import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const MARS_ASSETS = {
@@ -38,6 +39,8 @@ export function MarsMap() {
   const lightingUtcMs = useLightingUtcMs();
   const shownMs = useShownUtcMs();
   const { tracks } = useLanderFiles();
+  const load = useLoad();
+  const { ready, fail } = load;
   useFlyToMission('Mars', globe ? (lat, lon) => void globe.flyTo(lat, lon, LANDER_DISTANCE, ms(1200)) : undefined);
 
   useEffect(() => {
@@ -49,13 +52,19 @@ export function MarsMap() {
       onHeights: () => setHeightsReady(true),
     });
     setGlobe(created);
+    let live = true;
+    created.ready.then(
+      () => live && ready(),
+      (e: unknown) => live && fail(e),
+    );
     return () => {
+      live = false;
       created.dispose();
       setGlobe(null);
       setHeightsReady(false);
       useApp.getState().setMarsPlace(null);
     };
-  }, []);
+  }, [ready, fail]);
 
   useEffect(() => globe?.setRealLight(realLight), [globe, realLight]);
   useEffect(() => globe?.setNames(names), [globe, names]);
@@ -105,8 +114,13 @@ export function MarsMap() {
 
   return (
     <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="mars-map" />
-      <LanderPins host={globe} missions={PINNED.Mars} tracks={tracks} atUtcMs={shownMs} />
+      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="mars-map" />
+      <LanderPins
+        host={load.state === 'ready' ? globe : null}
+        missions={PINNED.Mars}
+        tracks={tracks}
+        atUtcMs={shownMs}
+      />
       <ViewPills wide>
         <button
           type="button"
@@ -156,6 +170,7 @@ export function MarsMap() {
         </button>
       </ViewPills>
       <ViewHint>{t('mars.hint')}</ViewHint>
+      <ViewStatus view="mars" load={load} />
       <search className="absolute inset-e-3 top-3">
         <form onSubmit={search} className="flex flex-col items-end gap-1">
           <input

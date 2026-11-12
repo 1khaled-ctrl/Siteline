@@ -66,6 +66,8 @@ export class GlobeView {
   private readonly onPick?: (latDeg: number, lonDeg: number) => void;
   private readonly textures: THREE.Texture[] = [];
   private readonly ranks: Partial<Record<'map' | 'slopes', number>> = {};
+  /** Settles once a colour map is on the Moon; fails only when every colour map failed to load. */
+  readonly ready: Promise<void>;
   private down?: { x: number; y: number };
   private userMoved = false;
   private flying = false;
@@ -106,9 +108,10 @@ export class GlobeView {
     });
     this.controls.addEventListener('change', () => this.requestRender());
 
-    this.loadTexture(textures.color, 'map', 0);
-    if (textures.colorHd) this.loadTexture(textures.colorHd, 'map', 1);
-    if (textures.slopesHd) this.loadTexture(textures.slopesHd, 'slopes', 1);
+    const maps = [this.loadTexture(textures.color, 'map', 0)];
+    if (textures.colorHd) maps.push(this.loadTexture(textures.colorHd, 'map', 1));
+    if (textures.slopesHd) this.loadTexture(textures.slopesHd, 'slopes', 1).catch(() => {});
+    this.ready = Promise.any(maps);
 
     const canvas = this.renderer.domElement;
     canvas.addEventListener('pointerdown', this.onPointerDown);
@@ -264,15 +267,23 @@ export class GlobeView {
   }
 
   /** Higher `rank` wins, so a small preview never replaces a high-resolution map that arrived first. */
-  private loadTexture(url: string, uniform: 'map' | 'slopes', rank: number): void {
-    new THREE.TextureLoader().load(url, (texture) => {
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      this.textures.push(texture);
-      if ((this.ranks[uniform] ?? -1) > rank) return;
-      this.ranks[uniform] = rank;
-      this.material.uniforms[uniform].value = texture;
-      if (uniform === 'slopes') this.material.uniforms.hasSlopes.value = 1;
-      this.requestRender();
+  private loadTexture(url: string, uniform: 'map' | 'slopes', rank: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      new THREE.TextureLoader().load(
+        url,
+        (texture) => {
+          texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+          this.textures.push(texture);
+          resolve();
+          if ((this.ranks[uniform] ?? -1) > rank) return;
+          this.ranks[uniform] = rank;
+          this.material.uniforms[uniform].value = texture;
+          if (uniform === 'slopes') this.material.uniforms.hasSlopes.value = 1;
+          this.requestRender();
+        },
+        undefined,
+        () => reject(new Error(`${url} did not load`)),
+      );
     });
   }
 

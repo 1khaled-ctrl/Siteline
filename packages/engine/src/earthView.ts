@@ -165,6 +165,8 @@ export class EarthView {
   private readonly detailLines: Partial<Record<'prov' | 'roads' | 'rivers' | 'lakes' | 'coast', THREE.LineSegments>> =
     {};
   private readonly textures: Partial<Record<EarthStyle, THREE.Texture>> = {};
+  /** Settles once the map-style imagery is on the globe, or fails if it could not load. */
+  readonly ready: Promise<void>;
   private readonly labelLayer = document.createElement('div');
   private readonly labels: Label[] = [];
   private readonly cityPool: CityLabel[] = [];
@@ -243,7 +245,7 @@ export class EarthView {
     for (let i = 0; i < 110; i++) this.cityPool.push(this.makeCityLabel());
 
     this.applyStyle();
-    void this.loadTexture('map');
+    this.ready = this.loadTexture('map');
     void this.loadTexture('night');
     void this.loadCountries();
     void this.loadIds();
@@ -378,7 +380,9 @@ export class EarthView {
   private async loadTexture(style: EarthStyle): Promise<void> {
     if (this.textures[style]) return;
     const url = this.opts.assets[style];
-    const texture = await new THREE.TextureLoader().loadAsync(url);
+    const texture = await new THREE.TextureLoader().loadAsync(url).catch(() => {
+      throw new Error(`${url} did not load`);
+    });
     if (this.disposed) return texture.dispose();
     texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     this.textures[style] = texture;

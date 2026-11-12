@@ -6,6 +6,7 @@ import { physics, URLS, useLightingUtcMs } from '../physics';
 import { REGIONS } from '../regions';
 import { LAYERS, type Layer, useApp } from '../store';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
+import { useLoad, ViewStatus } from './ViewStatus';
 
 const EXAGGERATION = 3;
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
@@ -50,7 +51,8 @@ export function PoleMap() {
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<PoleView | null>(null);
   const [maps, setMaps] = useState<PolarMaps>();
-  const [error, setError] = useState<string>();
+  const load = useLoad();
+  const { ready, fail } = load;
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
   const focusSeq = useApp((s) => s.focusSeq);
@@ -70,9 +72,10 @@ export function PoleMap() {
           onPick: (lat, lon) => useApp.getState().set({ latDeg: round4(lat), lonDeg: round4(lon) }),
         });
         setView(created);
+        ready();
       },
       (e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : String(e));
+        if (live) fail(e);
       },
     );
     physics.maps(URLS.maps).then(
@@ -86,7 +89,7 @@ export function PoleMap() {
       created?.dispose();
       setView(null);
     };
-  }, []);
+  }, [ready, fail]);
 
   useEffect(() => {
     view?.setSite(latDeg, lonDeg);
@@ -146,9 +149,8 @@ export function PoleMap() {
           ))}
         </fieldset>
       </ViewPills>
-      <ViewHint>
-        {error ? t('map.error', { message: error }) : view ? t('map.hint', { exag: EXAGGERATION }) : t('map.loading')}
-      </ViewHint>
+      <ViewHint>{t('map.hint', { exag: EXAGGERATION })}</ViewHint>
+      <ViewStatus view="pole" load={load} />
       <button
         type="button"
         onClick={() => useApp.getState().set({ view: 'globe' })}

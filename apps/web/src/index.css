@@ -96,9 +96,18 @@ body {
   animation: fade-in 700ms ease-out both;
 }
 
+/* A loading note waits a quarter second before showing, so a load from the cache never flashes it. */
+.status-in {
+  animation: fade-in 300ms ease-out 250ms both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in {
     animation: none;
+  }
+
+  .status-in {
+    animation: fade-in 1ms linear 250ms both;
   }
 }
 

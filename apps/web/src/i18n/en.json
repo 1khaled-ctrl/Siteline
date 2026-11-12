@@ -19,6 +19,28 @@
     "later": "One day later",
     "now": "Now"
   },
+  "status": {
+    "loading": {
+      "solar": "Loading planet positions…",
+      "earth": "Loading NASA Blue Marble imagery…",
+      "mars": "Loading the Mars maps…",
+      "globe": "Loading the Moon map…",
+      "pole": "Loading NASA LOLA south-pole terrain…",
+      "site": "Loading the terrain around this site…"
+    },
+    "failed": {
+      "solar": "The planet positions didn't arrive",
+      "earth": "The Earth imagery didn't arrive",
+      "mars": "The Mars maps didn't arrive",
+      "globe": "The Moon map didn't arrive",
+      "pole": "The south-pole terrain didn't arrive",
+      "site": "The terrain around this site didn't arrive"
+    },
+    "help": "Usually a network hiccup. Check the connection and try again.",
+    "retry": "Try again",
+    "reason": "Details: {{message}}",
+    "offline": "You're offline. What has loaded still works; anything new loads once you're back."
+  },
   "site": {
     "heading": "Landing site",
     "lat": "Latitude (°)",
@@ -203,8 +225,7 @@
   },
   "solar": {
     "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there.",
-    "flying": "Flying there…",
-    "error": "Could not load the planets: {{message}}"
+    "flying": "Flying there…"
   },
   "globe": {
     "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
@@ -275,8 +296,7 @@
   "siteView": {
     "crumb": "{{name}}, close up",
     "hint": "Drag to turn the terrain, scroll to zoom. Heights are stretched, so slopes look steeper than they are.",
-    "loading": "Loading the terrain…",
-    "failed": "Could not load the terrain around this site.",
+    "noPatch": "This site has no close-up terrain in the data.",
     "back": "Back to the globe",
     "home": "Reset view",
     "realSun": "Sunlight now",
@@ -295,9 +315,7 @@
   "map": {
     "backToGlobe": "Whole Moon",
     "display": "What the view shows",
-    "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date.",
-    "loading": "Loading south-pole terrain…",
-    "error": "Could not load the terrain: {{message}}"
+    "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date."
   },
   "earth": {
     "hint": "Drag to turn the Earth, scroll to zoom, click a place to name it. Zoom in for provinces, roads and cities.",
