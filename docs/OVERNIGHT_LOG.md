@@ -91,3 +91,17 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - To make them testable, the compare table's "first problem" rule and the card's file name moved out of the components into `verdict.ts`.
 - Not unit-tested: the canvas drawing of the share card and the React loading hooks (no DOM test library in the repo, and adding one changes the lockfile, which is the integrator's). Both were exercised in a real browser instead (items 6, 7, 9).
 - The AU and light-time maths the Worlds list uses already had tests against NASA's and JPL Horizons' figures (`bodyFacts.test.ts`), so nothing new was needed there.
+
+### 14. Copilot chat, scoped small (stretch)
+
+**What's there.** An **Ask SiteLine** button floats at the bottom-start of the 3D view on every screen and opens a small chat. It has three read-only tools, named as in `docs/contracts.md`:
+- `fly_to`: "Fly to Mars", "Take me to the south pole", or just "moon" moves the view.
+- `show_mission`: "Show me Apollo 11", "where is Curiosity?" opens that mission's card and flies there (it knows all 46 missions by full name, craft name or id).
+- `analyze_site`: questions about the selected Moon landing site ("Does this site pass?", "Why does it fail?", "When does the Sun set?", "Is Earth in view?", "How steep is it?", "How high is it?", "Sunlight over 19 years?", "Give me the report"). It runs **the same check, with the same inputs, as the site report**, so it can never say a number the panel doesn't; answers list their dataset ids, which open the sources dialog.
+- Each reply shows the tool call it made (for example `↳ analyze_site(aspect: "events")`), so it's clear what was looked up. Anything else gets a short "here's what I can do".
+
+**What's not there (by design tonight).** No AI model is connected: a small keyword matcher in `copilot.ts` picks the tool, and the panel says so ("Simple matcher, no AI yet"). Nothing calls a paid API, nothing writes data, and no new infrastructure was added. The planned Claude relay (`apps/copilot-worker`) can replace the matcher later and reuse the same tools unchanged. Not built yet: the other contract tools (`compare_sites`, `find_best`, `set_date`, `set_slip`, `toggle_layer`, `list_missions`, `launch_windows`, `explain`, `export_report`), JSON-schema validation of tool inputs, and free-form follow-up questions.
+
+Screenshot of a real conversation (Mons Mouton, landing 8 Apr 2028; its numbers match the site report beside it): [copilot-chat.png](screenshots/copilot-chat.png). Tests: `copilot.test.ts` (6 tests: tool choice, mission aliases, and that the summary carries the report's numbers unchanged).
+
+Bug found on the way: newer Chromium makes `scrollIntoView()` return a Promise, and a one-line React effect that returned it crashed the page. Fixed in the copilot; I checked the app's other one-line effects and they all return nothing.

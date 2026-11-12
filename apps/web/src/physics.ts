@@ -26,7 +26,7 @@ export interface StayState extends Partial<StayResponse> {
   retry: () => void;
 }
 
-function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQuery {
+export function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQuery {
   return {
     ...DEFAULT_STAY,
     site: { id: `moon:${site.latDeg},${site.lonDeg}`, body: 'moon', latDeg: site.latDeg, lonDeg: site.lonDeg },

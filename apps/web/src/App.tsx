@@ -8,6 +8,7 @@ import { BodyFacts } from './ui/BodyFacts';
 import { MarsSide, MoonSide, SiteSide } from './ui/BodySide';
 import { Breadcrumbs } from './ui/Breadcrumbs';
 import { Controls, LandingTime } from './ui/Controls';
+import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
 import { MoonView } from './ui/MoonView';
@@ -83,6 +84,7 @@ export function App() {
       {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
       <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
         <MoonView />
+        <Copilot />
         <aside
           id="panel"
           tabIndex={-1}

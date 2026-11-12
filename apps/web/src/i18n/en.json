@@ -48,6 +48,64 @@
     "reason": "Details: {{message}}",
     "offline": "You're offline. What has loaded still works; anything new loads once you're back."
   },
+  "copilot": {
+    "open": "Ask SiteLine",
+    "title": "Ask SiteLine",
+    "badge": "Simple matcher, no AI yet",
+    "close": "Close",
+    "inputLabel": "Message",
+    "placeholder": "Ask about this site, or say where to go",
+    "send": "Send",
+    "thinking": "Checking…",
+    "intro": "Ask about the selected Moon landing site, open a mission, or say where to go. Try one of these:",
+    "example1": "Does this site pass?",
+    "example2": "Why does it fail?",
+    "example3": "When does the Sun set?",
+    "example4": "Fly to Mars",
+    "example5": "Show me Apollo 11",
+    "note": "Runs in your browser and understands a few kinds of request. It only reads data and moves the view: it changes nothing and calls no outside service. A Claude-powered copilot is planned.",
+    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight over 19 years?\").",
+    "flying": "Flying to {{place}}.",
+    "places": {
+      "solar": "the solar system",
+      "earth": "Earth",
+      "mars": "Mars",
+      "moon": "the Moon",
+      "pole": "the Moon's south pole"
+    },
+    "mission": "Opening {{name}}; its card is in the side panel.",
+    "failed": "The check couldn't run: {{message}}",
+    "site": "The site at {{place}}, landing {{date}}:",
+    "verdict": {
+      "pass": "It passes every check for the stay.",
+      "fail": "It fails on: {{failed}}.",
+      "undecided": "Nothing fails, but it isn't decided yet: {{unknown}} can't be checked with the data loaded."
+    },
+    "checkNames": {
+      "sun": "Sun up for the whole stay",
+      "earth": "Earth in view",
+      "slope": "the landing slope",
+      "zone": "the Artemis zone"
+    },
+    "firstProblem": "First problem: {{problem}}.",
+    "noProblem": "Nothing goes wrong during the stay.",
+    "sun": "The least of the Sun visible at any moment of the stay is {{pct}}%.",
+    "nextSunset": "Next sunset: {{at}}.",
+    "earth": "Earth is in view {{pct}}% of the stay.",
+    "nextEarthset": "Next earthset: {{at}}.",
+    "slopeUnknown": "The slope can't be judged yet: the rule needs terrain finer than 100 m, and the loaded LOLA terrain is {{km}} km per pixel.",
+    "slopeNoTerrain": "The slope can't be judged: this spot is outside the loaded terrain.",
+    "slope": {
+      "yes": "The ground is flatter than the slope limit.",
+      "no": "The ground is steeper than the slope limit."
+    },
+    "height": "Ground height there: {{m}} m (NASA LOLA terrain).",
+    "heightNone": "This spot is outside the loaded terrain, so there is no ground height.",
+    "longTerm": "Over the 19-year cycle: sunlight {{sun}}% of the time, Earth in view {{earth}}%.{{shadow}}",
+    "shadowed": " It never sees the Sun.",
+    "longTermNone": "This spot is outside the 19-year maps.",
+    "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}."
+  },
   "share": {
     "button": "Share",
     "copy": "Copy a link to this check",
