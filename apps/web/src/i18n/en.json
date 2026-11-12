@@ -172,10 +172,32 @@
     "heading_one": "{{count}} pinned site",
     "heading_other": "{{count}} pinned sites",
     "site": "Site",
-    "sun": "Least Sun",
-    "earth": "Earth up",
     "verdict": "Stay",
-    "unpin": "Unpin"
+    "undecided": "Undecided",
+    "unpin": "Unpin",
+    "unpinSite": "Unpin {{site}}",
+    "open": "Check this site",
+    "intro": "Each site re-checked for the landing date and slip above. ★ marks the best value in a row.",
+    "caption": "Pinned sites side by side",
+    "slope": "Slope under {{deg}}°",
+    "firstProblem": "First problem",
+    "noProblem": "none",
+    "problem": {
+      "SUN_BELOW_HORIZON": "Sun sets",
+      "EARTH_BELOW_HORIZON": "Earth sets",
+      "SLOPE_TOO_STEEP": "Too steep",
+      "OUTSIDE_ZONE": "Outside the zone",
+      "NO_DATA_ephemeris": "Dates not covered",
+      "NO_DATA_slope": "Slope not measured"
+    },
+    "atLanding": {
+      "SUN_BELOW_HORIZON": "Sun down at landing",
+      "EARTH_BELOW_HORIZON": "Earth down at landing"
+    },
+    "bestBadge": "Best",
+    "bestValue": "(best in this row)",
+    "winner": "Best of these for this date: {{site}}.",
+    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded."
   },
   "best": {
     "button": "Best spot",

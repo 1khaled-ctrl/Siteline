@@ -27,6 +27,43 @@ export function verdictOf(checks: Readonly<Record<CheckKey, Check>>): Verdict {
   return all.includes('no') ? 'fail' : all.includes('unknown') ? 'undecided' : 'pass';
 }
 
+export interface RankInput {
+  verdict: Verdict;
+  earthVisiblePct: number;
+  /** Sunlight over the 19-year cycle, where the long-term maps cover the spot. */
+  longTermSunPct?: number;
+}
+
+const VERDICT_ORDER: Record<Verdict, number> = { pass: 0, undecided: 1, fail: 2 };
+const orLow = (v: number | undefined) => (v !== undefined && Number.isFinite(v) ? v : Number.NEGATIVE_INFINITY);
+
+/**
+ * The sites best first, by a rule simple enough to state on screen: the stay's verdict, then sunlight over 19 years,
+ * then the time Earth is in view. Sites still being checked (undefined) are left out.
+ */
+export function rankSites(rows: readonly (RankInput | undefined)[]): number[] {
+  return rows
+    .map((r, i) => ({ r, i }))
+    .filter((x): x is { r: RankInput; i: number } => x.r !== undefined)
+    .sort(
+      (a, b) =>
+        VERDICT_ORDER[a.r.verdict] - VERDICT_ORDER[b.r.verdict] ||
+        orLow(b.r.longTermSunPct) - orLow(a.r.longTermSunPct) ||
+        orLow(b.r.earthVisiblePct) - orLow(a.r.earthVisiblePct) ||
+        a.i - b.i,
+    )
+    .map((x) => x.i);
+}
+
+/** Which entries hold the highest value, when at least two values can be compared and they are not all equal. */
+export function bestOf(values: readonly (number | undefined)[]): Set<number> {
+  const known = values.map((v, i) => ({ v, i })).filter((x) => x.v !== undefined && Number.isFinite(x.v));
+  if (known.length < 2) return new Set();
+  const top = Math.max(...known.map((x) => x.v as number));
+  const winners = known.filter((x) => x.v === top);
+  return winners.length === known.length ? new Set() : new Set(winners.map((x) => x.i));
+}
+
 export interface ShareState {
   landingUtc: string;
   slipDays: number;

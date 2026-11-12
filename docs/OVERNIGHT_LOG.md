@@ -77,3 +77,10 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - New: a **Skip to the side panel** link appears on the first Tab, so keyboard users don't have to step through every map control first. The Share menu moves focus into itself when it opens and back to the Share button on Escape.
 - The breadcrumb arrows were the one contrast miss (2.5:1, decorative and hidden from screen readers anyway); now full grey.
 - Every control shows the blue focus ring (the global `:focus-visible` style); nothing overrides it. Screenshot of the keyboard walk: [keyboard-focus.png](screenshots/keyboard-focus.png).
+
+### 12. Compare view: a real side-by-side table
+
+- Pinned sites (up to 4) are now columns and the readings are rows: stay verdict, least of the Sun visible, time Earth is in view, slope, ground height, sunlight over 19 years, Earth in view over 19 years, and the first problem ("Sun down at landing", "Earth sets 9 Apr, 14:00", "none").
+- The best value in each comparable row gets a ★ (only when there is a real difference). The best site overall gets a **Best** badge and a line under the table naming it, with the ranking rule stated on screen: verdict first, then sunlight over 19 years, then Earth in view. Slope is shown but not ranked, since no site can be measured until finer terrain is loaded.
+- The verdict now uses the same rules as the site report (it used the raw pass flag before, so a site the report called "not decided yet" showed as "Fail" here).
+- Screenshot with four Artemis regions (Malapert Massif, Mons Mouton, Haworth, de Gerlache Rim 2) landing 8 Apr 2028: [compare-table.png](screenshots/compare-table.png). Tests for the ranking and the ★ rule are in `verdict.test.ts`.

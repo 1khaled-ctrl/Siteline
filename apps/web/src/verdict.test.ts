@@ -1,6 +1,6 @@
 import type { Reason, StayResult } from '@siteline/contracts';
 import { describe, expect, it } from 'vitest';
-import { checksOf, shareLink, verdictOf } from './verdict';
+import { bestOf, checksOf, rankSites, shareLink, verdictOf } from './verdict';
 
 function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
   return {
@@ -44,6 +44,48 @@ describe('verdictOf', () => {
   });
   it('passes only when every check passes', () => {
     expect(verdictOf({ sun: 'yes', earth: 'yes', slope: 'yes', zone: 'yes' })).toBe('pass');
+  });
+});
+
+describe('rankSites', () => {
+  it('puts a passing site first, whatever its sunlight', () => {
+    const order = rankSites([
+      { verdict: 'fail', earthVisiblePct: 100, longTermSunPct: 90 },
+      { verdict: 'pass', earthVisiblePct: 40, longTermSunPct: 20 },
+      { verdict: 'undecided', earthVisiblePct: 80, longTermSunPct: 85 },
+    ]);
+    expect(order).toEqual([1, 2, 0]);
+  });
+
+  it('breaks a tie on the verdict by 19-year sunlight, then by Earth in view', () => {
+    const order = rankSites([
+      { verdict: 'undecided', earthVisiblePct: 50, longTermSunPct: 70 },
+      { verdict: 'undecided', earthVisiblePct: 90, longTermSunPct: 70 },
+      { verdict: 'undecided', earthVisiblePct: 10, longTermSunPct: 80 },
+    ]);
+    expect(order).toEqual([2, 1, 0]);
+  });
+
+  it('ranks a spot outside the long-term maps below one inside them, and skips sites still being checked', () => {
+    const order = rankSites([
+      { verdict: 'fail', earthVisiblePct: 100 },
+      undefined,
+      { verdict: 'fail', earthVisiblePct: 0, longTermSunPct: 1 },
+    ]);
+    expect(order).toEqual([2, 0]);
+  });
+});
+
+describe('bestOf', () => {
+  it('marks the highest value, and every one that ties for it', () => {
+    expect([...bestOf([10, 74, 53])]).toEqual([1]);
+    expect([...bestOf([74, 10, 74])]).toEqual([0, 2]);
+  });
+
+  it('marks nothing when there is nothing to choose between', () => {
+    expect(bestOf([53]).size).toBe(0);
+    expect(bestOf([53, 53]).size).toBe(0);
+    expect(bestOf([undefined, 53, Number.NaN]).size).toBe(0);
   });
 });
 
