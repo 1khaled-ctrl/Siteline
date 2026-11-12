@@ -50,6 +50,34 @@ body {
   background: radial-gradient(ellipse 75% 70% at 50% 46%, #0e1932 0%, #090f20 48%, var(--color-space) 100%);
 }
 
+/* "Print or save as PDF" prints only the site report's summary card, on white, across a landscape page. */
+#print-card {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  body > :not(#print-card) {
+    display: none;
+  }
+
+  #print-card {
+    display: block;
+  }
+
+  #print-card img {
+    width: 100%;
+  }
+}
+
 /* In the base layer so a class on an element (`font-sans`, `text-sm`) still wins. */
 @layer base {
   /* Titles are set in the display face. */

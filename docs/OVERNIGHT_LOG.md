@@ -52,3 +52,13 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - The dataset list is read from `CREDITS.md` itself when the app is built (`credits.ts`), so the two can never disagree. Its thresholds (6.5-day stay, 50 % of the Sun's disc, 10° slope, −84° zone) are read from the code, not typed in.
 - The site report's "Sources:" ids are now links that open the dialog at that dataset, highlighted. The per-panel citations are all still there.
 - Screenshots: [sources-dialog.png](screenshots/sources-dialog.png), [sources-dialog-from-report.png](screenshots/sources-dialog-from-report.png). Tests: `credits.test.ts` (8 tests).
+
+### 9. Share this site report
+
+- A **Share** button sits beside "Pin to compare" in the site report's verdict box. It offers three things:
+  - **Copy a link to this check**: a URL with the spot, landing date and launch slip that reopens the same check for anyone.
+  - **Download as an image (PNG)**: a 1200 × 675 summary card (drawn at 2× for sharp text) with the verdict, the four checks, the six readings, the terrain caveat, the sources, the link, and a footer saying it is a planning aid, not a mission-certified analysis. Sized for slides, Slack and the judging video. Example: [share-card.png](screenshots/share-card.png).
+  - **Print or save as PDF**: the same card on white, alone on a landscape page. Example of the print view: [share-print.png](screenshots/share-print.png).
+- All three were exercised in a real browser: the download, the clipboard contents, and the print layout. Menu: [share-menu.png](screenshots/share-menu.png).
+- The check and verdict rules moved into `verdict.ts` so the report, the card and the compare table (item 12) use one definition. Tests: `verdict.test.ts` (7 tests).
+- The link uses whatever address the app is served from, so it reads `localhost` today and the real address once deployed.

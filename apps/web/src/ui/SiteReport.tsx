@@ -1,16 +1,16 @@
-import type { Reason, StayResult } from '@siteline/contracts';
+import type { Reason } from '@siteline/contracts';
 import { Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../format';
 import { useStay } from '../physics';
 import { MAX_PINS, samePin, useApp } from '../store';
+import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { panel, smallButton } from './Controls';
+import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
 import { PanelError, Spinner } from './ViewStatus';
-
-type Check = 'yes' | 'no' | 'unknown';
 
 /** The verdict's box and the check chips, tinted like the demo's pass and fail boxes. */
 const VERDICT_BOX = {
@@ -28,18 +28,6 @@ const STYLE: Record<Check, { icon: string; color: string }> = {
   no: { icon: '✗', color: 'text-fail' },
   unknown: { icon: '?', color: 'text-warn' },
 };
-
-function checks(r: StayResult) {
-  const has = (code: Reason['code']) => r.reasons.some((x) => x.code === code);
-  const noEphemeris = r.reasons.some((x) => x.code === 'NO_DATA' && x.detail.missing === 'ephemeris');
-  const light = (code: Reason['code']): Check => (noEphemeris ? 'unknown' : has(code) ? 'no' : 'yes');
-  return {
-    sun: light('SUN_BELOW_HORIZON'),
-    earth: light('EARTH_BELOW_HORIZON'),
-    slope: (Number.isFinite(r.slope100mDeg) ? (has('SLOPE_TOO_STEEP') ? 'no' : 'yes') : 'unknown') as Check,
-    zone: (has('OUTSIDE_ZONE') ? 'no' : 'yes') as Check,
-  };
-}
 
 function ReasonLine({ reason }: { reason: Reason }) {
   const key = reason.code === 'NO_DATA' ? `reason.NO_DATA_${reason.detail.missing}` : `reason.${reason.code}`;
@@ -90,9 +78,8 @@ export function SiteReport() {
     );
   if (!result || !query) return <ReportSkeleton />;
 
-  const c = checks(result);
-  const all = Object.values(c);
-  const verdict = all.includes('no') ? 'fail' : all.includes('unknown') ? 'undecided' : 'pass';
+  const c = checksOf(result);
+  const verdict = verdictOf(c);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -102,6 +89,11 @@ export function SiteReport() {
   ] as const;
   const pct = (v: number) => (Number.isFinite(v) ? `${formatNumber(v)}%` : '—');
   const slopeText = terrain ? t('report.needsFinerTerrain') : t('report.noTerrain');
+  const terrainNote = terrain
+    ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
+    : terrainError
+      ? `${t('report.flatWarning')} (${terrainError})`
+      : t('report.offTerrain');
 
   return (
     <section className={`${panel} flex flex-col gap-4`} aria-busy={loading}>
@@ -116,14 +108,25 @@ export function SiteReport() {
             <span aria-hidden="true">{verdictStyle.icon} </span>
             {t(`report.verdict.${verdict}`)}
           </p>
-          <button
-            type="button"
-            className={smallButton}
-            disabled={!pinned && pins.length >= MAX_PINS}
-            onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
-          >
-            {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <ShareReport
+              query={query}
+              result={result}
+              terrain={terrain}
+              longTerm={longTerm}
+              checks={c}
+              verdict={verdict}
+              note={terrainNote}
+            />
+            <button
+              type="button"
+              className={smallButton}
+              disabled={!pinned && pins.length >= MAX_PINS}
+              onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
+            >
+              {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
+            </button>
+          </div>
         </div>
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {(Object.keys(c) as (keyof typeof c)[]).map((k) => (
@@ -169,11 +172,7 @@ export function SiteReport() {
 
       <p className="rounded-lg border border-warn/50 bg-warn/8 p-3 text-sm text-warn">
         <span aria-hidden="true">⚠ </span>
-        {terrain
-          ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
-          : terrainError
-            ? `${t('report.flatWarning')} (${terrainError})`
-            : t('report.offTerrain')}
+        {terrainNote}
       </p>
 
       <div>

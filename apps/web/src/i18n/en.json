@@ -46,6 +46,22 @@
     "reason": "Details: {{message}}",
     "offline": "You're offline. What has loaded still works; anything new loads once you're back."
   },
+  "share": {
+    "button": "Share",
+    "copy": "Copy a link to this check",
+    "image": "Download as an image (PNG)",
+    "print": "Print or save as PDF",
+    "note": "The link opens this spot, date and launch slip for anyone.",
+    "copied": "Link copied",
+    "copyByHand": "Copy this link:",
+    "saved": "Image saved",
+    "kicker": "SiteLine · Moon south-pole landing check",
+    "place": "{{lat}}° {{northSouth}}, {{lon}}° {{eastWest}}",
+    "when": "Landing {{date}} · {{days}}-day stay",
+    "slip": "launch slip of {{n}} days",
+    "footer": "Made with SiteLine for NASA Space Apps 2026 from public NASA data. A planning aid, not a mission-certified analysis.",
+    "printAlt": "Summary of the site report"
+  },
   "sources": {
     "open": "Sources & methods",
     "title": "Sources and methods",

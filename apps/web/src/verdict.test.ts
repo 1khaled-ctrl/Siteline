@@ -1,0 +1,68 @@
+import type { Reason, StayResult } from '@siteline/contracts';
+import { describe, expect, it } from 'vitest';
+import { checksOf, shareLink, verdictOf } from './verdict';
+
+function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
+  return {
+    pass: false,
+    uncertain: false,
+    reasons,
+    sunFractionMin: 1,
+    earthVisiblePct: 100,
+    slope100mDeg,
+    slope2kmPctUnder20: 0,
+    series: { tUtcMs: new Float64Array(), sun: new Float32Array(), earth: new Float32Array() },
+    sources: [],
+  };
+}
+const reason = (code: Reason['code'], detail: Reason['detail'] = {}): Reason => ({ code, detail });
+
+describe('checksOf', () => {
+  it('reads each failure into its own check', () => {
+    const c = checksOf(result([reason('SUN_BELOW_HORIZON'), reason('OUTSIDE_ZONE')], 4));
+    expect(c).toEqual({ sun: 'no', earth: 'yes', slope: 'yes', zone: 'no' });
+  });
+
+  it('calls the slope unknown when the terrain could not measure it, and a steep one a fail', () => {
+    expect(checksOf(result([])).slope).toBe('unknown');
+    expect(checksOf(result([reason('SLOPE_TOO_STEEP')], 14)).slope).toBe('no');
+  });
+
+  it('calls Sun and Earth unknown when the dates are outside the ephemeris', () => {
+    const c = checksOf(result([reason('NO_DATA', { missing: 'ephemeris' })], 3));
+    expect(c.sun).toBe('unknown');
+    expect(c.earth).toBe('unknown');
+  });
+});
+
+describe('verdictOf', () => {
+  it('fails on any no, even beside an unknown', () => {
+    expect(verdictOf({ sun: 'no', earth: 'yes', slope: 'unknown', zone: 'yes' })).toBe('fail');
+  });
+  it('is undecided on an unknown with no failure', () => {
+    expect(verdictOf({ sun: 'yes', earth: 'yes', slope: 'unknown', zone: 'yes' })).toBe('undecided');
+  });
+  it('passes only when every check passes', () => {
+    expect(verdictOf({ sun: 'yes', earth: 'yes', slope: 'yes', zone: 'yes' })).toBe('pass');
+  });
+});
+
+describe('shareLink', () => {
+  it('opens the south-pole check with the same date, slip and spot', () => {
+    const link = shareLink('https://siteline.example/', {
+      landingUtc: '2028-03-03T00:00:00.000Z',
+      slipDays: -2,
+      latDeg: -89.45,
+      lonDeg: 222.69 - 360,
+    });
+    const url = new URL(link);
+    expect(url.origin + url.pathname).toBe('https://siteline.example/');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      view: 'pole',
+      t: '2028-03-03T00:00:00.000Z',
+      slip: '-2',
+      lat: '-89.45',
+      lon: String(222.69 - 360),
+    });
+  });
+});
