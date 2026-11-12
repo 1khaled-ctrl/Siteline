@@ -115,7 +115,7 @@ interface Label {
 
 /** A relief globe of Mars: MOLA heights on the mesh, shaded by slope, with IAU feature names. One scene unit is one Mars radius. */
 export class MarsView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.0004, 50);
   private readonly controls: OrbitControls;
@@ -158,7 +158,6 @@ export class MarsView {
   ) {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x05070a);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,

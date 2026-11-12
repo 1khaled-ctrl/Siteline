@@ -44,6 +44,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The 3D views draw on transparent canvases, so every world sits on this one backdrop: a faint blue glow behind the
+   world in the middle, falling off to deep space at the edges. */
+.space-backdrop {
+  background: radial-gradient(ellipse 75% 70% at 50% 46%, #0e1932 0%, #090f20 48%, var(--color-space) 100%);
+}
+
 /* In the base layer so a class on an element (`font-sans`, `text-sm`) still wins. */
 @layer base {
   /* Titles are set in the display face. */

@@ -25,3 +25,9 @@ The slim top bar (title, tagline, breadcrumbs and the −1d / date / +1d / Now s
 ### 4. Floating overlay controls: already done, no change
 
 Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, Sunlight now, Height and the Earth and Mars equivalents) float as pills over the 3D view's top-start corner (`ViewPills.tsx`). The landing date, slip and coordinates stay in the panel. Screenshots: [demo-ui-pole.png](screenshots/demo-ui-pole.png), [demo-ui-earth.png](screenshots/demo-ui-earth.png).
+
+### 5. Textures, glow and transparent backgrounds
+
+- All six 3D views (solar, Earth, Mars, Moon globe, south pole, landing close-up) now draw on a transparent canvas. One CSS backdrop behind them (`.space-backdrop` in `index.css`, a faint blue glow fading to deep space) replaces six copies of the same flat colour. Composite of all six: [transparent-backgrounds.png](screenshots/transparent-backgrounds.png).
+- Solar view: Earth, Moon and Mars use `earth.jpg`, `moon.jpg` and `mars_color.jpg` from `pipeline/raw/landfall/img/`; the others stay shaded spheres. Every planet has a soft glow; the Sun has a three-layer corona that slowly breathes.
+- Motion added to the solar view (from the session before the overnight run, committed with this item): twinkling stars and a faint Milky Way band, orbit trails that fade behind each planet in its direction of travel, slow spins with real axial tilts, a banded Saturn ring, a small orbit ring for the Moon, a dolly-in on open, a slow idle drift after 12 s untouched, and hover and click on the planets themselves. All of it stops under the system's reduce-motion setting and while the tab is hidden. Positions still come only from the ephemeris. Screenshot: [demo-ui-solar.png](screenshots/demo-ui-solar.png).

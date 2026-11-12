@@ -145,7 +145,7 @@ function lines(b64: string, radius: number, material: THREE.LineBasicMaterial): 
 
 /** A map-style globe of the Earth: NASA imagery, Natural Earth borders and names, and cities and roads up close. */
 export class EarthView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.01, 50);
   private readonly controls: OrbitControls;
@@ -196,7 +196,6 @@ export class EarthView {
   ) {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x05070a);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,

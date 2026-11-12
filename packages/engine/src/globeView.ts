@@ -51,7 +51,7 @@ export interface GlobeViewOptions {
 const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 
 export class GlobeView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(40, 1, 10, 100_000);
   private readonly controls: OrbitControls;
@@ -80,7 +80,6 @@ export class GlobeView {
     this.onPick = opts.onPick;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x05070a);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,

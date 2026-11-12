@@ -44,7 +44,7 @@ function CurrentView() {
 export function MoonView() {
   usePlayClock();
   return (
-    <div className="relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
+    <div className="space-backdrop relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
       <CurrentView />
     </div>
   );
