@@ -100,7 +100,9 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
     g.fillStyle = colour;
     g.font = '500 12px "IBM Plex Sans", system-ui, sans-serif';
     g.textAlign = 'center';
-    g.fillText(text, x, y + dy);
+    // Kept inside the canvas, which on a phone is narrower than the orbit is wide.
+    const half = g.measureText(text).width / 2 + 6;
+    g.fillText(text, Math.min(w - half, Math.max(half, x)), y + dy);
   };
   const line = (path: readonly XY[], colour: string, width: number, dash: number[] = []) => {
     if (path.length < 2) return;

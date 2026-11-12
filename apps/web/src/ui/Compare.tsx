@@ -66,8 +66,12 @@ export function Compare() {
         <span
           className={`inline-block rounded-pill border px-2 py-0.5 font-sans text-xs whitespace-nowrap ${VERDICT_STYLE[j.verdict].className}`}
         >
-          <span aria-hidden="true">{VERDICT_STYLE[j.verdict].icon} </span>
-          {j.verdict === 'undecided' ? t('compare.undecided') : t(`report.verdict.${j.verdict}`)}
+          <span aria-hidden="true">{VERDICT_STYLE[j.verdict].icon}</span>
+          {/* Four columns leave no room for the word on a phone; the mark and colour carry it there. */}
+          <span className="max-sm:sr-only">
+            {' '}
+            {j.verdict === 'undecided' ? t('compare.undecided') : t(`report.verdict.${j.verdict}`)}
+          </span>
         </span>
       ),
     },

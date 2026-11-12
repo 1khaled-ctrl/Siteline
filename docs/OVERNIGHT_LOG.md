@@ -147,3 +147,9 @@ Bug found on the way (item 14): newer Chromium makes `scrollIntoView()` return a
 - The rule (`confidence.ts`) is tied to the data, not to opinion: horizon-based readings (Sun, Earth, ground height) are high confidence on terrain at LOLA's full 240 m detail (the native resolution of `LDEM_75S_240M`, which our 1.2 km terrain was resampled from) and a first pass when coarser; the slope needs terrain at 100 m or finer, else "not measured"; the Artemis-zone check depends only on latitude, so it is always high; the 19-year readings are rated by their own map's 2.4 km grid. Today that makes Sun, Earth, height and the 19-year numbers "first pass", the zone "high", and the slope "not measured", exactly as the data supports. When finer terrain is loaded, the badges change by themselves.
 - The yellow warning box became a neutral **How sure is each reading** key with the three marks and the terrain line, so the limitation reads as information, not apology (it stays amber only when the horizon had to be taken as flat).
 - Screenshot: [confidence-badges.png](screenshots/confidence-badges.png). Tests: `confidence.test.ts` (5). Accessibility audit re-run on all screens: 0 findings.
+
+## Polish (picked up with time left)
+
+### P1. Phone check of tonight's additions
+
+The day strip, the compare table, the journey dialog and the copilot didn't exist during the item 10 pass, so I checked them at 390 px wide: no sideways scroll on any. Fixed two things: the compare table's verdict chips overlapped in four narrow columns (on a phone they now show just ✓, ✗ or ?, in colour, with the word kept for screen readers), and the journey map clipped labels near its edge (they now stay inside). Screenshot: [mobile-new-features.png](screenshots/mobile-new-features.png).
