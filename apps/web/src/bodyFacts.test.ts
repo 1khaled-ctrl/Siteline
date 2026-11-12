@@ -142,11 +142,11 @@ describe('distancesOf', () => {
   // JPL Horizons for 2026-11-22 12:00 UT: Mars 1.616031 AU from the Sun and 1.251436 AU (10.4079 light-minutes) from the
   // Earth; the Moon 0.00246683 AU (1.2310 light-seconds) from the Earth; the Earth 0.987698 AU from the Sun.
   describe.skipIf(!existsSync(tablePath))('against the real planets table', () => {
-    const file = readFileSync(tablePath);
-    const table = parsePlanets(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));
-    const p = table.snapshot(Date.UTC(2026, 10, 22, 12));
-
     it('puts Mars, the Moon and the Earth where JPL Horizons does', () => {
+      // Read here, not in the suite's body: Vitest runs that even when the suite is skipped.
+      const file = readFileSync(tablePath);
+      const table = parsePlanets(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));
+      const p = table.snapshot(Date.UTC(2026, 10, 22, 12));
       const mars = distancesOf('mars', p);
       expect(mars.sunDistAu).toBeCloseTo(1.616031, 3);
       expect((mars.earthDistKm ?? 0) / KM_PER_AU).toBeCloseTo(1.251436, 3);

@@ -18,6 +18,21 @@ jobs:
       - run: corepack pnpm install --frozen-lockfile
       - run: corepack pnpm lint
       - run: corepack pnpm typecheck
+      - name: Fetch the Landfall files the tests read
+        # Plain public reads from the R2 bucket, no secrets. Only raw/landfall is there so far; suites whose files are
+        # missing (the pipeline/out ones) skip themselves.
+        env:
+          BASE: https://pub-7be0ff89d7434202aff5f10a902675a5.r2.dev/raw/landfall
+        run: |
+          dir=pipeline/raw/landfall
+          get() { curl -fsSL --retry 3 --create-dirs -o "$dir/$1" "$BASE/$1"; }
+          for f in data/sites.json data/tracks.json data/earth.json data/earth10.json img/moon_height.png img/mars_height.png; do
+            get "$f"
+          done
+          # One close-up per key in sites.json.
+          for key in $(node -p "Object.keys(require('./$dir/data/sites.json')).join('\n')"); do
+            get "img/sites/$key.png"
+          done
       - run: corepack pnpm test
       - run: corepack pnpm build
 
