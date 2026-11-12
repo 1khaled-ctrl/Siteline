@@ -1,4 +1,5 @@
 import type { Reason, StayResult } from '@siteline/contracts';
+import { Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../format';
 import { useStay } from '../physics';
@@ -191,7 +192,19 @@ export function SiteReport() {
       <Checks />
 
       <p className="text-xs text-quiet">
-        {t('report.sources')}: {[...result.sources, ...(longTerm ? [longTerm.id] : [])].join(', ')}
+        {t('report.sources')}:{' '}
+        {[...result.sources, ...(longTerm ? [longTerm.id] : [])].map((id, i) => (
+          <Fragment key={id}>
+            {i > 0 && ', '}
+            <button
+              type="button"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              onClick={() => useApp.getState().setSources(id)}
+            >
+              {id}
+            </button>
+          </Fragment>
+        ))}
       </p>
     </section>
   );

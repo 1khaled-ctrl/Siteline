@@ -46,6 +46,36 @@
     "reason": "Details: {{message}}",
     "offline": "You're offline. What has loaded still works; anything new loads once you're back."
   },
+  "sources": {
+    "open": "Sources & methods",
+    "title": "Sources and methods",
+    "close": "Close",
+    "intro": "Every number in SiteLine is worked out from published data by code in this project; none is typed in by hand. This page brings together how each check works, how we tested it, and every dataset with its licence and link.",
+    "methodsHeading": "How the site check works",
+    "methods": {
+      "positions": "Where the Sun and the Earth are, seen from the Moon: NASA JPL's DE440 ephemeris, read with NAIF's SPICE toolkit by our pipeline into a table the app interpolates.",
+      "horizon": "What the ground hides: from each spot, the horizon is traced in every direction across NASA's LRO LOLA south-pole terrain.",
+      "sun": "Sunlight: through the {{days}}-day stay we step through time and measure how much of the Sun's disc clears that horizon. The site fails if less than {{pct}}% of the disc is up at any moment, and the moment it drops is found to the minute.",
+      "earth": "Earth in view, for talking to the lander: the same test for the Earth, counting {{rule}}.",
+      "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. The loaded terrain is too coarse to see 100 m, so the report says it needs finer terrain instead of guessing.",
+      "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
+      "longTerm": "Long-term sunlight and Earth view: maps over a 19-year cycle, computed from the same terrain by the Landfall concept demo, to be replaced by NASA's own product.",
+      "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
+      "facts": "World facts: NASA's planetary fact sheets and NAIF's gravitational parameters. Gravity and escape speed are worked out from them."
+    },
+    "earthRule": {
+      "centre": "the centre of its disc",
+      "rim": "any part of its disc",
+      "margin2deg": "its centre at least 2° above the horizon"
+    },
+    "checksHeading": "How we checked it",
+    "data": "Every dataset ({{n}})",
+    "licence": "Licence",
+    "source": "Source",
+    "fonts": "Fonts",
+    "libraries": "Libraries",
+    "more": "The same list is CREDITS.md in the project, and each panel names its own sources too."
+  },
   "site": {
     "heading": "Landing site",
     "lat": "Latitude (°)",

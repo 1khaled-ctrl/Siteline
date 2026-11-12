@@ -12,6 +12,7 @@ import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
+import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
 import { OfflineBanner } from './ui/ViewStatus';
 import { WorldsList } from './ui/WorldsList';
 
@@ -62,10 +63,12 @@ export function App() {
           <Tagline />
         </div>
         <Breadcrumbs />
-        <div className="ms-auto">
+        <div className="ms-auto flex flex-wrap items-center gap-2">
+          <SourcesButton />
           <DateStepper />
         </div>
       </header>
+      <SourcesDialog />
       <OfflineBanner />
       {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
       <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">

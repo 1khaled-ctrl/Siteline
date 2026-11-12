@@ -65,6 +65,9 @@ interface AppState extends View {
   focusSite: (latDeg: number, lonDeg: number) => void;
   togglePin: (pin: Pin) => void;
   setPlay: (patch: { playing?: boolean; speedHPerS?: number; playOffsetH?: number }) => void;
+  /** The sources-and-methods dialog: false when shut, else the dataset id to scroll to (or true for the top). */
+  sources: string | boolean;
+  setSources: (sources: string | boolean) => void;
 }
 
 const DEFAULTS: View = {
@@ -182,6 +185,8 @@ export const useApp = create<AppState>((set) => ({
       return { pins };
     }),
   setPlay: (patch) => set(patch),
+  sources: false,
+  setSources: (sources) => set({ sources }),
 }));
 
 useApp.subscribe((s) => {

@@ -45,3 +45,10 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - The site report, the Worlds list and the best-spots search show the same kind of card inside the panel, each with its own Try again. The site report also has a grey skeleton while its first check runs.
 - A slim amber banner under the header says when the browser is offline. When the connection comes back, every failed view and panel retries by itself; tested by blocking `planets.bin`, going offline, then restoring both. Screenshot: [offline-and-retry-solar.png](screenshots/offline-and-retry-solar.png).
 - Rover routes and close-up headers used to stay missing until a reload if their first fetch failed; the next view that needs them now asks again.
+
+### 8. One "Sources and methods" place
+
+- A **Sources & methods** button in the header opens one dialog with three parts: how the site check works (positions, horizon, sunlight, Earth in view, slope, Artemis zone, 19-year maps, planet distances, world facts), each with chips for the datasets it reads; the existing "How we checked it" validation table, open; and every dataset with its licence and source.
+- The dataset list is read from `CREDITS.md` itself when the app is built (`credits.ts`), so the two can never disagree. Its thresholds (6.5-day stay, 50 % of the Sun's disc, 10° slope, −84° zone) are read from the code, not typed in.
+- The site report's "Sources:" ids are now links that open the dialog at that dataset, highlighted. The per-panel citations are all still there.
+- Screenshots: [sources-dialog.png](screenshots/sources-dialog.png), [sources-dialog-from-report.png](screenshots/sources-dialog-from-report.png). Tests: `credits.test.ts` (8 tests).
