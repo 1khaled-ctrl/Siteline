@@ -11,6 +11,7 @@ import { Controls, LandingTime } from './ui/Controls';
 import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
+import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
 import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
@@ -80,6 +81,7 @@ export function App() {
         </div>
       </header>
       <SourcesDialog />
+      <JourneyDialog />
       <OfflineBanner />
       {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
       <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">

@@ -48,6 +48,70 @@
     "reason": "Details: {{message}}",
     "offline": "You're offline. What has loaded still works; anything new loads once you're back."
   },
+  "journey": {
+    "button": "Simulate the journey",
+    "title": "Journey to {{name}}",
+    "subtitle": {
+      "Moon": "From Earth to {{place}} on the Moon, landing {{date}}: the site and date of the site report.",
+      "Mars": "From Earth to {{place}} on Mars, landing {{date}}: the place picked and the date set above."
+    },
+    "caption": "Illustrative trajectory from real launch and arrival positions. Simplified, not a guidance-grade path.",
+    "working": "Working out the trajectory from the ephemeris…",
+    "failed": "Couldn't work out a trajectory: {{message}}",
+    "canvasLabel": "Map of the journey seen from above its orbit. Now: {{phase}}.",
+    "depart": {
+      "Moon": "Leaves Earth orbit",
+      "Mars": "Launch"
+    },
+    "arrive": {
+      "Moon": "Lunar orbit",
+      "Mars": "Arrival"
+    },
+    "touchdown": "Touchdown",
+    "notToScale": "Distances to scale; bodies enlarged",
+    "phaseLabel": "Now",
+    "phase": {
+      "start": {
+        "Moon": "Leaving Earth orbit (trans-lunar injection)",
+        "Mars": "Launch from Earth"
+      },
+      "cruise": {
+        "Moon": "Coasting to the Moon",
+        "Mars": "Cruising to Mars"
+      },
+      "arrived": {
+        "Moon": "In lunar orbit, before descent",
+        "Mars": "Entry, descent and landing"
+      },
+      "landed": "Landed at the site"
+    },
+    "time": "Date and time (UTC)",
+    "day": "Mission time",
+    "dayValue": "day {{n}} of {{of}}",
+    "fromEarth": "Distance from Earth",
+    "km": "{{n}} km",
+    "speed": {
+      "Moon": "Speed relative to Earth",
+      "Mars": "Speed around the Sun"
+    },
+    "kms": "{{n}} km/s",
+    "c3": "Launch energy (C3)",
+    "c3Value": "{{n}} km²/s²",
+    "launch": "Cheapest launch for this landing",
+    "arrivalSpeed": "Arrival speed relative to Mars",
+    "window": {
+      "near": "In a launch window: close to the {{ideal}} km²/s² of the ideal (Hohmann) transfer between these two orbits.",
+      "far": "Far from a launch window: the ideal (Hohmann) transfer between these orbits needs about {{ideal}} km²/s². Windows come round about every {{months}} months, when Earth and Mars line up."
+    },
+    "play": "▶ Play",
+    "pause": "❚❚ Pause",
+    "replay": "↺ Replay",
+    "scrub": "Journey time",
+    "assumptions": {
+      "Moon": "Timing modelled on Apollo 11: about {{coast}} days' coast after leaving Earth orbit, then about {{orbit}} day in lunar orbit before landing. The path is a two-body orbit around the Earth (Lambert's problem) from a parking orbit to where the ephemeris puts the Moon; the Moon's own pull and course corrections are left out. The lunar-orbit loops are drawn, not computed.",
+      "Mars": "The launch date is the one that needs the least launch energy for this landing date, searching {{min}} to {{max}} days of flight. The path is a two-body orbit around the Sun (Lambert's problem) between where the ephemeris puts Earth at launch and Mars at landing; the planets' own pulls near departure and arrival are left out."
+    }
+  },
   "copilot": {
     "open": "Ask SiteLine",
     "title": "Ask SiteLine",

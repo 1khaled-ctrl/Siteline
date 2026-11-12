@@ -4,6 +4,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { useApp } from '../store';
 import { panel, smallButton } from './Controls';
+import { JourneyButton } from './Journey';
 
 const CC_BY = 'https://creativecommons.org/licenses/by/4.0/';
 
@@ -78,6 +79,9 @@ export function MarsPanel() {
                 {t('mars.panel.zoomFeature', { name: place.feature.name })}
               </button>
             )}
+            <JourneyButton
+              target={{ body: 'Mars', latDeg: place.latDeg, lonDeg: place.lonDeg, name: place.feature?.name }}
+            />
           </div>
         )}
       </section>

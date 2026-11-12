@@ -146,6 +146,12 @@ const api = {
   },
 
   /** Planet positions from the Sun and the Moon's from the Earth (km, ECLIPJ2000), clamped to the table. */
+  /** The first and last moments the planets table covers; `planetsAt` holds still outside them. */
+  async planetsSpan(dataUrl: string): Promise<{ startUtcMs: number; endUtcMs: number }> {
+    const table = await loadPlanets(dataUrl);
+    return { startUtcMs: table.startUtcMs, endUtcMs: table.endUtcMs };
+  },
+
   async planetsAt(tUtcMs: number, dataUrl: string): Promise<Record<SolarBodyKey, readonly [number, number, number]>> {
     const table = await loadPlanets(dataUrl);
     return table.snapshot(Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs)));

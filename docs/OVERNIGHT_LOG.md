@@ -6,7 +6,15 @@ Every item below is committed locally on `main`. Nothing was pushed or deployed.
 
 ## Needs your decision
 
-_(Nothing yet.)_
+Each of these is a call I made so I could keep going. All are easy to reverse.
+
+1. **A Lambert solver now lives in `packages/physics`** (item 15). The brief asked for the Mars leg to be shaped by Lambert's problem, so I added a new file, `packages/physics/src/lambert.ts` (solver plus an exact two-body propagator, both from Curtis's textbook), with 5 tests including Curtis's worked Example 5.2, and one export line in `index.ts`. No existing physics code changed. That package belongs to the Orbits role, so it wants their review; the alternative is moving it into `apps/web`.
+2. **Small wiring changes in `packages/engine`** (World role): the six views' transparent canvases (approved, item 5) and a `ready` promise on the Moon, Earth and Mars globes so the UI knows when their imagery has loaded (item 6). No maths touched.
+3. **Journey assumptions** (item 15): Moon timing follows Apollo 11 (about 3 days' coast from trans-lunar injection, then about a day in lunar orbit), from a 185 km parking orbit, with injection 170° before the Moon's arrival point. Mars searches 120–400 days of flight for the cheapest launch. I call a Mars launch "in a launch window" when its C3 is within 2.5× the Hohmann C3 of the two orbits; that factor is mine, chosen so real windows (C3 about 9–20 km²/s²) count and far-off dates don't. Change any of them in `apps/web/src/journey.ts`.
+4. **Copilot tool names** (item 14): I used the names in `docs/contracts.md` (`fly_to`, `show_mission`, `analyze_site`) rather than the brief's `go_to`, so the future Claude relay can reuse them as they are.
+5. **English only.** `CLAUDE.md` asks for Arabic in the same PR as every string; you said English only for now, so tonight's ~250 new strings are English only and Arabic still needs adding.
+6. **One commit fails lint on its own.** The item 14 commit (`464b5a4`) left a blank line missing in this log, which Biome's Markdown formatting flags; the next commit fixes it. Squash or leave as you like.
+7. **Pre-existing flaky test, not touched** (physics role): `planets.test.ts` once failed with "Unexpected end of JSON input" because two physics test files write `tests/reference/validation.json` at the same time. A rerun passed. It wants a fix in `validationReport.ts` by its owner.
 
 ## Done
 
@@ -95,6 +103,7 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 ### 14. Copilot chat, scoped small (stretch)
 
 **What's there.** An **Ask SiteLine** button floats at the bottom-start of the 3D view on every screen and opens a small chat. It has three read-only tools, named as in `docs/contracts.md`:
+
 - `fly_to`: "Fly to Mars", "Take me to the south pole", or just "moon" moves the view.
 - `show_mission`: "Show me Apollo 11", "where is Curiosity?" opens that mission's card and flies there (it knows all 46 missions by full name, craft name or id).
 - `analyze_site`: questions about the selected Moon landing site ("Does this site pass?", "Why does it fail?", "When does the Sun set?", "Is Earth in view?", "How steep is it?", "How high is it?", "Sunlight over 19 years?", "Give me the report"). It runs **the same check, with the same inputs, as the site report**, so it can never say a number the panel doesn't; answers list their dataset ids, which open the sources dialog.
@@ -104,4 +113,22 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 
 Screenshot of a real conversation (Mons Mouton, landing 8 Apr 2028; its numbers match the site report beside it): [copilot-chat.png](screenshots/copilot-chat.png). Tests: `copilot.test.ts` (6 tests: tool choice, mission aliases, and that the summary carries the report's numbers unchanged).
 
-Bug found on the way: newer Chromium makes `scrollIntoView()` return a Promise, and a one-line React effect that returned it crashed the page. Fixed in the copilot; I checked the app's other one-line effects and they all return nothing.
+Bug found on the way (item 14): newer Chromium makes `scrollIntoView()` return a Promise, and a one-line React effect that returned it crashed the page. Fixed in the copilot; I checked the app's other one-line effects and they all return nothing.
+
+### 15. "Simulate the journey" (Part 4)
+
+**Where:** a **▶ Simulate the journey** button in the Moon site report (south-pole view), and in the Mars place panel once you click or search a place on Mars. It uses the site and the landing date (with slip) already on screen; nothing new is chosen.
+
+**What it shows:** a dialog with a top-down map in the plane of the orbit, the craft (gold arrow) flying along its path with the travelled part lit, the target body moving on its real track, a play/pause button and a **timeline scrubber**, live readouts (phase, UTC time, mission day, distance from Earth, speed, launch energy C3), and a small globe of the landing site that appears on arrival and marks touchdown. The caption **"Illustrative trajectory from real launch and arrival positions. Simplified, not a guidance-grade path."** is drawn on the animation itself, and the assumptions are written under it.
+
+**How it's computed** (`apps/web/src/journey.ts`):
+
+- **Moon:** positions from the app's ephemeris tables. The craft leaves a 185 km parking orbit and coasts 3 days on the two-body orbit around the Earth that meets the Moon where the ephemeris puts it (Lambert's problem with Earth's GM from `data/bodies.json`), then spends a day in lunar orbit and lands at the site at the landing time. Result for Mons Mouton, landing 8 Apr 2028: 10.9 km/s after injection, C3 −1.8 km²/s², in line with Apollo-era trans-lunar injections.
+- **Mars:** real Earth and Mars positions from the planets table. For each time of flight from 120 to 400 days it solves Lambert's problem around the Sun (Sun's GM from `gm_de440.tpc`) and keeps the launch with the lowest C3. It also works out, from the two orbits, the ideal Hohmann C3 and how often windows recur, and says whether the landing date sits in a launch window. **Check:** a landing at Jezero on 15 Sep 2027 gives a launch on 1 Nov 2026 with C3 9.3 km²/s² (Hohmann 8.8), which is where the real late-2026 Mars window is. A landing in January 2031 gives C3 284 km²/s² and says it's far from a window, as it should.
+- The search never starts before the planets table does, so it can't invent a departure position.
+
+**Screenshots mid-flight:** [journey-moon-midflight.png](screenshots/journey-moon-midflight.png), [journey-mars-midflight.png](screenshots/journey-mars-midflight.png); after touchdown: [journey-moon-landed.png](screenshots/journey-moon-landed.png).
+
+**Tests:** `lambert.test.ts` (5) and `journey.test.ts` (5: a made-up circular sky where the right answers are known: injection speed and C3, arrival at the Moon on time, a launch near the Hohmann time and energy, the Hohmann and synodic yardsticks, and no launch before the tables start). **159 tests** in total.
+
+**Simplified on purpose, and said so on screen:** no lunar gravity on the way in (the lunar-orbit loops are drawn, not computed), no planetary gravity at Mars departure and arrival, no course corrections, and bodies drawn larger than scale.

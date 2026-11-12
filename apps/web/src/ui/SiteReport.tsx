@@ -8,6 +8,7 @@ import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { panel, smallButton } from './Controls';
+import { JourneyButton } from './Journey';
 import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
 import { PanelError, Spinner } from './ViewStatus';
@@ -161,6 +162,8 @@ export function SiteReport() {
           </>
         )}
       </dl>
+
+      <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
 
       {result.reasons.length > 0 && (
         <ul className="list-disc space-y-1 ps-5 text-sm">
