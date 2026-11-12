@@ -1,6 +1,14 @@
 {
   "app": {
-    "tagline": "Fly down to a landing site and see if you can land there."
+    "tagline": {
+      "solar": "Solar system on the landing date",
+      "earth": "Earth map and places",
+      "mars": "Mars landers and places",
+      "globe": "Whole Moon, lit for the landing date",
+      "pole": "Moon south-pole landing check",
+      "siteMoon": "Moon landing site, up close",
+      "siteMars": "Mars landing site, up close"
+    }
   },
   "header": {
     "dateLabel": "Date and time (UTC)",

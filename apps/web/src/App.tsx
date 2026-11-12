@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
+import { findLander } from './landers';
 import { useApp, type MoonView as ViewName } from './store';
 import { BodyClock } from './ui/BodyClock';
 import { BodyFacts } from './ui/BodyFacts';
@@ -39,15 +40,25 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
   }
 }
 
-export function App() {
+/** The header's tagline names the world in view; a lander's close-up names the lander's world. */
+function Tagline() {
   const { t } = useTranslation();
+  const key = useApp((s) => {
+    if (s.view !== 'site') return s.view;
+    const body = findLander(s.missionId ?? '')?.body;
+    return body && `site${body}`;
+  });
+  return key ? <p className="text-xs text-quiet max-lg:hidden">{t(`app.tagline.${key}`)}</p> : null;
+}
+
+export function App() {
   const view = useApp((s) => s.view);
   return (
     <div className="flex min-h-dvh flex-col lg:h-dvh">
       <header className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bar px-3.5 py-2">
         <div className="flex flex-wrap items-baseline gap-x-2.5">
           <h1 className="text-[21px]">SiteLine</h1>
-          <p className="text-xs text-quiet max-lg:hidden">{t('app.tagline')}</p>
+          <Tagline />
         </div>
         <Breadcrumbs />
         <div className="ms-auto">
