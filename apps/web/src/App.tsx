@@ -12,6 +12,7 @@ import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
+import { OfflineBanner } from './ui/ViewStatus';
 import { WorldsList } from './ui/WorldsList';
 
 /** The views that show a world's facts; the solar system and a lander's close-up have none to show. */
@@ -65,6 +66,7 @@ export function App() {
           <DateStepper />
         </div>
       </header>
+      <OfflineBanner />
       {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
       <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
         <MoonView />

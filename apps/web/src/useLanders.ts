@@ -31,10 +31,11 @@ async function read<T>(url: string): Promise<T | undefined> {
 }
 
 function loadFiles(): Promise<LanderFiles> {
-  files ??= Promise.all([read<TracksJson>(TRACKS_URL), read<SitesJson>(SITES_URL)]).then(([tracks, sites]) => ({
-    tracks: tracks && parseTracks(tracks),
-    sites: sites && parseSites(sites),
-  }));
+  files ??= Promise.all([read<TracksJson>(TRACKS_URL), read<SitesJson>(SITES_URL)]).then(([tracks, sites]) => {
+    // A file that did not arrive is asked for again by the next view that wants it, not given up on for good.
+    if (!tracks || !sites) files = undefined;
+    return { tracks: tracks && parseTracks(tracks), sites: sites && parseSites(sites) };
+  });
   return files;
 }
 

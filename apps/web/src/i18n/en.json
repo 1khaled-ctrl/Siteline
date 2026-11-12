@@ -36,6 +36,11 @@
       "pole": "The south-pole terrain didn't arrive",
       "site": "The terrain around this site didn't arrive"
     },
+    "panel": {
+      "report": "The site check couldn't run",
+      "worlds": "The planet positions didn't arrive",
+      "best": "The search couldn't run"
+    },
     "help": "Usually a network hiccup. Check the connection and try again.",
     "retry": "Try again",
     "reason": "Details: {{message}}",
@@ -184,8 +189,7 @@
     "flatWarning": "Terrain is not loaded, so the horizon is treated as flat. Hills can hide the Sun and Earth earlier than shown here.",
     "offTerrain": "This spot is outside the loaded terrain, so the horizon is treated as flat.",
     "sources": "Sources",
-    "loading": "Checking the site…",
-    "error": "Could not run the check: {{message}}"
+    "loading": "Checking the site…"
   },
   "reason": {
     "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",

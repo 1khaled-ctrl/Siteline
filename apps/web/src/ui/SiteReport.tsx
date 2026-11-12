@@ -7,6 +7,7 @@ import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { panel, smallButton } from './Controls';
 import { Timeline } from './Timeline';
+import { PanelError, Spinner } from './ViewStatus';
 
 type Check = 'yes' | 'no' | 'unknown';
 
@@ -52,14 +53,41 @@ function ReasonLine({ reason }: { reason: Reason }) {
   );
 }
 
+/** The report's shape in grey while the first check runs, so the panel does not jump when it lands. */
+function ReportSkeleton() {
+  const { t } = useTranslation();
+  const bar = 'rounded-lg bg-panel-raised motion-safe:animate-pulse';
+  return (
+    <section className={`${panel} flex flex-col gap-4`} aria-busy="true">
+      <h2 className="text-2xl">{t('report.heading')}</h2>
+      <p role="status" className="flex items-center gap-2 text-sm text-quiet">
+        <Spinner />
+        {t('report.loading')}
+      </p>
+      <div className={`h-20 ${bar}`} />
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`h-16 ${bar}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function SiteReport() {
   const { t } = useTranslation();
-  const { query, result, terrain, terrainError, longTerm, error, loading } = useStay();
+  const { query, result, terrain, terrainError, longTerm, error, loading, retry } = useStay();
   const pins = useApp((s) => s.pins);
   const pinned = query ? pins.some((p) => samePin(p, query.site)) : false;
 
-  if (error) return <section className={panel}>{t('report.error', { message: error })}</section>;
-  if (!result || !query) return <section className={panel}>{t('report.loading')}</section>;
+  if (error)
+    return (
+      <section className={panel}>
+        <h2 className="mb-2 text-2xl">{t('report.heading')}</h2>
+        <PanelError title={t('status.panel.report')} reason={error} onRetry={retry} />
+      </section>
+    );
+  if (!result || !query) return <ReportSkeleton />;
 
   const c = checks(result);
   const all = Object.values(c);

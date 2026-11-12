@@ -52,6 +52,7 @@ export function Spinner({ className = 'size-4' }: { className?: string }) {
 export function ViewStatus({ view, load }: { view: StatusView; load: Load }) {
   const { t } = useTranslation();
   const retry = useContext(RetryView);
+  useRetryWhenOnline(load.state === 'failed', retry);
   if (load.state === 'ready') return null;
   if (load.state === 'loading')
     return (
@@ -84,6 +85,50 @@ export function ViewStatus({ view, load }: { view: StatusView; load: Load }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Runs `retry` when the network comes back, while `failed` holds. */
+export function useRetryWhenOnline(failed: boolean, retry: () => void): void {
+  useEffect(() => {
+    if (!failed) return;
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [failed, retry]);
+}
+
+/** A panel's own failure, smaller than a view's: what failed, a hint, and a button to try again. */
+export function PanelError({ title, reason, onRetry }: { title: string; reason?: string; onRetry: () => void }) {
+  const { t } = useTranslation();
+  useRetryWhenOnline(true, onRetry);
+  return (
+    <div role="alert" className="rounded-lg border border-fail/50 bg-fail/7 p-3 text-sm">
+      <p className="font-semibold text-ink">{title}</p>
+      <p className="mt-0.5 text-quiet">{t('status.help')}</p>
+      {reason && (
+        <p className="mt-1.5 font-mono text-xs wrap-break-word text-quiet" dir="ltr">
+          {t('status.reason', { message: reason })}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-2 min-h-9 rounded-md border border-sun/60 bg-sun/15 px-3 text-sm text-sun-ink hover:border-sun"
+      >
+        {t('status.retry')}
+      </button>
+    </div>
+  );
+}
+
+/** A slim note under the header while the browser has no network. */
+export function OfflineBanner() {
+  const { t } = useTranslation();
+  if (useOnline()) return null;
+  return (
+    <p role="status" className="border-b border-warn/40 bg-warn/10 px-3.5 py-1.5 text-center text-sm text-warn">
+      {t('status.offline')}
+    </p>
   );
 }
 

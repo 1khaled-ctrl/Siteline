@@ -38,3 +38,10 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - The Moon, Earth and Mars globes stay hidden until their colour map has arrived, then fade in, so you never see a black ball with pins floating on it. To know when that is, the three globe classes in `packages/engine` gained a `ready` promise (loading wiring only, no maths touched).
 - The page itself is dark from the first paint with a SiteLine splash until the app mounts (it used to be white for a moment).
 - The same overlay also covers a failed load with a retry button; see item 7.
+
+### 7. Error and offline states
+
+- A 3D view whose data fails shows a card saying what didn't arrive, a one-line hint, the technical reason in small print, and **Try again**, which rebuilds the view from scratch. Screenshot: [error-state-globe.png](screenshots/error-state-globe.png) (Moon map blocked on purpose).
+- The site report, the Worlds list and the best-spots search show the same kind of card inside the panel, each with its own Try again. The site report also has a grey skeleton while its first check runs.
+- A slim amber banner under the header says when the browser is offline. When the connection comes back, every failed view and panel retries by itself; tested by blocking `planets.bin`, going offline, then restoring both. Screenshot: [offline-and-retry-solar.png](screenshots/offline-and-retry-solar.png).
+- Rover routes and close-up headers used to stay missing until a reload if their first fetch failed; the next view that needs them now asks again.

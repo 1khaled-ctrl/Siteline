@@ -1,7 +1,7 @@
 import { DEFAULT_STAY, type StayQuery } from '@siteline/contracts';
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
 import { type Pin, useApp } from './store';
 
@@ -22,6 +22,8 @@ export interface StayState extends Partial<StayResponse> {
   query?: StayQuery;
   error?: string;
   loading: boolean;
+  /** Runs the check again, as after a failed fetch. */
+  retry: () => void;
 }
 
 function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQuery {
@@ -37,12 +39,15 @@ export function useStay(): StayState {
   const slipDays = useApp((s) => s.slipDays);
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
-  const [state, setState] = useState<StayState>({ loading: true });
+  const [state, setState] = useState<Omit<StayState, 'retry'>>({ loading: true });
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new `attempt` is what runs the check again.
   useEffect(() => {
     let live = true;
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
-    setState((s) => ({ ...s, loading: true }));
+    setState((s) => ({ ...s, error: undefined, loading: true }));
     physics.stay(query, URLS).then(
       (response) => {
         if (live) setState({ query, ...response, loading: false });
@@ -54,9 +59,9 @@ export function useStay(): StayState {
     return () => {
       live = false;
     };
-  }, [landingUtc, slipDays, latDeg, lonDeg]);
+  }, [landingUtc, slipDays, latDeg, lonDeg, attempt]);
 
-  return state;
+  return { ...state, retry };
 }
 
 /** Stay results for several sites at once, in the same order; entries are undefined until they arrive. */
@@ -106,17 +111,32 @@ export function useLightingUtcMs(): number {
  * so the time-lapse need not ask the worker on every frame.
  */
 export function usePlanetsAtHour(): Readonly<Record<SolarBodyKey, Vec3>> | undefined {
+  return usePlanetsAtHourState().positions;
+}
+
+export interface PlanetsState {
+  positions?: Readonly<Record<SolarBodyKey, Vec3>>;
+  /** Why the table could not be read, if it could not. */
+  error?: string;
+  retry: () => void;
+}
+
+/** `usePlanetsAtHour`, with the failure and a way to ask again. */
+export function usePlanetsAtHourState(): PlanetsState {
   const hourMs = Math.floor(useLightingUtcMs() / HOUR_MS) * HOUR_MS;
-  const [positions, setPositions] = useState<Readonly<Record<SolarBodyKey, Vec3>>>();
+  const [state, setState] = useState<Omit<PlanetsState, 'retry'>>({});
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new `attempt` is what asks again.
   useEffect(() => {
     let live = true;
     physics.planetsAt(hourMs, URLS.data).then(
-      (p) => live && setPositions(p),
-      () => live && setPositions(undefined),
+      (positions) => live && setState({ positions }),
+      (e: unknown) => live && setState({ error: e instanceof Error ? e.message : String(e) }),
     );
     return () => {
       live = false;
     };
-  }, [hourMs]);
-  return positions;
+  }, [hourMs, attempt]);
+  return { ...state, retry };
 }

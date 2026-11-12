@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { DAY_MS, physics, URLS } from '../physics';
 import { useApp } from '../store';
+import { PanelError } from './ViewStatus';
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
@@ -47,7 +48,11 @@ export function BestSpots({ region }: { region: Region }) {
       </button>
       {(spots || error) && (
         <ol className="absolute inset-e-0 top-10 z-10 w-72 rounded-lg border border-line bg-panel p-2 text-sm shadow-xl">
-          {error && <li className="text-fail">{error}</li>}
+          {error && (
+            <li>
+              <PanelError title={t('status.panel.best')} reason={error} onRetry={() => void run()} />
+            </li>
+          )}
           {spots?.map((s, i) => (
             <li key={`${s.latDeg},${s.lonDeg}`}>
               <button
