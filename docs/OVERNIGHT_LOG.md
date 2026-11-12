@@ -84,3 +84,10 @@ Built and committed earlier (`6a07ce7`). The display toggles (Missions, Names, S
 - The best value in each comparable row gets a ★ (only when there is a real difference). The best site overall gets a **Best** badge and a line under the table naming it, with the ranking rule stated on screen: verdict first, then sunlight over 19 years, then Earth in view. Slope is shown but not ranked, since no site can be measured until finer terrain is loaded.
 - The verdict now uses the same rules as the site report (it used the raw pass flag before, so a site the report called "not decided yet" showed as "Fail" here).
 - Screenshot with four Artemis regions (Malapert Massif, Mons Mouton, Haworth, de Gerlache Rim 2) landing 8 Apr 2028: [compare-table.png](screenshots/compare-table.png). Tests for the ranking and the ★ rule are in `verdict.test.ts`.
+
+### 13. Tests for tonight's work
+
+- **116 → 143 tests**, all passing. New files: `credits.test.ts` (reading CREDITS.md, including against the real file), `verdict.test.ts` (the four checks, the verdict, ranking, ★ rule, first problem, share link, card file name), `ui/ViewStatus.test.ts` (failure reasons, short dates).
+- To make them testable, the compare table's "first problem" rule and the card's file name moved out of the components into `verdict.ts`.
+- Not unit-tested: the canvas drawing of the share card and the React loading hooks (no DOM test library in the repo, and adding one changes the lockfile, which is the integrator's). Both were exercised in a real browser instead (items 6, 7, 9).
+- The AU and light-time maths the Worlds list uses already had tests against NASA's and JPL Horizons' figures (`bodyFacts.test.ts`), so nothing new was needed there.

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../format';
 import type { StayResponse } from '../physics.worker';
 import { useApp } from '../store';
-import { CHECK_KEYS, type Check, type CheckKey, shareLink, type Verdict } from '../verdict';
+import { CHECK_KEYS, type Check, type CheckKey, cardFileName, shareLink, type Verdict } from '../verdict';
 import { smallButton } from './Controls';
 import { type CardData, renderCard } from './reportCard';
 
@@ -109,12 +109,6 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
     };
   };
 
-  const fileName = () => {
-    const { latDeg, lonDeg } = query.site;
-    const place = `${Math.abs(latDeg)}${latDeg < 0 ? 'S' : 'N'}_${Math.abs(lonDeg)}${lonDeg < 0 ? 'W' : 'E'}`;
-    return `siteline-${place}-${query.landingUtc.slice(0, 10)}.png`;
-  };
-
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(pageLink());
@@ -130,7 +124,7 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
       if (!blob) return;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = fileName();
+      a.download = cardFileName(query.site.latDeg, query.site.lonDeg, query.landingUtc);
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       tell(t('share.saved'));

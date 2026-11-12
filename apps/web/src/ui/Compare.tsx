@@ -5,7 +5,7 @@ import { formatNumber, formatUtcShort } from '../format';
 import { DAY_MS, useStayMany } from '../physics';
 import type { StayResponse } from '../physics.worker';
 import { type Pin, useApp } from '../store';
-import { bestOf, type Check, checksOf, rankSites, type Verdict, verdictOf } from '../verdict';
+import { bestOf, type Check, checksOf, firstProblem, rankSites, type Verdict, verdictOf } from '../verdict';
 import { panel } from './Controls';
 
 interface Judged {
@@ -109,12 +109,10 @@ export function Compare() {
       key: 'problem',
       label: t('compare.firstProblem'),
       show: (j) => {
-        // The slope note is on every site until finer terrain arrives, so it would hide the problem that differs.
-        const first = j.r.result.reasons.find((x) => !(x.code === 'NO_DATA' && x.detail.missing === 'slope'));
-        if (!first) return t('compare.noProblem');
-        if (first.atUtc && Date.parse(first.atUtc) <= landingMs) return t(`compare.atLanding.${first.code}`);
-        const what = t(`compare.problem.${first.code === 'NO_DATA' ? `NO_DATA_${first.detail.missing}` : first.code}`);
-        return first.atUtc ? `${what} ${formatUtcShort(first.atUtc)}` : what;
+        const p = firstProblem(j.r.result.reasons, landingMs);
+        if (!p) return t('compare.noProblem');
+        if (p.atLanding) return t(`compare.atLanding.${p.key}`);
+        return p.atUtc ? `${t(`compare.problem.${p.key}`)} ${formatUtcShort(p.atUtc)}` : t(`compare.problem.${p.key}`);
       },
     },
   ];

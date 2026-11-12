@@ -64,6 +64,34 @@ export function bestOf(values: readonly (number | undefined)[]): Set<number> {
   return winners.length === known.length ? new Set() : new Set(winners.map((x) => x.i));
 }
 
+export interface Problem {
+  /** The reason's code, with what is missing for NO_DATA (`NO_DATA_ephemeris`). */
+  key: string;
+  atUtc?: string;
+  /** Already true at the landing moment, rather than something that happens later in the stay. */
+  atLanding: boolean;
+}
+
+/**
+ * The first thing that goes wrong in a stay. The note that the slope is not measured is skipped: every site carries it
+ * until finer terrain is loaded, so it would hide the problem that differs between sites.
+ */
+export function firstProblem(reasons: readonly Reason[], landingMs: number): Problem | undefined {
+  const first = reasons.find((r) => !(r.code === 'NO_DATA' && r.detail.missing === 'slope'));
+  if (!first) return undefined;
+  return {
+    key: first.code === 'NO_DATA' ? `NO_DATA_${first.detail.missing}` : first.code,
+    atUtc: first.atUtc,
+    atLanding: first.atUtc !== undefined && Date.parse(first.atUtc) <= landingMs,
+  };
+}
+
+/** The share card's file name: place and landing day, readable and safe in any file system. */
+export function cardFileName(latDeg: number, lonDeg: number, landingUtc: string): string {
+  const place = `${Math.abs(latDeg)}${latDeg < 0 ? 'S' : 'N'}_${Math.abs(lonDeg)}${lonDeg < 0 ? 'W' : 'E'}`;
+  return `siteline-${place}-${landingUtc.slice(0, 10)}.png`;
+}
+
 export interface ShareState {
   landingUtc: string;
   slipDays: number;

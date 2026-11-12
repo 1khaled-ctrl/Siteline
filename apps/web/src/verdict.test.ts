@@ -1,6 +1,6 @@
 import type { Reason, StayResult } from '@siteline/contracts';
 import { describe, expect, it } from 'vitest';
-import { bestOf, checksOf, rankSites, shareLink, verdictOf } from './verdict';
+import { bestOf, cardFileName, checksOf, firstProblem, rankSites, shareLink, verdictOf } from './verdict';
 
 function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
   return {
@@ -86,6 +86,36 @@ describe('bestOf', () => {
     expect(bestOf([53]).size).toBe(0);
     expect(bestOf([53, 53]).size).toBe(0);
     expect(bestOf([undefined, 53, Number.NaN]).size).toBe(0);
+  });
+});
+
+describe('firstProblem', () => {
+  const landing = Date.parse('2028-04-08T00:00:00Z');
+  const at = (code: Reason['code'], atUtc: string): Reason => ({ code, atUtc, detail: {} });
+
+  it('skips the slope note every site carries, to show the problem that differs', () => {
+    const p = firstProblem(
+      [reason('NO_DATA', { missing: 'slope' }), at('EARTH_BELOW_HORIZON', '2028-04-09T14:00:00Z')],
+      landing,
+    );
+    expect(p).toEqual({ key: 'EARTH_BELOW_HORIZON', atUtc: '2028-04-09T14:00:00Z', atLanding: false });
+  });
+
+  it('says when the problem is already there at landing', () => {
+    expect(firstProblem([at('SUN_BELOW_HORIZON', '2028-04-08T00:00:00.000Z')], landing)?.atLanding).toBe(true);
+  });
+
+  it('names what is missing for NO_DATA, and finds nothing when only the slope note is left', () => {
+    expect(firstProblem([reason('NO_DATA', { missing: 'ephemeris' })], landing)?.key).toBe('NO_DATA_ephemeris');
+    expect(firstProblem([reason('NO_DATA', { missing: 'slope' })], landing)).toBeUndefined();
+    expect(firstProblem([], landing)).toBeUndefined();
+  });
+});
+
+describe('cardFileName', () => {
+  it('names the spot with hemispheres instead of minus signs, and the landing day', () => {
+    expect(cardFileName(-89.45, -137.31, '2028-03-05T00:00:00.000Z')).toBe('siteline-89.45S_137.31W-2028-03-05.png');
+    expect(cardFileName(12.5, 30, '2030-01-01T06:00:00.000Z')).toBe('siteline-12.5N_30E-2030-01-01.png');
   });
 });
 
