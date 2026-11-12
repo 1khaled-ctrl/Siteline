@@ -23,6 +23,7 @@ import {
   subsolarPoint,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
+import { type DayStrip, dayStrip } from './dayStrip';
 
 const EPHEMERIS_SOURCES = ['spice-de440s', 'spice-moon-pa', 'spice-moon-fk', 'spice-naif0012'];
 // From the file's own description: LOLA LDEM_75S_240M crop, 700 × 700 int16, 0.5 m per unit, 1200 m per pixel.
@@ -145,13 +146,13 @@ const api = {
     return Object.fromEntries(PLANET_NAMES.map((p) => [p, table.orbitKm(p)])) as Record<PlanetName, Float32Array>;
   },
 
-  /** Planet positions from the Sun and the Moon's from the Earth (km, ECLIPJ2000), clamped to the table. */
   /** The first and last moments the planets table covers; `planetsAt` holds still outside them. */
   async planetsSpan(dataUrl: string): Promise<{ startUtcMs: number; endUtcMs: number }> {
     const table = await loadPlanets(dataUrl);
     return { startUtcMs: table.startUtcMs, endUtcMs: table.endUtcMs };
   },
 
+  /** Planet positions from the Sun and the Moon's from the Earth (km, ECLIPJ2000), clamped to the table. */
   async planetsAt(tUtcMs: number, dataUrl: string): Promise<Record<SolarBodyKey, readonly [number, number, number]>> {
     const table = await loadPlanets(dataUrl);
     return table.snapshot(Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs)));
@@ -195,6 +196,17 @@ const api = {
     const longTerm = at && Number.isFinite(at.sunPct) ? { id: MAPS.id, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     return Comlink.transfer({ result, terrain, terrainError, longTerm }, [tUtcMs.buffer, sun.buffer, earth.buffer]);
+  },
+
+  /** Day by day across the whole ephemeris, how much of each day this spot has the Sun and the Earth. */
+  async dayStrip(query: StayQuery, urls: DataUrls): Promise<DayStrip & { sources: string[] }> {
+    const ephemeris = await loadEphemeris(urls.data);
+    const dem = await quiet(loadDem(urls.terrain), () => {});
+    const hz = dem && horizonFor(dem, query.site.latDeg, query.site.lonDeg, query.observerHeightM);
+    const site = hz ? { ...query.site, heightM: hz.groundHeightM } : query.site;
+    const strip = dayStrip(ephemeris, hz?.mask ?? flatHorizon(), { ...query, site });
+    const sources = hz ? [...EPHEMERIS_SOURCES, TERRAIN.id] : EPHEMERIS_SOURCES;
+    return Comlink.transfer({ ...strip, sources }, [strip.sun.buffer, strip.earth.buffer]);
   },
 
   /** Rank spots inside a region; the timelines are left out to keep the reply small. */

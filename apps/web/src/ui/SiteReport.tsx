@@ -2,12 +2,13 @@ import type { Reason } from '@siteline/contracts';
 import { Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../format';
-import { useStay } from '../physics';
+import { DAY_MS, useStay } from '../physics';
 import { MAX_PINS, samePin, useApp } from '../store';
 import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { panel, smallButton } from './Controls';
+import { DayStripPanel } from './DayStrip';
 import { JourneyButton } from './Journey';
 import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
@@ -162,6 +163,13 @@ export function SiteReport() {
           </>
         )}
       </dl>
+
+      <DayStripPanel
+        latDeg={query.site.latDeg}
+        lonDeg={query.site.lonDeg}
+        fromMs={Date.parse(query.landingUtc)}
+        toMs={Date.parse(query.landingUtc) + query.stayDays * DAY_MS}
+      />
 
       <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
 

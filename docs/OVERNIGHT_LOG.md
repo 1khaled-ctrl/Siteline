@@ -14,7 +14,8 @@ Each of these is a call I made so I could keep going. All are easy to reverse.
 4. **Copilot tool names** (item 14): I used the names in `docs/contracts.md` (`fly_to`, `show_mission`, `analyze_site`) rather than the brief's `go_to`, so the future Claude relay can reuse them as they are.
 5. **English only.** `CLAUDE.md` asks for Arabic in the same PR as every string; you said English only for now, so tonight's ~250 new strings are English only and Arabic still needs adding.
 6. **One commit fails lint on its own.** The item 14 commit (`464b5a4`) left a blank line missing in this log, which Biome's Markdown formatting flags; the next commit fixes it. Squash or leave as you like.
-7. **Pre-existing flaky test, not touched** (physics role): `planets.test.ts` once failed with "Unexpected end of JSON input" because two physics test files write `tests/reference/validation.json` at the same time. A rerun passed. It wants a fix in `validationReport.ts` by its owner.
+7. **The "19-year" strip covers 2026–2035, not 19 years** (item 16). The two 19-year numbers in the site report are read from a precomputed map (`landfall-polar-maps`, made by the concept demo) that stores only the final percentages per pixel, not a time series, so that computation can't be re-sampled. Instead the strip runs the stay check's own Sun and Earth tests day by day across everything our ephemeris covers (2026–2035), and says so on screen. Its totals land close to the map's (Mons Mouton: sunlight 66 % vs 64 %, Earth 92 % vs 88 %), which is a useful cross-check. A true 19-year strip needs a longer ephemeris table from the pipeline.
+8. **Pre-existing flaky test, not touched** (physics role): `planets.test.ts` once failed with "Unexpected end of JSON input" because two physics test files write `tests/reference/validation.json` at the same time. A rerun passed. It wants a fix in `validationReport.ts` by its owner.
 
 ## Done
 
@@ -132,3 +133,10 @@ Bug found on the way (item 14): newer Chromium makes `scrollIntoView()` return a
 **Tests:** `lambert.test.ts` (5) and `journey.test.ts` (5: a made-up circular sky where the right answers are known: injection speed and C3, arrival at the Moon on time, a launch near the Hohmann time and energy, the Hohmann and synodic yardsticks, and no launch before the tables start). **159 tests** in total.
 
 **Simplified on purpose, and said so on screen:** no lunar gravity on the way in (the lunar-orbit loops are drawn, not computed), no planetary gravity at Mars departure and arrival, no course corrections, and bodies drawn larger than scale.
+
+### 16. Sun and Earth, every day: a strip behind the long-term numbers
+
+- The site report now has two heat maps under its readings: one row per year, one column per day, coloured by how much of each day the Sun is up (gold, the same colour-blind-safe ramp as the pole map's sunlight layer) and how much the Earth is in view (blue). The stay being checked is outlined in gold. Hovering a day reads it out ("2029-07-25: Sun up 100% of the day, Earth 100%"). The strips sweep in when they load (instantly under reduce-motion).
+- It shows _why_ a site passes or fails over time: the monthly lunar nights are the dark bands, and the long Earth-below-horizon spells line up across years.
+- Computed by the stay check's own tests (same horizon, same "half the Sun's disc" and Earth rules) every 3 hours over every day in the ephemeris, in the worker (about 2 s). See decision 7 above for why it covers 2026–2035 rather than 19 years.
+- Screenshot (Mons Mouton): [day-strip.png](screenshots/day-strip.png). Tests: `dayStrip.test.ts` (2, on a made-up sky with known answers).
