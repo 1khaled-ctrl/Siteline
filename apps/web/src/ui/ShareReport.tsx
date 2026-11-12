@@ -2,6 +2,7 @@ import type { StayQuery } from '@siteline/contracts';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { confidenceOf } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
 import type { StayResponse } from '../physics.worker';
 import { useApp } from '../store';
@@ -96,11 +97,16 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
       ]
         .filter(Boolean)
         .join(' · '),
-      checks: CHECK_KEYS.map((k) => ({
-        label: t(`report.${k}`),
-        value: checks[k] === 'unknown' && k === 'slope' ? slopeWords : t(`report.${checks[k]}`),
-        tone: checks[k],
-      })),
+      checks: CHECK_KEYS.map((k) => {
+        // The same confidence word as the report's badge, so a shared picture never reads a first pass as final.
+        const sure = confidenceOf(k, { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM });
+        const unmeasuredSlope = checks[k] === 'unknown' && k === 'slope';
+        return {
+          label: t(`report.${k}`),
+          value: unmeasuredSlope ? slopeWords : `${t(`report.${checks[k]}`)} · ${t(`confidence.short.${sure}`)}`,
+          tone: checks[k],
+        };
+      }),
       stats,
       note,
       sources: `${t('report.sources')}: ${[...result.sources, ...(longTerm ? [longTerm.id] : [])].join(', ')}`,
