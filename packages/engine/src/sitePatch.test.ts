@@ -131,7 +131,8 @@ describe.skipIf(!have)('the Landfall close-up patches', () => {
       readFileSync(fileURLToPath(new URL('../../../data/missions.json', import.meta.url)), 'utf8'),
     ) as MissionsJson,
   );
-  const sites = parseSites(JSON.parse(readFileSync(`${rawDir}data/sites.json`, 'utf8')) as SitesJson);
+  // Vitest runs a skipped suite's body to collect its tests, so nothing here may read a file that isn't there.
+  const sites = have ? parseSites(JSON.parse(readFileSync(`${rawDir}data/sites.json`, 'utf8')) as SitesJson) : {};
   const world = (body: 'moon' | 'mars') => {
     const png = readPngRgb(`${rawDir}img/${body}_height.png`);
     return decodeHeights(png.rgba, png.width, png.height);
