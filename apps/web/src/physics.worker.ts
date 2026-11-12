@@ -45,6 +45,8 @@ export interface TerrainInfo {
 
 export interface LongTerm {
   id: string;
+  /** The grid the maps were computed on. */
+  resolutionM: number;
   sunPct: number;
   earthPct: number;
   shadowed?: boolean;
@@ -193,7 +195,7 @@ const api = {
     });
     const terrain = hz && { id: TERRAIN.id, resolutionM: TERRAIN.pixM, groundHeightM: hz.groundHeightM };
     const at = maps && mapsAtSite(maps, query.site.latDeg, query.site.lonDeg);
-    const longTerm = at && Number.isFinite(at.sunPct) ? { id: MAPS.id, ...at } : undefined;
+    const longTerm = at && Number.isFinite(at.sunPct) ? { id: MAPS.id, resolutionM: MAPS.pixM, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     return Comlink.transfer({ result, terrain, terrainError, longTerm }, [tUtcMs.buffer, sun.buffer, earth.buffer]);
   },

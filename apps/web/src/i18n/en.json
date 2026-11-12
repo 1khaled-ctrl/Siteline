@@ -48,6 +48,21 @@
     "reason": "Details: {{message}}",
     "offline": "You're offline. What has loaded still works; anything new loads once you're back."
   },
+  "confidence": {
+    "heading": "How sure is each reading",
+    "short": {
+      "high": "high confidence",
+      "firstPass": "first pass",
+      "notMeasured": "not measured",
+      "flatHorizon": "flat horizon"
+    },
+    "why": {
+      "high": "High confidence: needs no terrain, or uses LOLA's terrain at its full {{full}} m detail.",
+      "firstPass": "First pass: worked out on the {{km}} km terrain loaded here, where narrow ridges are smoothed out. Verify with finer terrain.",
+      "notMeasured": "Not measured: needs terrain finer than {{slope}} m, or data this spot is outside of.",
+      "flatHorizon": "Flat horizon: this spot is off the loaded terrain, so hills that could hide the Sun or the Earth are left out."
+    }
+  },
   "dayStrip": {
     "heading": "Sun and Earth, every day {{first}}–{{last}}",
     "sun": "Sun up, as a share of each day",

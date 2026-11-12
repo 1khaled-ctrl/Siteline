@@ -1,12 +1,14 @@
 import type { Reason } from '@siteline/contracts';
 import { Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
 import { DAY_MS, useStay } from '../physics';
 import { MAX_PINS, samePin, useApp } from '../store';
 import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
+import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
 import { panel, smallButton } from './Controls';
 import { DayStripPanel } from './DayStrip';
 import { JourneyButton } from './Journey';
@@ -91,6 +93,10 @@ export function SiteReport() {
   ] as const;
   const pct = (v: number) => (Number.isFinite(v) ? `${formatNumber(v)}%` : '—');
   const slopeText = terrain ? t('report.needsFinerTerrain') : t('report.noTerrain');
+  const sure = { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM };
+  const mark = (reading: Reading) => (
+    <ConfidenceBadge level={confidenceOf(reading, sure)} terrainM={sure.terrainM} compact />
+  );
   const terrainNote = terrain
     ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
     : terrainError
@@ -138,28 +144,41 @@ export function SiteReport() {
               <strong className="font-semibold">
                 {c[k] === 'unknown' && k === 'slope' ? slopeText : t(`report.${c[k]}`)}
               </strong>
+              {/* An unmeasured slope already says why in its own words. */}
+              {!(k === 'slope' && c[k] === 'unknown') && (
+                <>
+                  {' '}
+                  <ConfidenceBadge level={confidenceOf(k, sure)} terrainM={sure.terrainM} />
+                </>
+              )}
             </li>
           ))}
         </ul>
       </div>
 
       <dl className="grid grid-cols-2 gap-2">
-        <StatTile label={t('report.sunMin')} edge="sun">
+        <StatTile label={t('report.sunMin')} edge="sun" badge={mark('sun')}>
           {pct(result.sunFractionMin * 100)}
         </StatTile>
-        <StatTile label={t('report.earthPct')} edge="earth">
+        <StatTile label={t('report.earthPct')} edge="earth" badge={mark('earth')}>
           {pct(result.earthVisiblePct)}
         </StatTile>
-        {terrain && <StatTile label={t('report.groundHeight')}>{formatNumber(terrain.groundHeightM, 0)} m</StatTile>}
+        {terrain && (
+          <StatTile label={t('report.groundHeight')} badge={mark('height')}>
+            {formatNumber(terrain.groundHeightM, 0)} m
+          </StatTile>
+        )}
         {longTerm && (
           <>
-            <StatTile label={t('report.longTermSun')} edge="sun">
+            <StatTile label={t('report.longTermSun')} edge="sun" badge={mark('longTerm')}>
               {formatNumber(longTerm.sunPct, 0)}%
             </StatTile>
-            <StatTile label={t('report.longTermEarth')} edge="earth">
+            <StatTile label={t('report.longTermEarth')} edge="earth" badge={mark('longTerm')}>
               {formatNumber(longTerm.earthPct, 0)}%
             </StatTile>
-            <StatTile label={t('report.shadowed')}>{longTerm.shadowed ? t('report.yes') : t('report.no')}</StatTile>
+            <StatTile label={t('report.shadowed')} badge={mark('longTerm')}>
+              {longTerm.shadowed ? t('report.yes') : t('report.no')}
+            </StatTile>
           </>
         )}
       </dl>
@@ -181,10 +200,7 @@ export function SiteReport() {
         </ul>
       )}
 
-      <p className="rounded-lg border border-warn/50 bg-warn/8 p-3 text-sm text-warn">
-        <span aria-hidden="true">⚠ </span>
-        {terrainNote}
-      </p>
+      <ConfidenceKey terrainM={sure.terrainM} note={terrainNote} />
 
       <div>
         <h3 className="mb-2 text-base">{t('report.events')}</h3>

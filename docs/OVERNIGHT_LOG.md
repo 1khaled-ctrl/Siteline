@@ -1,6 +1,6 @@
 # Overnight log, 12–13 Nov 2026
 
-**Status:** in progress.
+**Status:** all 17 items done (Parts 1–4), each in its own commit. Tests went from 116 to 166. Time was left, so small polish items follow at the end, logged the same way.
 
 Every item below is committed locally on `main`. Nothing was pushed or deployed. `pnpm test`, `pnpm typecheck` and `pnpm lint` passed before each commit.
 
@@ -140,3 +140,10 @@ Bug found on the way (item 14): newer Chromium makes `scrollIntoView()` return a
 - It shows _why_ a site passes or fails over time: the monthly lunar nights are the dark bands, and the long Earth-below-horizon spells line up across years.
 - Computed by the stay check's own tests (same horizon, same "half the Sun's disc" and Earth rules) every 3 hours over every day in the ephemeris, in the worker (about 2 s). See decision 7 above for why it covers 2026–2035 rather than 19 years.
 - Screenshot (Mons Mouton): [day-strip.png](screenshots/day-strip.png). Tests: `dayStrip.test.ts` (2, on a made-up sky with known answers).
+
+### 17. Confidence badges tied to the terrain
+
+- Each check chip in the verdict box now carries a badge, and each reading tile a mark: **● high confidence**, **◐ first pass**, **○ not measured**, or **◌ flat horizon** (spot off the terrain). Hover or a screen reader gives the reason in one sentence.
+- The rule (`confidence.ts`) is tied to the data, not to opinion: horizon-based readings (Sun, Earth, ground height) are high confidence on terrain at LOLA's full 240 m detail (the native resolution of `LDEM_75S_240M`, which our 1.2 km terrain was resampled from) and a first pass when coarser; the slope needs terrain at 100 m or finer, else "not measured"; the Artemis-zone check depends only on latitude, so it is always high; the 19-year readings are rated by their own map's 2.4 km grid. Today that makes Sun, Earth, height and the 19-year numbers "first pass", the zone "high", and the slope "not measured", exactly as the data supports. When finer terrain is loaded, the badges change by themselves.
+- The yellow warning box became a neutral **How sure is each reading** key with the three marks and the terrain line, so the limitation reads as information, not apology (it stays amber only when the horizon had to be taken as flat).
+- Screenshot: [confidence-badges.png](screenshots/confidence-badges.png). Tests: `confidence.test.ts` (5). Accessibility audit re-run on all screens: 0 findings.
