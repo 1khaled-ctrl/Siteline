@@ -34,8 +34,25 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
         run: |
-          endpoint="${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}"
-          echo "R2_URL=${endpoint%/}" >> "$GITHUB_ENV"
+          endpoint="$(printf '%s' "${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}" | tr -d '[:space:]')"
+          # The dashboard shows the S3 API URL with the bucket on the end. As an endpoint that puts the bucket in every
+          # key, so every object 404s: keep only the scheme and host.
+          host="$(printf '%s' "$endpoint" | sed -E 's#^(https?://[^/]+).*#\1#')"
+          [ "$host" = "${endpoint%/}" ] || echo "::notice::R2_ENDPOINT had a path after the host; using the host only."
+          echo "R2_URL=$host" >> "$GITHUB_ENV"
+          # A pasted secret can carry a trailing newline or spaces.
+          echo "R2_ROOT=s3://$(printf '%s' "$R2_BUCKET" | tr -d '[:space:]')" >> "$GITHUB_ENV"
+
+      - name: Check the bucket
+        run: |
+          aws s3 ls --endpoint-url "$R2_URL" "$R2_ROOT/raw/landfall/img/" > "$RUNNER_TEMP/listing.txt" || {
+            echo "::error::Can't list raw/landfall/img/ in R2_BUCKET at this endpoint: check that R2_BUCKET is the bucket's name and that R2_ENDPOINT (or R2_ACCOUNT_ID) is the account that holds it."
+            exit 1
+          }
+          grep -q ' mars_height.png$' "$RUNNER_TEMP/listing.txt" || {
+            echo "::error::The bucket has no raw/landfall/img/mars_height.png: run the raw/landfall sync first."
+            exit 1
+          }
 
       # The kernels (about 50 MB) and the USGS names change rarely, so keep them between runs.
       - uses: actions/cache@v4
@@ -48,7 +65,7 @@ jobs:
       - name: Download the raw datasets from R2
         run: |
           aws s3 cp --endpoint-url "$R2_URL" \
-            "s3://$R2_BUCKET/raw/landfall/img/mars_height.png" pipeline/raw/landfall/img/mars_height.png
+            "$R2_ROOT/raw/landfall/img/mars_height.png" pipeline/raw/landfall/img/mars_height.png
 
       - name: Install the pipeline
         working-directory: pipeline
@@ -73,4 +90,4 @@ jobs:
           ls -lR pipeline/out
 
       - name: Upload pipeline/out to R2
-        run: aws s3 sync --endpoint-url "$R2_URL" --no-progress pipeline/out "s3://$R2_BUCKET/out"
+        run: aws s3 sync --endpoint-url "$R2_URL" --no-progress pipeline/out "$R2_ROOT/out"
