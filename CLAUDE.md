@@ -64,7 +64,7 @@ Most bugs in planetary software are one of these.
 pnpm 12 runs through corepack, and the pipeline uses uv with Python 3.13.
 
 - `corepack pnpm install` installs the JavaScript dependencies.
-- `corepack pnpm dev` starts the web app at http://localhost:5173 and serves `pipeline/out` at `/data`.
+- `corepack pnpm dev` starts the web app at http://localhost:5173. Its data (textures, terrain, ephemeris tables) comes from the project's R2 bucket with no setup, through `/r2` on the dev server; set `DATA_BASE_URL=local` in `apps/web/.env.local` to serve a local `pipeline/out` and `pipeline/raw/landfall` instead.
 - `corepack pnpm test`, `corepack pnpm typecheck` and `corepack pnpm lint` run Vitest, tsc and Biome. The tests also rewrite `tests/reference/validation.json`, which the app's "How we checked it" panel shows.
 - `corepack pnpm e2e` runs the Playwright smoke test against a running dev server (run `corepack pnpm exec playwright install chromium` once).
 - `corepack pnpm ephemeris` downloads the SPICE kernels into `pipeline/raw/spice`, writes `pipeline/out/ephemeris/moon_sun_earth.bin`, and regenerates `tests/reference/sun_earth_golden.json`.

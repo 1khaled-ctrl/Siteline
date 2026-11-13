@@ -6,9 +6,16 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 /**
- * URL prefix -> local folder, for running with a local pipeline. With DATA_BASE_URL set to the R2 bucket's public URL
- * the app reads the same files from there instead: the bucket holds pipeline/out under out/ and pipeline/raw/landfall
- * under raw/landfall/ (see .github/workflows/pipeline.yml). VITE_DATA_URL and VITE_ASSETS_URL still override each one.
+ * The R2 bucket's public URL. The app's data lives there and not in git: pipeline/out under out/, pipeline/raw/landfall
+ * under raw/landfall/ (see .github/workflows/pipeline.yml) and the 10 m south pole terrain under raw/lola/ (see
+ * terrain-mirror.yml). A fresh clone reads all of it from here, with no setup.
+ */
+const R2_PUBLIC_URL = 'https://pub-7be0ff89d7434202aff5f10a902675a5.r2.dev';
+
+/**
+ * URL prefix -> local folder, for running with a local pipeline: set DATA_BASE_URL=local (in the shell or
+ * apps/web/.env.local) to read these instead of R2. DATA_BASE_URL set to another URL reads from there, and
+ * VITE_DATA_URL, VITE_ASSETS_URL and VITE_TERRAIN_10M_URL still override each one.
  */
 const MOUNTS: [string, string][] = [
   ['/data', fileURLToPath(new URL('../../pipeline/out', import.meta.url))],
@@ -44,23 +51,35 @@ const PGDA_PROXY = {
   },
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   // Read from the shell or from apps/web/.env.local (git ignores it), with no prefix filter.
   const env = loadEnv(mode, process.cwd(), '');
-  const base = env.DATA_BASE_URL?.replace(/\/+$/, '');
+  const setting = env.DATA_BASE_URL?.trim();
+  const base = setting === 'local' ? undefined : (setting || R2_PUBLIC_URL).replace(/\/+$/, '');
+  // The dev server reads the bucket through /r2 on the page's own address, so it works on any port or address (a
+  // second dev server on 5174, a phone on the LAN) without the bucket's CORS rule having to list it. A build reads the
+  // bucket directly.
+  const root = base && command === 'serve' ? '/r2' : base;
+  const r2Proxy = base
+    ? { '/r2': { target: base, changeOrigin: true, rewrite: (path: string) => path.replace(/^\/r2/, '') } }
+    : {};
   return {
     plugins: [react(), tailwindcss(), localData()],
     // The sound libraries load on the first tap and the GeoTIFF reader with the first slope, not with the app; named
     // here, the dev server bundles them up front instead of finding them mid-session and reloading the page.
     optimizeDeps: { include: ['tone', 'howler', 'geotiff'] },
-    server: { proxy: PGDA_PROXY },
+    server: { proxy: { ...PGDA_PROXY, ...r2Proxy } },
     // The physics worker is a module worker; built as one too, it can leave the GeoTIFF reader in a chunk of its own
     // that loads with the first slope, rather than with the app.
     worker: { format: 'es' },
-    define: base
+    define: root
       ? {
-          'import.meta.env.VITE_DATA_URL': JSON.stringify(env.VITE_DATA_URL || `${base}/out`),
-          'import.meta.env.VITE_ASSETS_URL': JSON.stringify(env.VITE_ASSETS_URL || `${base}/raw/landfall`),
+          'import.meta.env.VITE_DATA_URL': JSON.stringify(env.VITE_DATA_URL || `${root}/out`),
+          'import.meta.env.VITE_ASSETS_URL': JSON.stringify(env.VITE_ASSETS_URL || `${root}/raw/landfall`),
+          // The slope's terrain from the bucket's copy, in seconds; NASA's own server (through /pgda) takes minutes.
+          'import.meta.env.VITE_TERRAIN_10M_URL': JSON.stringify(
+            env.VITE_TERRAIN_10M_URL || `${root}/raw/lola/LDEM_83S_10MPP_ADJ.TIF`,
+          ),
         }
       : {},
   };
