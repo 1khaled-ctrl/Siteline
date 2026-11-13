@@ -13,7 +13,7 @@ import {
   type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
-import { fitCamera, type Insets, NO_INSETS } from './screen';
+import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
 
 export interface MarsAssets {
   /** Optional small colour map shown while the full one loads. */
@@ -156,6 +156,7 @@ export class MarsView {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -371,6 +372,17 @@ export class MarsView {
     this.requestRender();
   }
 
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
   setInsets(insets: Insets): void {
     this.insets = insets;
@@ -579,6 +591,7 @@ export class MarsView {
     this.renderer.render(this.scene, this.camera);
     this.placeLabels(D);
     this.frameListener?.();
+    for (const listener of this.frameListeners) listener();
   }
 
   private placeLabels(D: number): void {

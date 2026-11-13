@@ -7,7 +7,9 @@ import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
+import { CalloutLayer } from './Callouts';
 import { LanderPins } from './LanderPins';
+import { BodyCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -95,6 +97,23 @@ export function GlobeMap() {
   return (
     <section className="fade-in absolute inset-0">
       <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="globe-map" />
+      <CalloutLayer
+        source={load.state === 'ready' ? globe : null}
+        items={
+          globe
+            ? [
+                {
+                  id: 'body',
+                  // On the globe's upper edge, clear of the toolbar, while the whole globe is in view.
+                  anchor: () => onOutline(globe.discOnScreen(), -38),
+                  prefer: 'ne',
+                  label: t('facts.heading.Moon'),
+                  children: <BodyCard body="Moon" />,
+                },
+              ]
+            : []
+        }
+      />
       <LanderPins
         host={load.state === 'ready' ? globe : null}
         missions={PINNED.Moon}

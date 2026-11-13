@@ -104,7 +104,7 @@ export function SiteReport() {
       : t('report.offTerrain');
 
   return (
-    <section className={`${panel} flex flex-col gap-4`} aria-busy={loading}>
+    <section className={`${panel} flex flex-col gap-4`} aria-busy={loading} id="site-report" tabIndex={-1}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-2xl">{t('report.heading')}</h2>
         <span className="text-sm text-quiet">{t('report.landing', { date: formatUtc(query.landingUtc) })}</span>

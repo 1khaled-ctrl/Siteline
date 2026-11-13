@@ -87,6 +87,7 @@ export class SiteView implements PinHost {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -212,6 +213,12 @@ export class SiteView implements PinHost {
     this.camera.position.copy(this.controls.target).addScaledVector(offset.normalize(), d);
     this.controls.update();
     this.requestRender();
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
@@ -388,6 +395,7 @@ export class SiteView implements PinHost {
     this.controls.rotateSpeed = 0.6;
     this.renderer.render(this.scene, this.camera);
     this.frameListener?.();
+    for (const listener of this.frameListeners) listener();
   }
 
   private requestRender(): void {

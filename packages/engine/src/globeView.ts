@@ -1,7 +1,7 @@
 import { MOON_RADIUS_M, siteFrame, unitToLatLon, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { fitCamera, type Insets, NO_INSETS } from './screen';
+import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -76,6 +76,7 @@ export class GlobeView {
   private frameListener?: () => void;
 
   private insets: Insets = NO_INSETS;
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -172,6 +173,7 @@ export class GlobeView {
         this.camera.lookAt(this.controls.target);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
+        for (const listener of this.frameListeners) listener();
         if (k < 1) this.frame = requestAnimationFrame(step);
         else {
           this.frame = 0;
@@ -236,6 +238,7 @@ export class GlobeView {
         this.camera.lookAt(this.controls.target);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
+        for (const listener of this.frameListeners) listener();
         if (k < 1) this.frame = requestAnimationFrame(step);
         else {
           this.frame = 0;
@@ -247,6 +250,17 @@ export class GlobeView {
       };
       this.frame = requestAnimationFrame(step);
     });
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(R_KM, this.camera, this.renderer.domElement, new THREE.Vector3());
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */

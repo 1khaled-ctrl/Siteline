@@ -2,10 +2,13 @@ import { type LayerColour, PoleView } from '@siteline/engine';
 import { mapValue, type PolarMaps } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { physics, URLS, useLightingUtcMs } from '../physics';
+import { physics, URLS, useLightingUtcMs, useStay } from '../physics';
 import { REGIONS } from '../regions';
 import { useStageInsets } from '../stage';
 import { LAYERS, type Layer, useApp } from '../store';
+import { checksOf, verdictOf } from '../verdict';
+import { CalloutLayer } from './Callouts';
+import { SiteCard, VERDICT_TONE } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { useLoad, ViewStatus } from './ViewStatus';
 
@@ -128,9 +131,29 @@ export function PoleMap() {
     view?.setInsets(insets);
   }, [view, insets]);
 
+  const { result } = useStay();
+  const tone = result ? VERDICT_TONE[verdictOf(checksOf(result))] : 'accent';
+
   return (
     <section className="fade-in absolute inset-0">
       <div ref={ref} className="stage-canvas" data-testid="pole-map" />
+      <CalloutLayer
+        source={view}
+        items={
+          view
+            ? [
+                {
+                  id: 'site',
+                  anchor: () => view.siteOnScreen(),
+                  prefer: 'ne',
+                  tone,
+                  label: t('callout.site'),
+                  children: <SiteCard />,
+                },
+              ]
+            : []
+        }
+      />
       <ViewPills
         below={
           layer !== 'none' && (
@@ -161,6 +184,7 @@ export function PoleMap() {
         type="button"
         onClick={() => useApp.getState().set({ view: 'globe' })}
         className={`${viewButton} absolute inset-e-3 top-3`}
+        data-avoid
       >
         {t('map.backToGlobe')}
       </button>

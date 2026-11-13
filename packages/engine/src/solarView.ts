@@ -18,6 +18,10 @@ export interface SolarViewOptions {
   /** Colour maps for the bodies that have one; the rest stay a flat colour. */
   textures?: Partial<Record<SolarBodyKey, string>>;
   onSelect?: (body: SolarBodyKey) => void;
+  /** A click on a body that has no view to fly into. */
+  onPoint?: (body: SolarBodyKey) => void;
+  /** The pointer coming onto a body or its name, or leaving it (null). */
+  onHover?: (body: SolarBodyKey | null) => void;
   /**
    * For the app's opening: hold the camera straight over the Sun, close enough that the Earth's orbit is this many
    * pixels in radius, until `setIntroProgress` pulls it back. Without it the view opens with its own short dolly.
@@ -177,6 +181,9 @@ export class SolarView {
   private insets: Insets = NO_INSETS;
   private readonly loads: Promise<void>[] = [];
   private readonly scratch = new THREE.Vector3();
+  private readonly frameListeners = new Set<() => void>();
+  /** Bodies whose name chip is hidden, because the app shows a card for them instead. */
+  private hiddenLabels: ReadonlySet<SolarLabelKey> = new Set();
 
   constructor(
     private readonly container: HTMLElement,
@@ -299,6 +306,18 @@ export class SolarView {
     const away = toScene(s.positionsKm.moon).normalize();
     this.mesh('moon').position.copy(earth).addScaledVector(away, MOON_ORBIT_SCENE);
     this.moonRing.position.copy(earth);
+    this.requestRender();
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** Hides the name chips of these bodies, for the ones the app labels with a card of its own. */
+  setHiddenLabels(keys: ReadonlySet<SolarLabelKey>): void {
+    this.hiddenLabels = keys;
     this.requestRender();
   }
 
@@ -509,10 +528,10 @@ export class SolarView {
       ring.rotation.x = Math.PI / 2;
       mesh.add(ring);
     }
-    // A planet you can fly into takes the pointer on a larger, invisible hit sphere around it.
-    if (key !== 'sun' && this.opts.navigable.has(key)) {
+    // Every planet takes the pointer on a larger, invisible hit sphere around it; the ones you can fly into get a bigger one.
+    if (key !== 'sun') {
       const hit = new THREE.Mesh(
-        new THREE.SphereGeometry(Math.max(size * 1.9, 0.55), 12, 8),
+        new THREE.SphereGeometry(Math.max(size * (this.opts.navigable.has(key) ? 1.9 : 1.4), 0.55), 12, 8),
         new THREE.MeshBasicMaterial({ visible: false }),
       );
       hit.userData.body = key;
@@ -678,7 +697,7 @@ export class SolarView {
     if (!press || this.flying) return;
     if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 6 || performance.now() - press.at > 500) return;
     const body = this.pick(e);
-    if (body) this.opts.onSelect?.(body);
+    if (body) (this.opts.navigable.has(body) ? this.opts.onSelect : this.opts.onPoint)?.(body);
   };
   private readonly onPointerLeave = (): void => this.setHover(null);
   private readonly onVisibility = (): void => (document.hidden ? this.stopLoop() : this.startLoop());
@@ -708,13 +727,14 @@ export class SolarView {
       if (halo) halo.material.opacity = on ? 0.95 : 0.55;
       const el = this.labels.get(key);
       if (el) {
-        el.style.borderColor = on ? '#5ba9ff' : '#3a4c80';
+        el.style.borderColor = on ? '#5ba9ff' : this.opts.navigable.has(key) ? '#3a4c80' : '#22304f';
         el.style.boxShadow = on ? '0 0 14px rgba(91, 169, 255, 0.4)' : 'none';
       }
     };
     if (this.hovered) style(this.hovered, false);
     this.hovered = body;
     if (body) style(body, true);
+    this.opts.onHover?.(body);
     this.renderer.domElement.style.cursor = body ? 'pointer' : '';
     this.requestRender();
   }
@@ -767,7 +787,7 @@ export class SolarView {
     const p = new THREE.Vector3();
     for (const [key, el] of this.labels) {
       p.copy(this.mesh(key).position).project(this.camera);
-      const visible = p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
+      const visible = !this.hiddenLabels.has(key) && p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
       el.style.display = visible ? '' : 'none';
       if (!visible) continue;
       el.style.left = `${((p.x + 1) / 2) * w}px`;
@@ -775,6 +795,7 @@ export class SolarView {
       const offset = key === 'moon' ? -(LOOK[key].size * 6 + 34) : LOOK[key].size * 6 + 6;
       el.style.top = `${((1 - p.y) / 2) * h + offset}px`;
     }
+    for (const listener of this.frameListeners) listener();
   }
 
   private requestRender(): void {

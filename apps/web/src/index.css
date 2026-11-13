@@ -159,7 +159,7 @@ body {
 @media (width >= 64rem) {
   .stage-canvas,
   .lander-pins {
-    inset-inline-end: -422px;
+    inset-inline-end: calc(-1 * var(--hud-end, 422px));
   }
 }
 
@@ -386,7 +386,8 @@ body {
     inset 0 0 0 1px rgb(255 255 255 / 0.02);
   transition:
     border-color 0.25s,
-    box-shadow 0.25s;
+    box-shadow 0.25s,
+    outline-color 0.9s;
 }
 .glass:hover,
 .hud > *:hover {
@@ -395,6 +396,110 @@ body {
     0 14px 44px rgb(0 0 0 / 0.5),
     0 0 24px rgb(91 169 255 / 0.12),
     inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+/* Callouts: glass cards in the scene, each with a leader line to the exact point it describes. */
+.callout {
+  width: max-content;
+  max-width: 264px;
+  padding: 10px 12px 9px;
+  border-radius: 12px;
+  transform-origin: 0 0;
+  will-change: transform, opacity;
+}
+.callout-mark {
+  --tone: var(--color-accent);
+}
+.callout-mark[data-tone="sun"] {
+  --tone: var(--color-sun);
+}
+.callout-mark[data-tone="pass"] {
+  --tone: var(--color-pass);
+}
+.callout-mark[data-tone="fail"] {
+  --tone: var(--color-fail);
+}
+.callout-mark[data-tone="warn"] {
+  --tone: var(--color-warn);
+}
+.callout-line {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.25;
+  filter: drop-shadow(0 0 3px rgb(0 0 0 / 0.8));
+}
+.callout-dot {
+  fill: var(--tone);
+  stroke: #04070f;
+  stroke-width: 1.5;
+}
+.callout-ping {
+  fill: none;
+  stroke: var(--tone);
+  stroke-width: 1.25;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: callout-ping 2.6s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+@keyframes callout-ping {
+  from {
+    opacity: 0.85;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+.callout[data-tone="pass"] {
+  border-color: rgb(65 207 143 / 0.45);
+}
+.callout[data-tone="fail"] {
+  border-color: rgb(255 111 111 / 0.5);
+}
+.callout[data-tone="warn"] {
+  border-color: rgb(240 192 80 / 0.45);
+}
+.callout-readings {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 14px;
+  row-gap: 2px;
+  font-size: 12px;
+}
+.callout-readings dt {
+  color: var(--color-quiet);
+}
+.callout-readings dd {
+  text-align: end;
+  color: var(--color-ink);
+}
+.callout-go {
+  min-height: 28px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgb(91 169 255 / 0.55);
+  background: rgb(91 169 255 / 0.14);
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--color-ink);
+  white-space: nowrap;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.callout-go:hover {
+  border-color: var(--color-accent);
+  background: rgb(91 169 255 / 0.26);
+}
+.callout-source {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--color-quiet);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.callout-source:hover {
+  color: var(--color-ink);
 }
 
 /* The panel is a stack of floating glass cards: each direct child is one, with the 3D view showing through. They
@@ -468,6 +573,10 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .callout-ping {
+    animation: none;
+    opacity: 0;
+  }
   .hud > *,
   .orbit-spin,
   .orbit-unspin {
@@ -476,4 +585,13 @@ body {
   :root:not([data-opened]) .hud > * {
     opacity: 1;
   }
+}
+
+/* A card the scene pointed you to lights its edge for a moment (showCard adds and then drops .flash). */
+.hud > * {
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+}
+.hud > .flash {
+  outline-color: rgb(91 169 255 / 0.85);
 }

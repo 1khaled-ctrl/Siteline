@@ -15,7 +15,7 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
-import { fitCamera, type Insets, NO_INSETS } from './screen';
+import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
 
 export type EarthStyle = 'map' | 'satellite' | 'night';
 
@@ -194,6 +194,7 @@ export class EarthView {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -356,6 +357,17 @@ export class EarthView {
       distance: this.camera.position.length(),
     };
     return this.flyTo(at.latDeg, at.lonDeg, 1 + (at.distance - 1) * factor, durationMs);
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
@@ -588,6 +600,7 @@ export class EarthView {
     this.marker.scale.setScalar(Math.max(0.00015, (D - 1) * 0.004));
     if (D < 1.9) void this.loadDetail();
     this.renderer.render(this.scene, this.camera);
+    for (const listener of this.frameListeners) listener();
     this.placeLabels(D);
   }
 

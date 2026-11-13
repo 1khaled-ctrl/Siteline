@@ -1,7 +1,7 @@
 import { DEFAULT_STAY, type StayQuery } from '@siteline/contracts';
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
 import { type Pin, useApp } from './store';
 
@@ -34,6 +34,27 @@ export function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQ
   };
 }
 
+/**
+ * One stay check per question, shared by everything that shows it (the site report, the site's callout, the compare
+ * table), so asking twice costs one run in the worker. A failed run is forgotten, so asking again tries again.
+ */
+const stays = new Map<string, Promise<StayResponse>>();
+function stayOnce(query: StayQuery, fresh = false): Promise<StayResponse> {
+  const key = JSON.stringify(query);
+  if (fresh) stays.delete(key);
+  const known = stays.get(key);
+  if (known) return known;
+  const run = physics.stay(query, URLS);
+  stays.set(key, run);
+  run.catch(() => stays.delete(key));
+  // A day's worth of questions is plenty; drop the oldest beyond that.
+  for (const old of stays.keys()) {
+    if (stays.size <= 32) break;
+    stays.delete(old);
+  }
+  return run;
+}
+
 export function useStay(): StayState {
   const landingUtc = useApp((s) => s.landingUtc);
   const slipDays = useApp((s) => s.slipDays);
@@ -42,13 +63,16 @@ export function useStay(): StayState {
   const [state, setState] = useState<Omit<StayState, 'retry'>>({ loading: true });
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  const asked = useRef(0);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new `attempt` is what runs the check again.
   useEffect(() => {
     let live = true;
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
     setState((s) => ({ ...s, error: undefined, loading: true }));
-    physics.stay(query, URLS).then(
+    // A retry asks the worker again rather than reuse what failed or what is cached.
+    const fresh = attempt !== asked.current;
+    asked.current = attempt;
+    stayOnce(query, fresh).then(
       (response) => {
         if (live) setState({ query, ...response, loading: false });
       },
@@ -84,11 +108,9 @@ export function useStayMany(pins: Pin[]): (StayResponse | undefined)[] {
   useEffect(() => {
     let live = true;
     setRows(sites.map(() => undefined));
-    Promise.all(sites.map((s) => physics.stay(queryFor(s, landingUtc, slipDays), URLS).catch(() => undefined))).then(
-      (all) => {
-        if (live) setRows(all);
-      },
-    );
+    Promise.all(sites.map((s) => stayOnce(queryFor(s, landingUtc, slipDays)).catch(() => undefined))).then((all) => {
+      if (live) setRows(all);
+    });
     return () => {
       live = false;
     };

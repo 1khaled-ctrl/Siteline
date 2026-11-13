@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
 import { useBoot } from './boot';
 import { findLander } from './landers';
+import { useStage } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
 import { BodyClock } from './ui/BodyClock';
 import { BodyFacts } from './ui/BodyFacts';
@@ -58,11 +59,36 @@ function Tagline() {
   return key ? <p className="text-xs text-quiet max-lg:hidden">{t(`app.tagline.${key}`)}</p> : null;
 }
 
+/**
+ * Watches whether the floating panel has anything in it: when every card in it is empty (the solar system's clock card
+ * hides while no slip or time-lapse is set), the 3D view takes the whole width and centres in it.
+ */
+function usePanelShown(): (el: HTMLElement | null) => void {
+  return useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    const check = () => {
+      const shown = [...el.children].some((c) => (c as HTMLElement).offsetHeight > 0);
+      document.documentElement.style.setProperty('--hud-end', shown ? '422px' : '0px');
+      useStage.getState().setPanelShown(shown);
+    };
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    const watch = new MutationObserver(() => {
+      for (const c of el.children) observer.observe(c);
+      check();
+    });
+    watch.observe(el, { childList: true });
+    for (const c of el.children) observer.observe(c);
+    check();
+  }, []);
+}
+
 export function App() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
   const opened = useBoot((s) => s.opened);
   useGlassLight();
+  const panelRef = usePanelShown();
   return (
     <>
       <Intro />
@@ -97,6 +123,7 @@ export function App() {
           <MoonView />
           <Copilot />
           <aside
+            ref={panelRef}
             id="panel"
             tabIndex={-1}
             aria-label={t('app.panel')}

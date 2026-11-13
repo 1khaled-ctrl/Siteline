@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useStageInsets } from '../stage';
 import { useApp } from '../store';
+import { CalloutLayer } from './Callouts';
+import { BodyCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -141,6 +143,23 @@ export function EarthMap() {
   return (
     <section className="fade-in absolute inset-0">
       <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="earth-map" />
+      <CalloutLayer
+        source={load.state === 'ready' ? globe : null}
+        items={
+          globe
+            ? [
+                {
+                  id: 'body',
+                  // On the globe's upper edge, clear of the toolbar, while the whole globe is in view.
+                  anchor: () => onOutline(globe.discOnScreen(), -38),
+                  prefer: 'ne',
+                  label: t('facts.heading.Earth'),
+                  children: <BodyCard body="Earth" />,
+                },
+              ]
+            : []
+        }
+      />
       <ViewPills wide>
         <fieldset className="flex gap-1.5">
           <legend className="sr-only">{t('earth.style')}</legend>

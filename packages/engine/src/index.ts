@@ -49,7 +49,14 @@ export { findFeature, MARS_RADIUS_KM, type MarsFeature, NEAR_FEATURE_KM } from '
 export { type MarsAssets, type MarsPlace, MarsView, type MarsViewOptions } from './marsView';
 export { type ModelSun, ModelView } from './modelView';
 export { type LayerColour, PoleView, type PoleViewOptions, type Region } from './poleView';
-export { fitCamera, type Insets, NO_INSETS, type ScreenPoint } from './screen';
+export {
+  type FrameSource,
+  fitCamera,
+  type Insets,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+} from './screen';
 export {
   decodePatch,
   parseSites,

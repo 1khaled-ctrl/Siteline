@@ -193,6 +193,7 @@ export function Copilot() {
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-avoid
         className="fixed inset-e-4 bottom-4 z-20 min-h-10 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
       >
         <span aria-hidden="true">✦ </span>
@@ -203,6 +204,7 @@ export function Copilot() {
   return (
     <section
       aria-label={t('copilot.title')}
+      data-avoid
       className="fixed inset-x-3 bottom-3 z-30 flex h-[min(520px,75dvh)] flex-col gap-2 rounded-xl border border-line bg-panel p-3 shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(520px,calc(100%-80px))] lg:w-[420px]"
       data-testid="copilot"
     >

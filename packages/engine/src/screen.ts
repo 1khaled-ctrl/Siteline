@@ -49,3 +49,33 @@ export function toScreen(
     visible: scratch.z < 1 && Math.abs(scratch.x) <= 1 && Math.abs(scratch.y) <= 1,
   };
 }
+
+/** A globe's outline on the page: its centre and its radius in CSS pixels. */
+export interface ScreenDisc {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Where a sphere of `radius` around the scene's origin appears; null when the camera is inside it. */
+export function discToScreen(
+  radius: number,
+  camera: THREE.PerspectiveCamera,
+  canvas: HTMLElement,
+  scratch: THREE.Vector3,
+): ScreenDisc | null {
+  const d = camera.position.length();
+  if (d <= radius) return null;
+  camera.updateMatrixWorld();
+  const centre = toScreen(scratch.set(0, 0, 0), camera, canvas, scratch);
+  // The outline's angular radius, as a share of half the vertical field of view, in pixels.
+  const h = canvas.getBoundingClientRect().height;
+  const r = (Math.tan(Math.asin(radius / d)) / Math.tan((camera.fov * Math.PI) / 360)) * (h / 2);
+  return { x: centre.x, y: centre.y, r };
+}
+
+/** Views that tell overlays when they have drawn, so what follows them moves in the same frame. */
+export interface FrameSource {
+  /** Calls `listener` after every draw; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void;
+}
