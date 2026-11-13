@@ -19,7 +19,8 @@ function usePlayClock() {
     let last = performance.now();
     const tick = (now: number) => {
       const { speedHPerS, playOffsetH, setPlay } = useApp.getState();
-      const dt = Math.min(0.1, (now - last) / 1000);
+      // A frame's timestamp can be earlier than the moment the effect ran, so the first step is never negative.
+      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
       setPlay({ playOffsetH: (playOffsetH + speedHPerS * dt) % LOOP_HOURS });
       frame = requestAnimationFrame(tick);
@@ -47,7 +48,8 @@ export function MoonView() {
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
   return (
-    <div className="space-backdrop relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
+    // The stage is dragged to turn it, so nothing on it (names, cards, hints) gets selected as text along the way.
+    <div className="space-backdrop absolute inset-y-0 inset-s-0 inset-e-(--hud-end) select-none">
       <RetryView value={retry}>
         <CurrentView key={attempt} />
       </RetryView>

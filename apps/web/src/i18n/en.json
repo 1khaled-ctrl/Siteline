@@ -19,7 +19,11 @@
     "dayOn": "+1 d",
     "earlier": "One day earlier",
     "later": "One day later",
-    "now": "Now"
+    "now": "Now",
+    "live": "Live",
+    "liveHint": "Following the real clock. Pick a date to hold one.",
+    "nowHint": "Back to the real clock",
+    "changeDate": "Date and time (UTC): {{date}}, {{time}}. Press to change it."
   },
   "status": {
     "loading": {
@@ -243,7 +247,7 @@
       "horizon": "What the ground hides: from each spot, the horizon is traced in every direction across NASA's LRO LOLA south-pole terrain.",
       "sun": "Sunlight: through the {{days}}-day stay we step through time and measure how much of the Sun's disc clears that horizon. The site fails if less than {{pct}}% of the disc is up at any moment, and the moment it drops is found to the minute.",
       "earth": "Earth in view, for talking to the lander: the same test for the Earth, counting {{rule}}.",
-      "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. The loaded terrain is too coarse to see 100 m, so the report says it needs finer terrain instead of guessing.",
+      "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. Inside 83°S the slope is measured on LOLA’s 10 m terrain of the south pole, reading only the few tiles around the site: a plane fitted to the heights within 50 m gives the landing slope, and Horn’s method on each 10 m cell within 1 km gives how much of that 2 km area is under 20°, as steep as astronauts can walk. Outside 83°S, or if those tiles do not arrive, the report says it needs finer terrain instead of guessing.",
       "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
       "longTerm": "Long-term sunlight and Earth view: maps over a 19-year cycle, computed from the same terrain by the Landfall concept demo, to be replaced by NASA's own product.",
       "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
@@ -260,7 +264,14 @@
     "source": "Source",
     "fonts": "Fonts",
     "libraries": "Libraries",
-    "more": "The same list is CREDITS.md in the project, and each panel names its own sources too."
+    "more": "The same list is CREDITS.md in the project, and each panel names its own sources too.",
+    "soundHeading": "Sound",
+    "sound": {
+      "sonification": "The time-lapse is sonified. As it plays over the Moon, a tone follows the share of the Sun's disc above the selected site's horizon: the same number the stay check works out from the DE440 ephemeris and the LOLA terrain, read at each moment of the time-lapse. Its pitch rises from {{lowHz}} Hz in the dark to {{highHz}} Hz in full Sun, evenly by ear, and it grows louder as more of the Sun shows. It is the idea behind NASA's own data sonifications, such as the Chandra X-ray Center's and the radio sounds of Juno's Waves instrument.",
+      "cues": "A few short sounds go with what you see, never instead of it: a rising major third when a site passes, one soft note while it is not decided yet, and a single low note when it fails; air for each camera flight, longer and brighter the faster the camera moves; on the way back out to the solar system, air that falls away as the worlds recede, then the opening's chord an octave lower as the whole system comes into view; a very quiet tick for each click of the phone's dial; and a small chime when the copilot answers.",
+      "control": "Browsers allow no sound until you tap or press a key, so once everything has loaded the opening asks for one tap to enter, and plays its sound with it. The speaker button in the header, or the M key, turns every sound off or on at once, and the choice is remembered in this browser.",
+      "opening": "The opening has its own sound, made to follow the picture: a low hum that builds with the loading, a glint each time the light catches the turning emblem, then air as it rushes past, a quick glide as the shooting star streaks off, a soft chord as its gold ring opens into the Earth’s orbit, and a small ping as the lander reaches the Moon."
+    }
   },
   "site": {
     "heading": "Landing site",
@@ -280,11 +291,9 @@
     "speed": "Play speed",
     "speedOption": "{{hours}} h per second",
     "lightingLanding": "The 3D view is lit for the landing time.",
-    "lightingAt": "The 3D view is lit for {{days}} days after landing."
-  },
-  "clock": {
-    "litFor": "With the Moon's launch slip and time-lapse, the views show {{when}}.",
-    "reset": "Back to the set date"
+    "lightingAt": "The 3D view is lit for {{days}} days after landing.",
+    "sunNow": "Sun above the site's horizon",
+    "heard": "You are hearing this: the tone's pitch and loudness follow it."
   },
   "worlds": {
     "heading": "Worlds",
@@ -293,7 +302,7 @@
     "signal": "Signal from Earth",
     "au": "{{n}} AU",
     "none": "–",
-    "note": "Distances are for the date shown, from NASA JPL's DE440 ephemeris; AU is the Earth's average distance from the Sun. The signal time is how long light or radio takes to get there from Earth. Click Earth, the Moon or Mars to fly there."
+    "note": "Distances are for the date shown, from NASA JPL's DE440 ephemeris; AU is the Earth's average distance from the Sun. The signal time is how long light or radio takes to get there from Earth. Tap Earth, the Moon or Mars to fly there."
   },
   "facts": {
     "heading": {
@@ -364,7 +373,12 @@
     "bestBadge": "Best",
     "bestValue": "(best in this row)",
     "winner": "Best of these for this date: {{site}}.",
-    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded."
+    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded.",
+    "introDeck": "Each site re-checked for the landing date and slip above, best first. Swipe a card away for the next; ★ marks the best value of a reading.",
+    "deck": "Deck of pinned sites",
+    "previous": "Previous site",
+    "next": "Next site",
+    "position": "Site {{n}} of {{of}}"
   },
   "best": {
     "button": "Best spot",
@@ -428,7 +442,10 @@
     "flatWarning": "Terrain is not loaded, so the horizon is treated as flat. Hills can hide the Sun and Earth earlier than shown here.",
     "offTerrain": "This spot is outside the loaded terrain, so the horizon is treated as flat.",
     "sources": "Sources",
-    "loading": "Checking the site…"
+    "loading": "Checking the site…",
+    "landingSlope": "Slope over 100 m",
+    "walkable": "Ground under 20° within 1 km",
+    "measuringSlope": "measuring on 10 m terrain…"
   },
   "reason": {
     "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",
@@ -671,5 +688,80 @@
       "zoomFeature": "Zoom to {{name}}",
       "sources": "Heights: NASA MGS MOLA (<megdr>MEGDR</megdr>, made by the MOLA Science Team and archived by the PDS Geosciences Node at Washington University in St. Louis) through <jaanga>Jaanga’s height-map tiles</jaanga>, © 2015 Jaanga authors, <ccby>CC BY 4.0</ccby>, resampled to a coarser grid (about 21 km), so peaks and floors can read a few hundred metres off. Slope shading is computed from these heights, so it has no finer detail than they do. Colour: <sss>Solar System Scope</sss> Mars map, <ccby>CC BY 4.0</ccby>, based on NASA elevation and imagery data and recompressed; the site notes that unmapped gaps in its maps are filled with fictional terrain. Names and feature types: <gaz>IAU Gazetteer of Planetary Nomenclature</gaz> (USGS), public domain. Details in CREDITS.md."
     }
+  },
+  "intro": {
+    "loading": "Loading SiteLine",
+    "progress": "What is loading",
+    "skip": "Skip intro",
+    "slow": "Still loading {{what}}…",
+    "task": {
+      "emblem": "the emblem",
+      "fonts": "the type",
+      "positions": "where the planets are",
+      "orbits": "the orbits",
+      "imagery": "the planets' colour maps"
+    },
+    "view": {
+      "solar": "where the planets are",
+      "earth": "NASA Blue Marble imagery",
+      "mars": "the Mars maps",
+      "globe": "the Moon map",
+      "pole": "NASA LOLA south-pole terrain",
+      "site": "the terrain around this site"
+    },
+    "state": {
+      "pending": "loading",
+      "done": "loaded",
+      "failed": "failed"
+    },
+    "soundOn": "Sound on",
+    "soundOff": "Sound off",
+    "enter": "Tap to enter"
+  },
+  "callout": {
+    "fly": "Fly there",
+    "sourceDe440": "Positions: NASA JPL DE440",
+    "site": "Landing site",
+    "fullReport": "Full report",
+    "allFacts": "All facts",
+    "checking": "Checking the stay…",
+    "check": {
+      "sun": "Sunlit",
+      "earth": "Earth in view",
+      "slope": "Slope",
+      "zone": "Near the pole"
+    },
+    "flyTo": "Fly to {{name}}",
+    "place": "The place you picked"
+  },
+  "sheet": {
+    "open": "Show the panel",
+    "close": "Hide the panel"
+  },
+  "dial": {
+    "label": {
+      "worlds": "Pick a world: turn the dial",
+      "time": "Move the time: turn the dial",
+      "sites": "Pick a pinned site: turn the dial"
+    },
+    "landing": "Landing",
+    "hours": "+{{n}} h",
+    "site": "Site {{n}} of {{of}}",
+    "turn": "Turn",
+    "tapFly": "Tap to fly",
+    "tapReset": "Tap: landing",
+    "modeTime": "Time",
+    "modeSites": "Pinned sites"
+  },
+  "tilt": {
+    "on": "Tilt to look: on",
+    "off": "Tilt to look",
+    "denied": "Motion access was turned down; the view still drags.",
+    "none": "This phone has no motion sensor the browser can read."
+  },
+  "sound": {
+    "label": "Sound",
+    "muteHint": "Sound is on. Press to mute everything (or press M).",
+    "unmuteHint": "Sound is off. Press to turn it on (or press M)."
   }
 }

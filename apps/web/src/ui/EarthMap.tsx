@@ -9,7 +9,10 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
+import { CalloutLayer } from './Callouts';
+import { BodyCard, EarthPlaceCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -132,9 +135,45 @@ export function EarthMap() {
     void globe.flyToCountry(c, ms(1400));
   };
 
+  const insets = useStageInsets();
+  useActiveView(globe);
+  useEffect(() => {
+    globe?.setInsets(insets);
+  }, [globe, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="earth-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="earth-map" />
+      <CalloutLayer
+        source={load.state === 'ready' ? globe : null}
+        items={
+          globe
+            ? [
+                {
+                  id: 'body',
+                  // On the globe's upper edge, clear of the toolbar, while the whole globe is in view.
+                  anchor: () => onOutline(globe.discOnScreen(), -38),
+                  prefer: 'ne',
+                  keepOff: () => globe.discOnScreen(),
+                  label: t('facts.heading.Earth'),
+                  children: <BodyCard body="Earth" />,
+                },
+                ...(place
+                  ? [
+                      {
+                        id: 'place',
+                        anchor: () => globe.placeOnScreen(place.latDeg, place.lonDeg),
+                        prefer: 'ne' as const,
+                        tone: 'sun' as const,
+                        label: t('callout.place'),
+                        children: <EarthPlaceCard />,
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+      />
       <ViewPills wide>
         <fieldset className="flex gap-1.5">
           <legend className="sr-only">{t('earth.style')}</legend>

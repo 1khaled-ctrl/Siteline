@@ -102,7 +102,7 @@ export interface ShareState {
 /** A link that opens the south-pole check on this spot, landing date and slip. */
 export function shareLink(base: string, s: ShareState): string {
   const p = new URLSearchParams({
-    view: 'pole',
+    open: 'pole',
     t: s.landingUtc,
     slip: String(s.slipDays),
     lat: String(s.latDeg),

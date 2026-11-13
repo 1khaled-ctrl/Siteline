@@ -10,6 +10,7 @@ import {
 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenPoint, toScreen } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -89,6 +90,10 @@ export class PoleView {
   private readonly onPick?: (latDeg: number, lonDeg: number) => void;
   private down?: { x: number; y: number };
   private frame = 0;
+
+  private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -217,6 +222,30 @@ export class PoleView {
     this.requestRender();
   }
 
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** Where the picked site's ground is on the page; null when it is off the terrain. */
+  siteOnScreen(): ScreenPoint | null {
+    if (!this.marker.visible) return null;
+    this.camera.updateMatrixWorld();
+    return toScreen(this.marker.position, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
   dispose(): void {
     cancelAnimationFrame(this.frame);
     this.resize.disconnect();
@@ -240,7 +269,9 @@ export class PoleView {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      this.look.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
+      for (const listener of this.frameListeners) listener();
     });
   }
 
@@ -248,8 +279,7 @@ export class PoleView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

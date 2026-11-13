@@ -9,6 +9,7 @@ export {
   type OceanKey,
   PICK_CITY_KM,
 } from './earthView';
+export { type Flight, onFlight } from './flights';
 export { type GlobeTextures, GlobeView, type GlobeViewOptions } from './globeView';
 export {
   type Bilingual,
@@ -50,6 +51,14 @@ export { type MarsAssets, type MarsPlace, MarsView, type MarsViewOptions } from 
 export { type ModelSun, ModelView } from './modelView';
 export { type LayerColour, PoleView, type PoleViewOptions, type Region } from './poleView';
 export {
+  type FrameSource,
+  fitCamera,
+  type Insets,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+} from './screen';
+export {
   decodePatch,
   parseSites,
   patchKey,
@@ -58,4 +67,10 @@ export {
   type SitesJson,
 } from './sitePatch';
 export { type PinHost, SITE_BODY_RADIUS_KM, type SiteBody, SiteView, type SiteViewOptions } from './siteView';
-export { type SolarLabelKey, type SolarSnapshot, SolarView, type SolarViewOptions } from './solarView';
+export {
+  LOOK as SOLAR_LOOK,
+  type SolarLabelKey,
+  type SolarSnapshot,
+  SolarView,
+  type SolarViewOptions,
+} from './solarView';

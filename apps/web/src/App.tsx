@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { MotionConfig } from 'motion/react';
+import { type CSSProperties, type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
-import { findLander } from './landers';
+import { useBoot } from './boot';
+import { useStage, useWide } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
-import { BodyClock } from './ui/BodyClock';
 import { BodyFacts } from './ui/BodyFacts';
 import { MarsSide, MoonSide, SiteSide } from './ui/BodySide';
 import { Breadcrumbs } from './ui/Breadcrumbs';
@@ -11,10 +12,19 @@ import { Controls, LandingTime } from './ui/Controls';
 import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
+import { useGlassLight } from './ui/glass';
+import { HeaderBrand } from './ui/HeaderBrand';
+import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
+import { OrbitDial } from './ui/OrbitDial';
+import { Peek } from './ui/Peek';
+import { Sheet } from './ui/Sheet';
 import { SiteReport } from './ui/SiteReport';
+import { SoundEffects } from './ui/SoundEffects';
+import { SoundToggle } from './ui/SoundToggle';
 import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
+import { TiltButton } from './ui/Tilt';
 import { OfflineBanner } from './ui/ViewStatus';
 import { WorldsList } from './ui/WorldsList';
 
@@ -30,13 +40,13 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
   const factsCard = facts && <BodyFacts key={facts} body={facts} />;
   switch (view) {
     case 'solar':
-      return [<BodyClock key="clock" />, <WorldsList key="worlds" />];
+      return <WorldsList key="worlds" />;
     case 'earth':
-      return [<BodyClock key="clock" />, factsCard, <EarthPanel key="side" />];
+      return [factsCard, <EarthPanel key="side" />];
     case 'mars':
-      return [<BodyClock key="clock" />, factsCard, <MarsSide key="side" />];
+      return [factsCard, <MarsSide key="side" />];
     case 'site':
-      return [<BodyClock key="clock" />, <SiteSide key="side" />];
+      return <SiteSide key="side" />;
     case 'globe':
       return [factsCard, <LandingTime key="time" />, <MoonSide key="side" />, <Controls key="controls" />];
     default:
@@ -44,58 +54,107 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
   }
 }
 
-/** The header's tagline names the world in view; a lander's close-up names the lander's world. */
-function Tagline() {
-  const { t } = useTranslation();
-  const key = useApp((s) => {
-    if (s.view !== 'site') return s.view;
-    const body = findLander(s.missionId ?? '')?.body;
-    return body && `site${body}`;
-  });
-  return key ? <p className="text-xs text-quiet max-lg:hidden">{t(`app.tagline.${key}`)}</p> : null;
+/**
+ * Watches whether the floating panel has anything in it: when every card in it is empty (on a wide screen the solar
+ * system's worlds carry their cards in the scene, so its panel is empty), the 3D view takes the whole width and centres
+ * in it.
+ */
+function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
+  return useCallback((el: HTMLElement | null) => {
+    if (!el) return;
+    const check = () => {
+      const shown = [...el.children].some((c) => (c as HTMLElement).offsetHeight > 0);
+      document.documentElement.style.setProperty('--hud-end', shown ? '422px' : '0px');
+      useStage.getState().setPanelShown(shown);
+    };
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    const watch = new MutationObserver(() => {
+      for (const c of el.children) observer.observe(c);
+      check();
+    });
+    watch.observe(el, { childList: true });
+    for (const c of el.children) observer.observe(c);
+    check();
+    return () => {
+      observer.disconnect();
+      watch.disconnect();
+      document.documentElement.style.removeProperty('--hud-end');
+      useStage.getState().setPanelShown(true);
+    };
+  }, []);
 }
 
 export function App() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
+  const opened = useBoot((s) => s.opened);
+  useGlassLight();
+  const panelRef = usePanelShown();
+  const wide = useWide();
   return (
-    <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <a
-        href="#panel"
-        className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
-      >
-        {t('app.skipToPanel')}
-      </a>
-      <header className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bar px-3.5 py-2">
-        <div className="flex flex-wrap items-baseline gap-x-2.5">
-          <h1 className="text-[21px]">SiteLine</h1>
-          <Tagline />
-        </div>
-        <Breadcrumbs />
-        {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
-        <div className="ms-auto">
-          <SourcesButton />
-        </div>
-        <div className="max-sm:w-full">
-          <DateStepper />
-        </div>
-      </header>
-      <SourcesDialog />
-      <JourneyDialog />
-      <OfflineBanner />
-      {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
-      <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
-        <MoonView />
-        <Copilot />
-        <aside
-          id="panel"
-          tabIndex={-1}
-          aria-label={t('app.panel')}
-          className="flex flex-col gap-5 border-t border-line bg-panel p-4 lg:absolute lg:inset-y-3 lg:inset-e-3 lg:z-10 lg:w-[410px] lg:overflow-y-auto lg:rounded-xl lg:border lg:bg-panel/95 lg:pb-6"
+    <>
+      <Intro />
+      <SoundEffects />
+      {/* Out of reach of the keyboard and screen readers until the opening hands over. */}
+      <div className="flex h-dvh flex-col" inert={!opened}>
+        <a
+          href="#panel"
+          className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
         >
-          <PanelContent view={view} />
-        </aside>
-      </main>
-    </div>
+          {t('app.skipToPanel')}
+        </a>
+        {/* The header assembles itself piece by piece as the opening hands over (`bar-in`, in order of `--i`). */}
+        <MotionConfig reducedMotion="user">
+          <header className="bar relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2">
+            <div className="bar-in" style={{ '--i': 0 } as CSSProperties}>
+              <HeaderBrand />
+            </div>
+            <div className="bar-in" style={{ '--i': 1 } as CSSProperties}>
+              <Breadcrumbs />
+            </div>
+            {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
+            <div className="bar-in ms-auto flex items-center gap-1.5" style={{ '--i': 2 } as CSSProperties}>
+              <SoundToggle />
+              <SourcesButton />
+            </div>
+            <div className="bar-in max-sm:w-full" style={{ '--i': 3 } as CSSProperties}>
+              <DateStepper />
+            </div>
+            <div className="bar-edge" aria-hidden="true">
+              <span className="bar-comet" />
+            </div>
+          </header>
+        </MotionConfig>
+        <SourcesDialog />
+        <JourneyDialog />
+        <OfflineBanner />
+        {/* The 3D view fills the window. On a wide screen the panel's cards float over its end as panes of glass
+          (`.hud` in index.css); on a phone they live in a sheet that peeks up from the bottom, under a thumb dial. */}
+        <main className="relative min-h-0 flex-1 overflow-hidden">
+          <MoonView />
+          <Copilot />
+          {wide ? (
+            <aside
+              ref={panelRef}
+              id="panel"
+              tabIndex={-1}
+              aria-label={t('app.panel')}
+              className="hud absolute inset-y-3 inset-e-3 z-10 flex w-[410px] flex-col gap-3 overflow-y-auto pe-1"
+            >
+              <PanelContent view={view} />
+            </aside>
+          ) : (
+            <>
+              <Sheet peek={<Peek view={view} />} label={t('app.panel')}>
+                <PanelContent view={view} />
+              </Sheet>
+              <OrbitDial />
+              <TiltButton />
+            </>
+          )}
+        </main>
+      </div>
+    </>
   );
 }

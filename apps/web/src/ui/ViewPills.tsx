@@ -16,10 +16,14 @@ export function ViewPills({ wide, below, children }: { wide?: boolean; below?: R
     <div
       className={`pointer-events-none absolute inset-s-3 inset-e-3 top-14 flex flex-col items-start gap-1.5 sm:top-3 ${wide ? 'sm:inset-e-72' : 'sm:inset-e-48'}`}
     >
-      <fieldset aria-label={t('map.display')} className="flex flex-wrap items-center gap-1.5 *:pointer-events-auto">
+      <fieldset
+        aria-label={t('map.display')}
+        className="flex flex-wrap items-center gap-1.5 *:pointer-events-auto"
+        data-avoid
+      >
         {children}
       </fieldset>
-      {below}
+      {below && <div data-avoid>{below}</div>}
     </div>
   );
 }
@@ -30,7 +34,10 @@ export const hintBox = 'max-w-2xl rounded-md bg-bar/80 px-2.5 py-1 text-center t
 /** How to use the view, centred along its bottom edge as in the demo, which also leaves it off a phone screen. */
 export function ViewHint({ children }: { children: ReactNode }) {
   return (
-    <p className={`pointer-events-none absolute inset-x-3 bottom-3.5 mx-auto w-fit max-sm:hidden ${hintBox}`}>
+    <p
+      className={`pointer-events-none absolute inset-x-3 bottom-3.5 mx-auto w-fit max-sm:hidden ${hintBox}`}
+      data-avoid
+    >
       {children}
     </p>
   );

@@ -4,8 +4,17 @@ import { type MouseEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CREDITS, FONTS_NOTE, LIBRARIES_NOTE, type Span, spans } from '../credits';
 import { formatNumber } from '../format';
+import { SUN_TONE_LOW_HZ, SUN_TONE_OCTAVES } from '../sound/maps';
 import { useApp } from '../store';
 import { Checks } from './Checks';
+
+/** What the sound section explains, in order: the sonification first, then the cues, the opening and the controls. */
+const SOUND_NOTES = ['sonification', 'cues', 'opening', 'control'] as const;
+/** The sonification's pitch range, from the same constants the sound uses. */
+const soundValues = {
+  lowHz: formatNumber(SUN_TONE_LOW_HZ, 0),
+  highHz: formatNumber(SUN_TONE_LOW_HZ * 2 ** SUN_TONE_OCTAVES, 0),
+};
 
 /** Each step of the site check, and the datasets (CREDITS.md ids) it reads. */
 const METHODS: { key: string; ids: string[] }[] = [
@@ -13,7 +22,7 @@ const METHODS: { key: string; ids: string[] }[] = [
   { key: 'horizon', ids: ['lola-ldem-75s-240m'] },
   { key: 'sun', ids: [] },
   { key: 'earth', ids: [] },
-  { key: 'slope', ids: ['lola-ldem-75s-240m'] },
+  { key: 'slope', ids: ['lola-spole-10m'] },
   { key: 'zone', ids: [] },
   { key: 'longTerm', ids: ['landfall-polar-maps'] },
   { key: 'planets', ids: ['spice-de440s'] },
@@ -145,6 +154,17 @@ function SourcesBody() {
         <section>
           <h3 className="mb-2 text-lg">{t('sources.checksHeading')}</h3>
           <Checks open />
+        </section>
+
+        <section>
+          <h3 className="mb-2 text-lg">{t('sources.soundHeading')}</h3>
+          <ul className="flex flex-col gap-2">
+            {SOUND_NOTES.map((k) => (
+              <li key={k} className="rounded-lg border border-line bg-panel-raised px-3 py-2">
+                <p>{t(`sources.sound.${k}`, soundValues)}</p>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section>

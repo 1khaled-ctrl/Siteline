@@ -3,9 +3,12 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MISSIONS, PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
+import { CalloutLayer } from './Callouts';
 import { LanderPins } from './LanderPins';
+import { BodyCard, MarsPlaceCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -112,9 +115,44 @@ export function MarsMap() {
     void globe.flyToFeature(f, ms(1400));
   };
 
+  const insets = useStageInsets();
+  useActiveView(globe);
+  useEffect(() => {
+    globe?.setInsets(insets);
+  }, [globe, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="mars-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="mars-map" />
+      <CalloutLayer
+        source={load.state === 'ready' ? globe : null}
+        items={
+          globe
+            ? [
+                {
+                  id: 'body',
+                  // On the globe's upper edge, clear of the toolbar, while the whole globe is in view.
+                  anchor: () => onOutline(globe.discOnScreen(), -38),
+                  prefer: 'ne',
+                  label: t('facts.heading.Mars'),
+                  children: <BodyCard body="Mars" />,
+                },
+                ...(place
+                  ? [
+                      {
+                        id: 'place',
+                        anchor: () => globe.placeOnScreen(place.latDeg, place.lonDeg),
+                        prefer: 'ne' as const,
+                        tone: 'sun' as const,
+                        label: t('callout.place'),
+                        children: <MarsPlaceCard />,
+                      },
+                    ]
+                  : []),
+              ]
+            : []
+        }
+      />
       <LanderPins
         host={load.state === 'ready' ? globe : null}
         missions={PINNED.Mars}

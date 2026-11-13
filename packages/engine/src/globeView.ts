@@ -1,6 +1,8 @@
 import { MOON_RADIUS_M, siteFrame, unitToLatLon, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { angleBetween, reportFlight, zoomSize } from './flights';
+import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -73,6 +75,10 @@ export class GlobeView {
   private flying = false;
   private frame = 0;
   private frameListener?: () => void;
+
+  private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -152,6 +158,7 @@ export class GlobeView {
     const q = new THREE.Quaternion();
     const r0 = startPos.length();
     const r1 = endPos.length();
+    reportFlight({ durationMs, zoom: zoomSize(r0, r1), turnRad: angleBetween(startPos, endPos) });
     this.flying = true;
     this.controls.enabled = false;
     return new Promise((resolve) => {
@@ -167,8 +174,10 @@ export class GlobeView {
           .multiplyScalar(r0 + (r1 - r0) * e);
         this.controls.target.lerpVectors(startTarget, endTarget, e);
         this.camera.lookAt(this.controls.target);
+        this.look.apply(this.camera);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
+        for (const listener of this.frameListeners) listener();
         if (k < 1) this.frame = requestAnimationFrame(step);
         else {
           this.frame = 0;
@@ -212,6 +221,7 @@ export class GlobeView {
     const still = new THREE.Quaternion();
     const q = new THREE.Quaternion();
     const r0 = startPos.length();
+    reportFlight({ durationMs, zoom: zoomSize(r0, r1), turnRad: angleBetween(startPos, endDir) });
     const origin = new THREE.Vector3();
     cancelAnimationFrame(this.frame);
     this.frame = 0;
@@ -231,8 +241,10 @@ export class GlobeView {
           .multiplyScalar(r0 + (r1 - r0) * e);
         this.controls.target.lerpVectors(startTarget, origin, e);
         this.camera.lookAt(this.controls.target);
+        this.look.apply(this.camera);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
+        for (const listener of this.frameListeners) listener();
         if (k < 1) this.frame = requestAnimationFrame(step);
         else {
           this.frame = 0;
@@ -244,6 +256,28 @@ export class GlobeView {
       };
       this.frame = requestAnimationFrame(step);
     });
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(R_KM, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
   }
 
   dispose(): void {
@@ -291,6 +325,7 @@ export class GlobeView {
     if (this.frame || this.flying) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      this.look.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
       this.frameListener?.();
     });
@@ -300,8 +335,7 @@ export class GlobeView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

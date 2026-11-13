@@ -66,40 +66,53 @@ export function StatTile({
   );
 }
 
-/** What the Moon, the Earth or Mars is like: the facts that do not depend on where you land. */
-export function BodyFacts({ body }: { body: FactBody }) {
+/**
+ * A body's readings worded for the screen, shared by its facts card and its card in the scene. The last two depend on
+ * how far the body is from the Sun and the Earth at the hour the map is lit for, and say so until the table arrives.
+ */
+export function useBodyReadings(body: FactBody) {
   const { t } = useTranslation();
-  // How far the body is from the Sun and the Earth at the hour the map is lit for; that moves the last two readings.
   const positions = usePlanetsAtHour();
   const distances = positions && distancesOf(TABLE_KEY[body], positions);
   const c = BODY_CONSTANTS[body];
   const unit = (m: Measure<string>) => t(`facts.units.${m.unit}`, { n: formatNumber(m.n, m.digits) });
+  const sunlight = distances && sunlightWM2(SOLAR_CONSTANT_W_M2, distances.sunDistAu);
+  const pending = t('facts.pending');
+  return {
+    gravity: t('facts.units.gravity', { n: formatNumber(surfaceGravityMS2(c.gmKm3PerS2, c.radiusKm), 2) }),
+    escape: t('facts.units.escape', { n: formatNumber(escapeSpeedKmS(c.gmKm3PerS2, c.radiusKm), 2) }),
+    rotation: unit(dayLength(c.rotationH)),
+    solarDay: unit(dayLength(c.solarDayH)),
+    sunlight: sunlight === undefined ? pending : t('facts.units.sunlight', { n: formatNumber(sunlight, 0) }),
+    signal: distances?.earthDistKm == null ? pending : unit(signalDelay(lightTimeS(distances.earthDistKm))),
+  };
+}
+
+/** What the Moon, the Earth or Mars is like: the facts that do not depend on where you land. */
+export function BodyFacts({ body }: { body: FactBody }) {
+  const { t } = useTranslation();
+  const r = useBodyReadings(body);
+  const c = BODY_CONSTANTS[body];
   // A true minus sign, as in the rest of the text, rather than the hyphen the number formatter gives.
   const celsius = (kelvin: number | undefined) =>
     kelvin === undefined ? '' : formatNumber(kelvinToCelsius(kelvin), 0).replace('-', '−');
   const mbar =
     c.surfacePressureMbar === null ? '' : formatNumber(c.surfacePressureMbar, c.surfacePressureMbar < 100 ? 1 : 0);
-  const sunlight = distances && sunlightWM2(SOLAR_CONSTANT_W_M2, distances.sunDistAu);
-  const pending = t('facts.pending');
 
   return (
-    <section className={panel} data-testid="body-facts">
+    <section className={panel} data-testid="body-facts" id="body-facts" tabIndex={-1}>
       <h2 className="mb-2 text-2xl">{t(`facts.heading.${body}`)}</h2>
       <dl className="grid grid-cols-2 gap-2">
-        <StatTile label={t('facts.gravity')}>
-          {t('facts.units.gravity', { n: formatNumber(surfaceGravityMS2(c.gmKm3PerS2, c.radiusKm), 2) })}
-        </StatTile>
-        <StatTile label={t('facts.escape')}>
-          {t('facts.units.escape', { n: formatNumber(escapeSpeedKmS(c.gmKm3PerS2, c.radiusKm), 2) })}
-        </StatTile>
-        <StatTile label={t('facts.rotation')}>{unit(dayLength(c.rotationH))}</StatTile>
-        <StatTile label={t('facts.solarDay')}>{unit(dayLength(c.solarDayH))}</StatTile>
+        <StatTile label={t('facts.gravity')}>{r.gravity}</StatTile>
+        <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
+        <StatTile label={t('facts.rotation')}>{r.rotation}</StatTile>
+        <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
         <StatTile label={t('facts.sunlight')} edge="sun">
-          {sunlight === undefined ? pending : t('facts.units.sunlight', { n: formatNumber(sunlight, 0) })}
+          {r.sunlight}
         </StatTile>
         {body !== 'Earth' && (
           <StatTile label={t('facts.signal')} edge="earth">
-            {distances?.earthDistKm == null ? pending : unit(signalDelay(lightTimeS(distances.earthDistKm)))}
+            {r.signal}
           </StatTile>
         )}
         <StatTile label={t('facts.temperature')} text>

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lonLatToScene } from './earthData';
 import type { SurfaceLine } from './landerData';
+import { fitCamera, type Insets, LookOffset, NO_INSETS } from './screen';
 import { patchHeightM, patchSlopes, type SitePatch } from './sitePatch';
 
 export type SiteBody = 'Moon' | 'Mars';
@@ -84,6 +85,10 @@ export class SiteView implements PinHost {
   private frameListener?: () => void;
   private frame = 0;
   private disposed = false;
+
+  private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
+  private readonly frameListeners = new Set<() => void>();
 
   constructor(
     private readonly container: HTMLElement,
@@ -209,6 +214,23 @@ export class SiteView implements PinHost {
     this.camera.position.copy(this.controls.target).addScaledVector(offset.normalize(), d);
     this.controls.update();
     this.requestRender();
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
   }
 
   dispose(): void {
@@ -377,8 +399,10 @@ export class SiteView implements PinHost {
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();
     this.controls.rotateSpeed = 0.6;
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     this.frameListener?.();
+    for (const listener of this.frameListeners) listener();
   }
 
   private requestRender(): void {
@@ -393,8 +417,7 @@ export class SiteView implements PinHost {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 }

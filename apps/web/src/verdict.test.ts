@@ -130,7 +130,7 @@ describe('shareLink', () => {
     const url = new URL(link);
     expect(url.origin + url.pathname).toBe('https://siteline.example/');
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      view: 'pole',
+      open: 'pole',
       t: '2028-03-03T00:00:00.000Z',
       slip: '-2',
       lat: '-89.45',

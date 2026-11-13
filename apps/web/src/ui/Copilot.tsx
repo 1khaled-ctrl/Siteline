@@ -5,6 +5,7 @@ import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, typ
 import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
 import { physics, queryFor, URLS } from '../physics';
+import { sound } from '../sound';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
 import { Spinner } from './ViewStatus';
@@ -53,7 +54,10 @@ export function Copilot() {
     end.current?.scrollIntoView({ block: 'end' });
   }, [log]);
 
-  const say = (m: Omit<Message, 'id'>) => setLog((l) => [...l, { ...m, id: next.current++ }]);
+  const say = (m: Omit<Message, 'id'>) => {
+    setLog((l) => [...l, { ...m, id: next.current++ }]);
+    if (m.from === 'siteline') sound.chime();
+  };
 
   const place = (s: { latDeg: number; lonDeg: number }) =>
     t('share.place', {
@@ -193,16 +197,19 @@ export function Copilot() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed inset-e-4 bottom-4 z-20 min-h-10 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
+        data-avoid
+        className="copilot-open fixed inset-e-4 z-20 min-h-11 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent max-lg:min-w-11 max-lg:px-0 lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
       >
-        <span aria-hidden="true">✦ </span>
-        {t('copilot.open')}
+        <span aria-hidden="true">✦</span>
+        {/* On a phone the button is just the star, beside the dial. */}
+        <span className="max-lg:sr-only"> {t('copilot.open')}</span>
       </button>
     );
 
   return (
     <section
       aria-label={t('copilot.title')}
+      data-avoid
       className="fixed inset-x-3 bottom-3 z-30 flex h-[min(520px,75dvh)] flex-col gap-2 rounded-xl border border-line bg-panel p-3 shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(520px,calc(100%-80px))] lg:w-[420px]"
       data-testid="copilot"
     >

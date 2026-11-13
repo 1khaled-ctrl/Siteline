@@ -4,17 +4,19 @@
 // Usage: node tests/e2e/smoke.mjs [url] [screenshot-prefix]
 import { chromium } from 'playwright';
 
-const url = process.argv[2] || 'http://localhost:5173/?view=globe&t=2028-03-03T00:00:00.000Z&lat=-89.68&lon=-166';
+const url = process.argv[2] || 'http://localhost:5173/?open=globe&t=2028-03-03T00:00:00.000Z&lat=-89.68&lon=-166';
 const shots = process.argv[3];
 const errors = [];
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+// Reduced motion: the panel's cards hold still (Playwright only clicks what has stopped moving) and the opening is a
+// short fade instead of the flight.
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, reducedMotion: 'reduce' });
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
 // Solar system first: the planets draw, then flying to the Moon lands on the globe. The Earth comes first.
-await page.goto(url.replace('view=globe', 'view=solar'), { waitUntil: 'networkidle' });
+await page.goto(url.replace('open=globe', 'open=solar'), { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
 if (
@@ -25,7 +27,11 @@ if (
 await page.waitForTimeout(2500);
 if (shots) await page.screenshot({ path: `${shots}-solar.png` });
 // Earth: the globe, then a country by search, then a city by clicking its label.
-await page.getByRole('button', { name: 'Earth', exact: true }).first().click();
+// The world's card on a wide screen, its row in the list on a phone.
+await page
+  .getByRole('button', { name: /^(Fly to )?Earth$/ })
+  .first()
+  .click();
 await page.waitForSelector('[data-testid="earth-map"] canvas', { timeout: 60_000 });
 await page.getByText('Egypt', { exact: true }).first().waitFor({ timeout: 60_000 });
 // The Moon's landing controls stay with the Moon views; the header's date is on every view.
@@ -62,7 +68,11 @@ await page.getByRole('button', { name: 'Solar system' }).click();
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.waitForTimeout(1500);
 // Mars: the relief globe, a volcano by search with its real height, a landing-site crater, then the real-Sun line.
-await page.getByRole('button', { name: 'Mars', exact: true }).first().click();
+// The world's card on a wide screen, its row in the list on a phone.
+await page
+  .getByRole('button', { name: /^(Fly to )?Mars$/ })
+  .first()
+  .click();
 await page.waitForSelector('[data-testid="mars-map"] canvas', { timeout: 60_000 });
 await page.getByText('Valles Marineris', { exact: true }).first().waitFor({ timeout: 60_000 });
 await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
@@ -138,7 +148,11 @@ await page.getByRole('button', { name: /All landings/ }).click();
 await page.getByRole('button', { name: 'Solar system' }).click();
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.waitForTimeout(1500);
-await page.getByRole('button', { name: 'Moon', exact: true }).first().click();
+// The world's card on a wide screen, its row in the list on a phone.
+await page
+  .getByRole('button', { name: /^(Fly to )?Moon$/ })
+  .first()
+  .click();
 await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000 });
 await page.getByRole('heading', { name: 'Landing site' }).waitFor({ timeout: 5_000 });
 await page.waitForTimeout(3000);
@@ -162,7 +176,11 @@ if (shots) await page.screenshot({ path: `${shots}-moon-landers.png` });
 
 await page.getByRole('button', { name: 'Fly to the south pole' }).click();
 await page.waitForSelector('[data-testid="pole-map"] canvas', { timeout: 60_000 });
-await page.getByText(/^(✓ |✗ |\? )?(Pass|Fail|Not decided yet)$/).waitFor({ timeout: 60_000 });
+// The report in the panel; the site's card in the scene says the same in short.
+await page
+  .locator('#site-report')
+  .getByText(/^(✓ |✗ |\? )?(Pass|Fail|Not decided yet)$/)
+  .waitFor({ timeout: 60_000 });
 await page.waitForTimeout(3000);
 if (shots) await page.screenshot({ path: `${shots}-pole.png` });
 
@@ -194,7 +212,7 @@ await page.getByRole('button', { name: 'Plan this site in 3D' }).click();
 await page.waitForSelector('[data-testid="pole-map"] canvas', { timeout: 60_000 });
 const planned = Number(new URL(page.url()).searchParams.get('lat'));
 if (Math.abs(planned + 84.79) > 0.01) throw new Error(`Plan this site went to latitude ${planned}`);
-await page.goto(`${new URL(url).origin}/?view=mars&mission=curiosity`, { waitUntil: 'networkidle' });
+await page.goto(`${new URL(url).origin}/?open=mars&mission=curiosity`, { waitUntil: 'networkidle' });
 await page.getByTestId('mission-card').getByText('38.16 km').waitFor({ timeout: 30_000 });
 
 if (errors.length) {

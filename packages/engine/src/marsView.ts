@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lonLatToScene, sceneToLonLat } from './earthData';
+import { angleBetween, reportFlight, zoomSize } from './flights';
 import type { SurfaceLine } from './landerData';
 import {
   decodeHeights,
@@ -13,6 +14,15 @@ import {
   type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
+import {
+  discToScreen,
+  fitCamera,
+  type Insets,
+  LookOffset,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+} from './screen';
 
 export interface MarsAssets {
   /** Optional small colour map shown while the full one loads. */
@@ -154,6 +164,10 @@ export class MarsView {
   private frame = 0;
   private disposed = false;
 
+  private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
+  private readonly frameListeners = new Set<() => void>();
+
   constructor(
     private readonly container: HTMLElement,
     private readonly opts: MarsViewOptions,
@@ -285,6 +299,7 @@ export class MarsView {
     const d0 = from.length();
     const d1 = clamp(distance, this.controls.minDistance, this.controls.maxDistance);
     const flight = ++this.flightId;
+    reportFlight({ durationMs, zoom: zoomSize(d0, d1), turnRad: angleBetween(from, to) });
     this.destination = { latDeg, lonDeg, distance: d1 };
     cancelAnimationFrame(this.frame);
     this.flying = true;
@@ -366,6 +381,36 @@ export class MarsView {
     this.routes = lines;
     this.buildRoutes();
     this.requestRender();
+  }
+
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** Where a place on the globe is on the page; null on the far side. */
+  placeOnScreen(latDeg: number, lonDeg: number): ScreenPoint | null {
+    const p = this.project(latDeg, lonDeg);
+    if (!p) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + p.xPx, y: rect.top + p.yPx, depth: 0, visible: true };
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
   }
 
   dispose(): void {
@@ -483,6 +528,8 @@ export class MarsView {
 
   private async loadHeights(url: string): Promise<void> {
     const image = new Image();
+    // Read back pixel by pixel, so a map from another origin (the R2 bucket) must come with CORS or the canvas locks.
+    image.crossOrigin = 'anonymous';
     image.src = url;
     try {
       await image.decode();
@@ -565,9 +612,11 @@ export class MarsView {
       .addScaledVector(up, 0.6)
       .addScaledVector(right, 0.5)
       .normalize();
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     this.placeLabels(D);
     this.frameListener?.();
+    for (const listener of this.frameListeners) listener();
   }
 
   private placeLabels(D: number): void {
@@ -620,8 +669,7 @@ export class MarsView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

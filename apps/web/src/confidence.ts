@@ -16,15 +16,19 @@ export interface ConfidenceInputs {
   terrainM?: number;
   /** The grid of the 19-year maps, when the spot is on them. */
   longTermM?: number;
+  /** The grid the slope was measured on, when it was (LOLA's 10 m terrain); otherwise the terrain above decides. */
+  slopeM?: number;
 }
 
-export function confidenceOf(reading: Reading, { terrainM, longTermM }: ConfidenceInputs): Confidence {
+export function confidenceOf(reading: Reading, { terrainM, longTermM, slopeM }: ConfidenceInputs): Confidence {
   switch (reading) {
     // Only the latitude matters.
     case 'zone':
       return 'high';
-    case 'slope':
-      return terrainM !== undefined && terrainM <= SLOPE_NEEDS_M ? 'high' : 'notMeasured';
+    case 'slope': {
+      const m = slopeM ?? terrainM;
+      return m !== undefined && m <= SLOPE_NEEDS_M ? 'high' : 'notMeasured';
+    }
     // The horizon decides when the Sun and the Earth are up.
     case 'sun':
     case 'earth':

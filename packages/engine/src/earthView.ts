@@ -15,6 +15,17 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
+import { angleBetween, reportFlight, zoomSize } from './flights';
+import {
+  discToScreen,
+  fitCamera,
+  type Insets,
+  LookOffset,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+  toScreen,
+} from './screen';
 
 export type EarthStyle = 'map' | 'satellite' | 'night';
 
@@ -192,6 +203,10 @@ export class EarthView {
   private frame = 0;
   private disposed = false;
 
+  private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
+  private readonly frameListeners = new Set<() => void>();
+
   constructor(
     private readonly container: HTMLElement,
     private readonly opts: EarthViewOptions,
@@ -300,6 +315,7 @@ export class EarthView {
     const d0 = from.length();
     const d1 = clamp(distance, this.controls.minDistance, this.controls.maxDistance);
     const flight = ++this.flightId;
+    reportFlight({ durationMs, zoom: zoomSize(d0, d1), turnRad: angleBetween(from, to) });
     this.destination = { latDeg, lonDeg, distance: d1 };
     cancelAnimationFrame(this.frame);
     this.flying = true;
@@ -355,6 +371,38 @@ export class EarthView {
     return this.flyTo(at.latDeg, at.lonDeg, 1 + (at.distance - 1) * factor, durationMs);
   }
 
+  /** Calls `listener` after every draw, for overlays that must move with the picture; returns a function that stops it. */
+  addFrameListener(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    return () => this.frameListeners.delete(listener);
+  }
+
+  /** The globe's outline on the page; null when the camera is inside it. */
+  discOnScreen(): ScreenDisc | null {
+    return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** Where a place on the globe is on the page; null on the far side. */
+  placeOnScreen(latDeg: number, lonDeg: number): ScreenPoint | null {
+    const dir = dirOf(latDeg, lonDeg);
+    const d = this.camera.position.length();
+    // On the near side when within the horizon angle of the camera's direction, plus a margin.
+    if (dir.dot(this.camera.position.clone().normalize()) < 1 / d + 0.01) return null;
+    this.camera.updateMatrixWorld();
+    return toScreen(dir.multiplyScalar(1.003), this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frame);
@@ -405,6 +453,8 @@ export class EarthView {
       const im = new Image();
       im.onload = () => resolve(im);
       im.onerror = () => resolve(undefined);
+      // Read back pixel by pixel, so a map from another origin (the R2 bucket) must come with CORS or the canvas locks.
+      im.crossOrigin = 'anonymous';
       im.src = this.opts.assets.ids;
     });
     if (!image || this.disposed) return;
@@ -576,7 +626,9 @@ export class EarthView {
     // A fixed share of the view: the marker's size follows the camera's height above the ground.
     this.marker.scale.setScalar(Math.max(0.00015, (D - 1) * 0.004));
     if (D < 1.9) void this.loadDetail();
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
+    for (const listener of this.frameListeners) listener();
     this.placeLabels(D);
   }
 
@@ -675,8 +727,7 @@ export class EarthView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

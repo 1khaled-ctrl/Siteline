@@ -14,6 +14,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { COLOUR_URL, findLander, MISSIONS, patchImageUrl } from '../landers';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
 import { LanderPins } from './LanderPins';
@@ -29,6 +30,8 @@ const DEFAULT_RELIEF = 3;
 /** Read a close-up height patch: the PNG decoded through a canvas, then the heights unpacked from red and green. */
 async function readPatch(url: string, meta: SitePatchMeta): Promise<SitePatch> {
   const image = new Image();
+  // Read back pixel by pixel, so a patch from another origin (the R2 bucket) must come with CORS or the canvas locks.
+  image.crossOrigin = 'anonymous';
   image.src = url;
   await image.decode();
   const canvas = document.createElement('canvas');
@@ -113,6 +116,12 @@ export function SiteMap() {
     });
   }, [mission, meta, tracks, shownMs]);
 
+  const insets = useStageInsets();
+  useActiveView(view);
+  useEffect(() => {
+    view?.setInsets(insets);
+  }, [view, insets]);
+
   if (!mission) return null;
   const metresPerPixel =
     meta && pixels
@@ -122,8 +131,8 @@ export function SiteMap() {
     sunny && meta && subsolar && sunHeightDeg(meta.latDeg, meta.lonDeg, subsolar.latDeg, subsolar.lonDeg) < 0;
 
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="site-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className="stage-canvas" data-testid="site-map" />
       <LanderPins host={view} missions={onGround} tracks={tracks} atUtcMs={shownMs} />
       <ViewPills
         below={
