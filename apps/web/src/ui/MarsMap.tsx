@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MISSIONS, PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
@@ -112,9 +113,14 @@ export function MarsMap() {
     void globe.flyToFeature(f, ms(1400));
   };
 
+  const insets = useStageInsets();
+  useEffect(() => {
+    globe?.setInsets(insets);
+  }, [globe, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="mars-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="mars-map" />
       <LanderPins
         host={load.state === 'ready' ? globe : null}
         missions={PINNED.Mars}

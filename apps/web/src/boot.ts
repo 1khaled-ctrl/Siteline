@@ -55,11 +55,20 @@ interface BootState {
   open: () => void;
 }
 
+/** Marks the page as open, which lets the panel's cards float in. */
+function markOpened(): void {
+  if (typeof document !== 'undefined') document.documentElement.dataset.opened = '';
+}
+if (INTRO_MODE === 'none') markOpened();
+
 export const useBoot = create<BootState>((set) => ({
   tasks: {},
   opened: INTRO_MODE === 'none',
   setTask: (task, status) => set((s) => ({ tasks: { ...s.tasks, [task]: status } })),
-  open: () => set({ opened: true }),
+  open: () => {
+    markOpened();
+    set({ opened: true });
+  },
 }));
 
 /** Counts a load toward the opening, which holds until every counted load settles. Hands back the same promise. */

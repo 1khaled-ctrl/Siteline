@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { INTRO_MODE, RING_PX, track, useBoot } from '../boot';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useStage } from '../stage';
+import { useStage, useStageInsets } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { ViewHint } from './ViewPills';
 import { useLoad, ViewStatus } from './ViewStatus';
@@ -101,9 +101,14 @@ export function SolarMap() {
     };
   }, [view, lightingUtcMs, ready, fail]);
 
+  const insets = useStageInsets();
+  useEffect(() => {
+    view?.setInsets(insets);
+  }, [view, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="solar-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className="stage-canvas" data-testid="solar-map" />
       <ViewHint>{flying ? t('solar.flying') : t('solar.hint')}</ViewHint>
       <ViewStatus view="solar" load={load} />
     </section>

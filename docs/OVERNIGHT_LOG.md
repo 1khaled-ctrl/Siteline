@@ -11,6 +11,9 @@
 - The opening plays once per browser tab (sessionStorage); `?intro=1` replays it and `?intro=0` skips it. Esc or "Skip intro" also skips.
 - The opening waits on real loads (fonts, the emblem, planet positions, orbits, the planets' colour maps, the first view); at least 1.7 s so it never flashes, a "Still loading …" line after 4.5 s, and after 25 s it opens anyway so each view shows its own progress.
 - The lander flies to the Moon, not the Earth: SiteLine is about landing on the Moon.
+- The 3D canvas now runs on under the floating panel on wide screens, and each view shifts its camera's centre (`setViewOffset`) into the free part, so the world stays centred and the scene shows through the glass. That is a small `setInsets` on all six engine views (World role) plus a shared `fitCamera` helper.
+- Fixed while testing, not part of the brief: the Mars height map, the Earth country-id map and the close-up height patches are read back pixel by pixel, and since the data moved to R2 the browser locked those canvases ("tainted by cross-origin data") because the images were requested without CORS. Each now sets `crossOrigin = 'anonymous'`; R2 already sends the header. This is why Mars hung on "Loading the Mars maps…" and the close-ups failed; the Playwright smoke test passes end to end again.
+- The smoke test now runs with reduced motion: Playwright only clicks elements that have stopped moving, and the panel's cards drift a pixel or two. It also gets the opening's short fade instead of the flight.
 
 ---
 

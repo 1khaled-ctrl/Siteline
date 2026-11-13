@@ -149,6 +149,20 @@ body {
   direction: ltr;
 }
 
+/* A 3D view's canvas. On a wide screen it runs on under the floating panel (410 px and its 12 px margin), so the scene
+   shows through the glass; the view centres its world in the part the panel leaves free. Overlays placed from the
+   canvas's own pixels (the lander pins) run on with it, so their origin stays the canvas's. */
+.stage-canvas {
+  position: absolute;
+  inset: 0;
+}
+@media (width >= 64rem) {
+  .stage-canvas,
+  .lander-pins {
+    inset-inline-end: -422px;
+  }
+}
+
 .lander-pin {
   --pin: var(--color-ink);
   position: absolute;
@@ -354,45 +368,84 @@ body {
   animation: fade-in 0.6s 1.2s both;
 }
 
-/* The panel is a stack of floating glass cards: each direct child is one, with the 3D view showing through. */
+/* Glass: the panel's cards and the callouts in the scene. A blur of what is behind, a hairline edge, and a soft
+   highlight that leans toward the pointer (--mx and --my, set by useGlassLight). */
+.glass,
+.hud > * {
+  --mx: 50%;
+  --my: -30%;
+  border: 1px solid rgb(146 186 255 / 0.17);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(420px circle at var(--mx) var(--my), rgb(255 255 255 / 0.075), transparent 62%),
+    linear-gradient(155deg, rgb(18 27 48 / 0.72), rgb(8 13 26 / 0.6));
+  backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow:
+    0 14px 40px rgb(0 0 0 / 0.45),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    inset 0 0 0 1px rgb(255 255 255 / 0.02);
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+.glass:hover,
+.hud > *:hover {
+  border-color: rgb(146 186 255 / 0.38);
+  box-shadow:
+    0 14px 44px rgb(0 0 0 / 0.5),
+    0 0 24px rgb(91 169 255 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+/* The panel is a stack of floating glass cards: each direct child is one, with the 3D view showing through. They
+   float in once the app has opened, then drift a few pixels, each on its own beat, and hold still the moment the
+   pointer or the keyboard is in the panel, or something is open to read. */
 .hud {
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-hover) transparent;
 }
 .hud > * {
-  border: 1px solid rgb(91 169 255 / 0.16);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(155deg, rgb(18 27 48 / 0.74), rgb(8 13 26 / 0.62));
-  backdrop-filter: blur(16px) saturate(1.35);
-  box-shadow:
-    0 14px 40px rgb(0 0 0 / 0.45),
-    inset 0 1px 0 rgb(255 255 255 / 0.07);
   padding: 16px;
-  animation: hud-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transition:
-    border-color 0.25s,
-    box-shadow 0.25s;
-}
-.hud > *:hover {
-  border-color: rgb(91 169 255 / 0.4);
-  box-shadow:
-    0 14px 44px rgb(0 0 0 / 0.5),
-    0 0 24px rgb(91 169 255 / 0.12),
-    inset 0 1px 0 rgb(255 255 255 / 0.09);
+  animation:
+    hud-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    hud-drift 9s ease-in-out -2s infinite alternate;
 }
 .hud > *:nth-child(2) {
-  animation-delay: 0.07s;
+  animation-delay: 0.08s, -6s;
+  animation-duration: 0.6s, 11s;
 }
 .hud > *:nth-child(3) {
-  animation-delay: 0.14s;
+  animation-delay: 0.16s, -3.5s;
+  animation-duration: 0.6s, 10s;
 }
 .hud > *:nth-child(n + 4) {
-  animation-delay: 0.21s;
+  animation-delay: 0.24s, -8s;
+  animation-duration: 0.6s, 12.5s;
+}
+.hud:hover > *,
+.hud:focus-within > *,
+:root[data-reading] .hud > * {
+  animation-play-state: running, paused;
+}
+:root:not([data-opened]) .hud > * {
+  animation: none;
+  opacity: 0;
 }
 @keyframes hud-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.98);
+    transform: translateY(18px) scale(0.97);
+  }
+}
+@keyframes hud-drift {
+  0% {
+    translate: 0 -2px;
+  }
+  50% {
+    translate: 1px 1.5px;
+  }
+  100% {
+    translate: -1px -1px;
   }
 }
 
@@ -419,5 +472,8 @@ body {
   .orbit-spin,
   .orbit-unspin {
     animation: none;
+  }
+  :root:not([data-opened]) .hud > * {
+    opacity: 1;
   }
 }

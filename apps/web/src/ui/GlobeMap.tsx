@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
@@ -86,9 +87,14 @@ export function GlobeMap() {
     };
   }, [globe, lightingUtcMs]);
 
+  const insets = useStageInsets();
+  useEffect(() => {
+    globe?.setInsets(insets);
+  }, [globe, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="globe-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="globe-map" />
       <LanderPins
         host={load.state === 'ready' ? globe : null}
         missions={PINNED.Moon}

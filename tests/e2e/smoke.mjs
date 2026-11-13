@@ -9,7 +9,9 @@ const shots = process.argv[3];
 const errors = [];
 
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+// Reduced motion: the panel's cards hold still (Playwright only clicks what has stopped moving) and the opening is a
+// short fade instead of the flight.
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, reducedMotion: 'reduce' });
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 

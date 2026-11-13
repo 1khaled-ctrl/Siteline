@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lonLatToScene } from './earthData';
 import type { SurfaceLine } from './landerData';
+import { fitCamera, type Insets, NO_INSETS } from './screen';
 import { patchHeightM, patchSlopes, type SitePatch } from './sitePatch';
 
 export type SiteBody = 'Moon' | 'Mars';
@@ -84,6 +85,8 @@ export class SiteView implements PinHost {
   private frameListener?: () => void;
   private frame = 0;
   private disposed = false;
+
+  private insets: Insets = NO_INSETS;
 
   constructor(
     private readonly container: HTMLElement,
@@ -209,6 +212,12 @@ export class SiteView implements PinHost {
     this.camera.position.copy(this.controls.target).addScaledVector(offset.normalize(), d);
     this.controls.update();
     this.requestRender();
+  }
+
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
   }
 
   dispose(): void {
@@ -393,8 +402,7 @@ export class SiteView implements PinHost {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 }

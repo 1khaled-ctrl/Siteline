@@ -12,6 +12,7 @@ import { Controls, LandingTime } from './ui/Controls';
 import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
+import { useGlassLight } from './ui/glass';
 import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
@@ -61,6 +62,7 @@ export function App() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
   const opened = useBoot((s) => s.opened);
+  useGlassLight();
   return (
     <>
       <Intro />

@@ -15,6 +15,7 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
+import { fitCamera, type Insets, NO_INSETS } from './screen';
 
 export type EarthStyle = 'map' | 'satellite' | 'night';
 
@@ -192,6 +193,8 @@ export class EarthView {
   private frame = 0;
   private disposed = false;
 
+  private insets: Insets = NO_INSETS;
+
   constructor(
     private readonly container: HTMLElement,
     private readonly opts: EarthViewOptions,
@@ -355,6 +358,12 @@ export class EarthView {
     return this.flyTo(at.latDeg, at.lonDeg, 1 + (at.distance - 1) * factor, durationMs);
   }
 
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frame);
@@ -405,6 +414,8 @@ export class EarthView {
       const im = new Image();
       im.onload = () => resolve(im);
       im.onerror = () => resolve(undefined);
+      // Read back pixel by pixel, so a map from another origin (the R2 bucket) must come with CORS or the canvas locks.
+      im.crossOrigin = 'anonymous';
       im.src = this.opts.assets.ids;
     });
     if (!image || this.disposed) return;
@@ -675,8 +686,7 @@ export class EarthView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

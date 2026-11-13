@@ -9,6 +9,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
@@ -132,9 +133,14 @@ export function EarthMap() {
     void globe.flyToCountry(c, ms(1400));
   };
 
+  const insets = useStageInsets();
+  useEffect(() => {
+    globe?.setInsets(insets);
+  }, [globe, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="earth-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className={`stage-canvas ${revealWhen(load)}`} data-testid="earth-map" />
       <ViewPills wide>
         <fieldset className="flex gap-1.5">
           <legend className="sr-only">{t('earth.style')}</legend>

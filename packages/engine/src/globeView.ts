@@ -1,6 +1,7 @@
 import { MOON_RADIUS_M, siteFrame, unitToLatLon, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fitCamera, type Insets, NO_INSETS } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -73,6 +74,8 @@ export class GlobeView {
   private flying = false;
   private frame = 0;
   private frameListener?: () => void;
+
+  private insets: Insets = NO_INSETS;
 
   constructor(
     private readonly container: HTMLElement,
@@ -246,6 +249,12 @@ export class GlobeView {
     });
   }
 
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
   dispose(): void {
     cancelAnimationFrame(this.frame);
     this.resize.disconnect();
@@ -300,8 +309,7 @@ export class GlobeView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 

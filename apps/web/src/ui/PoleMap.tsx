@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { REGIONS } from '../regions';
+import { useStageInsets } from '../stage';
 import { LAYERS, type Layer, useApp } from '../store';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { useLoad, ViewStatus } from './ViewStatus';
@@ -122,9 +123,14 @@ export function PoleMap() {
     };
   }, [view, lightingUtcMs]);
 
+  const insets = useStageInsets();
+  useEffect(() => {
+    view?.setInsets(insets);
+  }, [view, insets]);
+
   return (
-    <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="pole-map" />
+    <section className="fade-in absolute inset-0">
+      <div ref={ref} className="stage-canvas" data-testid="pole-map" />
       <ViewPills
         below={
           layer !== 'none' && (

@@ -13,6 +13,7 @@ import {
   type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
+import { fitCamera, type Insets, NO_INSETS } from './screen';
 
 export interface MarsAssets {
   /** Optional small colour map shown while the full one loads. */
@@ -153,6 +154,8 @@ export class MarsView {
   private flying = false;
   private frame = 0;
   private disposed = false;
+
+  private insets: Insets = NO_INSETS;
 
   constructor(
     private readonly container: HTMLElement,
@@ -368,6 +371,12 @@ export class MarsView {
     this.requestRender();
   }
 
+  /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
   dispose(): void {
     this.disposed = true;
     this.clearRoutes();
@@ -483,6 +492,8 @@ export class MarsView {
 
   private async loadHeights(url: string): Promise<void> {
     const image = new Image();
+    // Read back pixel by pixel, so a map from another origin (the R2 bucket) must come with CORS or the canvas locks.
+    image.crossOrigin = 'anonymous';
     image.src = url;
     try {
       await image.decode();
@@ -620,8 +631,7 @@ export class MarsView {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
     this.requestRender();
   }
 
