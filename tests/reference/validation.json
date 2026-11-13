@@ -4,7 +4,7 @@
   "worstDeg": 0.00013479352802476619,
   "toleranceDeg": 0.001,
   "reference": "SPICE spkcpo, MOON_ME, LT+S, from the site",
-  "recordedUtc": "2026-11-11T22:18:48.400Z"
+  "recordedUtc": "2026-11-13T23:30:27.346Z"
  },
  "sunlight": {
   "terrain": "LOLA LDEM_75S_240M at 1.2 km per pixel",
@@ -33,7 +33,7 @@
     "oursPct": 83.91295737982092
    }
   ],
-  "recordedUtc": "2026-11-11T22:18:48.671Z"
+  "recordedUtc": "2026-11-13T23:30:27.154Z"
  },
  "planets": {
   "cases": 40,
@@ -43,20 +43,52 @@
   "worstMoonRelativeError": 0.002029956786136809,
   "toleranceDeg": 0.01,
   "reference": "SPICE spkpos, ECLIPJ2000, geometric; Mars and the outer planets are system barycentres",
-  "recordedUtc": "2026-11-11T22:18:48.449Z"
+  "recordedUtc": "2026-11-13T23:30:27.465Z"
  },
  "earthSun": {
   "cases": 40,
   "worstDeg": 0.005730358682082035,
   "toleranceDeg": 0.03,
   "reference": "SPICE spkpos SUN from EARTH in ITRF93, geometric; precession and obliquity of date, no nutation",
-  "recordedUtc": "2026-11-11T22:18:48.378Z"
+  "recordedUtc": "2026-11-13T23:30:27.371Z"
  },
  "marsSun": {
   "cases": 40,
   "worstDeg": 0.0000065976355361199995,
   "toleranceDeg": 0.001,
   "reference": "SPICE spkpos SUN from MARS BARYCENTER in IAU_MARS (pck00011.tpc), geometric, 2026 to 2036",
-  "recordedUtc": "2026-11-11T22:18:48.728Z"
+  "recordedUtc": "2026-11-13T23:30:27.810Z"
+ },
+ "sunlight30m": {
+  "terrain": "LOLA LDEM_75S_30MPP_ADJ at 30 m per pixel near the site, about 1 km beyond it",
+  "reference": "Bussey et al. 2010, Icarus 208 (Kaguya topography), and our own 1.2 km LOLA result",
+  "open": "Unexplained: the 30 m terrain finds much more skyline than the 1.2 km grid. Sites are judged on the 1.2 km grid until this is understood.",
+  "rows": [
+   {
+    "point": "A, Shackleton ridge",
+    "latDeg": -89.68,
+    "lonDeg": -166,
+    "busseyPct": 81,
+    "coarsePct": 68,
+    "finePct": 38.36760594818924
+   },
+   {
+    "point": "B, peak near the ridge",
+    "latDeg": -89.44,
+    "lonDeg": -141.8,
+    "busseyPct": 82,
+    "coarsePct": 80.6,
+    "finePct": 35.68864879749288
+   },
+   {
+    "point": "D, near Shackleton rim",
+    "latDeg": -88.79,
+    "lonDeg": 124.5,
+    "busseyPct": 86,
+    "coarsePct": 83.9,
+    "finePct": 49.12127638515084
+   }
+  ],
+  "recordedUtc": "2026-11-13T23:30:27.549Z"
  }
 }

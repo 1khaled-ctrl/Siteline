@@ -10,6 +10,16 @@ export const URLS: DataUrls = {
   data: import.meta.env.VITE_DATA_URL ?? '/data',
   terrain: `${ASSETS}/data/terrain.json`,
   maps: `${ASSETS}/data/maps.json`,
+  /*
+   * LOLA's 30 m south pole terrain (PGDA product 90), read by byte ranges from the project's R2 copy: a tiled GeoTIFF
+   * with overviews, which the worker reads around each site.
+   *
+   * Off by default. It is plumbed in and tested, but on the three points we validate against it gives about half the
+   * sunlight the 1.2 km grid does (see tests/reference/validation.json, section `sunlight30m`), and that question is
+   * open, so what the app judges sites by stays the grid every published number here was checked against. Set
+   * VITE_TERRAIN_30M_URL to switch a deployment over.
+   */
+  horizonTerrain: import.meta.env.VITE_TERRAIN_30M_URL,
   // LOLA's 10 m south pole terrain, for the slope. NASA's server lets no other site's page read it (no CORS), so the
   // reads go through the site's own `/pgda`: the dev and preview servers' proxy (vite.config.ts), and on the deployed
   // site a Pages Function (the repository's functions/pgda). A host without either names a copy that allows cross-site
