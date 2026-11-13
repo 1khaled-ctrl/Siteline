@@ -1,6 +1,7 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
+import { sound } from '../sound';
 import { useStage } from '../stage';
 import { samePin, useApp } from '../store';
 import { FLYABLE, type Flyable, WORLDS, type World, worldColour } from './WorldsList';
@@ -13,7 +14,10 @@ const LOOP_HOURS = 30 * 24;
 
 type Mode = 'worlds' | 'time' | 'sites';
 
-const tick = () => navigator.vibrate?.(6);
+const tick = () => {
+  navigator.vibrate?.(6);
+  sound.tick();
+};
 
 /**
  * The phone's one control: a dial at the bottom of the screen, turned with the thumb. What it turns depends on the

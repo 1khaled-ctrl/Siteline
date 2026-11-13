@@ -1,15 +1,21 @@
-import { DEFAULT_STAY, type StayQuery } from '@siteline/contracts';
+import { DEFAULT_STAY, type StayQuery, type StayResult } from '@siteline/contracts';
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
-import { type Pin, useApp } from './store';
+import { type MoonView, type Pin, useApp } from './store';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 export const URLS: DataUrls = {
   data: import.meta.env.VITE_DATA_URL ?? '/data',
   terrain: `${ASSETS}/data/terrain.json`,
   maps: `${ASSETS}/data/maps.json`,
+  // LOLA's 10 m south pole terrain, for the slope. NASA's server lets no other site's page read it (no CORS), so the dev
+  // server passes the reads through (see vite.config.ts); a deployed build needs a copy that allows them, such as one
+  // in the R2 bucket, named in VITE_TERRAIN_10M_URL. Without either, the slope stays "needs finer terrain".
+  fine:
+    import.meta.env.VITE_TERRAIN_10M_URL ??
+    (import.meta.env.DEV ? '/pgda/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF' : undefined),
 };
 export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;
@@ -38,13 +44,20 @@ export function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQ
  * One stay check per question, shared by everything that shows it (the site report, the site's callout, the compare
  * table), so asking twice costs one run in the worker. A failed run is forgotten, so asking again tries again.
  */
+/**
+ * How long a stay check waits, once the rest is worked out, for the slope's tiles from the 10 m terrain: hardly at all
+ * the first time, so the report shows at once, and then patiently, for the second ask that brings the slope.
+ */
+const SLOPE_QUICK_MS = 150;
+const SLOPE_PATIENT_MS = 45_000;
+
 const stays = new Map<string, Promise<StayResponse>>();
-function stayOnce(query: StayQuery, fresh = false): Promise<StayResponse> {
-  const key = JSON.stringify(query);
+function stayOnce(query: StayQuery, fresh = false, slopeWaitMs = SLOPE_QUICK_MS): Promise<StayResponse> {
+  const key = `${slopeWaitMs}|${JSON.stringify(query)}`;
   if (fresh) stays.delete(key);
   const known = stays.get(key);
   if (known) return known;
-  const run = physics.stay(query, URLS);
+  const run = physics.stay(query, URLS, slopeWaitMs);
   stays.set(key, run);
   run.catch(() => stays.delete(key));
   // A day's worth of questions is plenty; drop the oldest beyond that.
@@ -53,6 +66,17 @@ function stayOnce(query: StayQuery, fresh = false): Promise<StayResponse> {
     stays.delete(old);
   }
   return run;
+}
+
+/**
+ * A stay check, and if its slope was still on the way (a site's first read of the 10 m terrain takes a few seconds),
+ * the same check again once the slope is in: `use` gets each answer as it comes.
+ */
+async function stayThenSlope(query: StayQuery, fresh: boolean, use: (r: StayResponse) => void): Promise<void> {
+  const first = await stayOnce(query, fresh);
+  use(first);
+  if (!first.slopePending) return;
+  use(await stayOnce(query, fresh, SLOPE_PATIENT_MS).catch(() => ({ ...first, slopePending: false })));
 }
 
 export function useStay(): StayState {
@@ -72,20 +96,51 @@ export function useStay(): StayState {
     // A retry asks the worker again rather than reuse what failed or what is cached.
     const fresh = attempt !== asked.current;
     asked.current = attempt;
-    stayOnce(query, fresh).then(
-      (response) => {
-        if (live) setState({ query, ...response, loading: false });
-      },
-      (e: unknown) => {
-        if (live) setState({ query, error: e instanceof Error ? e.message : String(e), loading: false });
-      },
-    );
+    stayThenSlope(query, fresh, (response) => {
+      if (live) setState({ query, ...response, loading: false });
+    }).catch((e: unknown) => {
+      if (live) setState({ query, error: e instanceof Error ? e.message : String(e), loading: false });
+    });
     return () => {
       live = false;
     };
   }, [landingUtc, slipDays, latDeg, lonDeg, attempt]);
 
   return { ...state, retry };
+}
+
+/** The time-lapse loops over 30 days; its sunlight track runs a little longer, so an hour-rounded start still covers it. */
+const TRACK_DAYS = 30.1;
+
+/**
+ * The share of the Sun's disc above the selected site's horizon across the time-lapse's 30 days: the same stay check as
+ * the site report (the SPICE ephemeris against the LOLA terrain's horizon), run over 30 days instead of the stay's 6.5.
+ * It starts at the landing hour, so the live clock's minutes do not ask again. Undefined until it arrives, and not
+ * asked for at all until `wanted`.
+ */
+export function useSunTrack(wanted: boolean): StayResult['series'] | undefined {
+  const landingUtc = useApp((s) => s.landingUtc);
+  const slipDays = useApp((s) => s.slipDays);
+  const latDeg = useApp((s) => s.latDeg);
+  const lonDeg = useApp((s) => s.lonDeg);
+  const hourUtc = new Date(Math.floor(Date.parse(landingUtc) / HOUR_MS) * HOUR_MS).toISOString();
+  const key = `${latDeg},${lonDeg},${hourUtc},${slipDays}`;
+  const [track, setTrack] = useState<{ key: string; series: StayResult['series'] }>();
+
+  useEffect(() => {
+    if (!wanted) return;
+    let live = true;
+    const query = { ...queryFor({ latDeg, lonDeg }, hourUtc, slipDays), stayDays: TRACK_DAYS };
+    stayOnce(query).then(
+      (r) => live && setTrack({ key, series: r.result.series }),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [wanted, key, latDeg, lonDeg, hourUtc, slipDays]);
+
+  return track?.key === key ? track.series : undefined;
 }
 
 /** Stay results for several sites at once, in the same order; entries are undefined until they arrive. */
@@ -107,9 +162,21 @@ export function useStayMany(pins: Pin[]): (StayResponse | undefined)[] {
 
   useEffect(() => {
     let live = true;
-    setRows(sites.map(() => undefined));
-    Promise.all(sites.map((s) => stayOnce(queryFor(s, landingUtc, slipDays)).catch(() => undefined))).then((all) => {
-      if (live) setRows(all);
+    // Keep the rows on screen while new ones are worked out (the live clock asks again each minute), unless the sites
+    // themselves changed.
+    setRows((old) => (old.length === sites.length ? old : sites.map(() => undefined)));
+    const queries = sites.map((s) => queryFor(s, landingUtc, slipDays));
+    Promise.all(queries.map((q) => stayOnce(q).catch(() => undefined))).then((all) => {
+      if (!live) return;
+      setRows(all);
+      // A site whose slope was still on the way gets its row again once the slope is in.
+      all.forEach((row, i) => {
+        if (!row?.slopePending) return;
+        stayOnce(queries[i], false, SLOPE_PATIENT_MS).then(
+          (later) => live && setRows((rows) => rows.map((old, j) => (j === i ? later : old))),
+          () => {},
+        );
+      });
     });
     return () => {
       live = false;
@@ -119,12 +186,23 @@ export function useStayMany(pins: Pin[]): (StayResponse | undefined)[] {
   return rows;
 }
 
-/** The time the 3D views are lit for: landing plus slip, plus the time-lapse offset. */
+/** The Moon's views, the only ones its launch slip moves. */
+const SLIPPED_VIEWS: ReadonlySet<MoonView> = new Set<MoonView>(['globe', 'pole']);
+
+/**
+ * The time a view is lit for: the header's date plus the time-lapse offset, and on the Moon's views the launch slip
+ * as well. The slip is the Moon's what-if, so the solar system, the Earth and Mars stay on the header's date with it.
+ */
+export function lightingUtcMsOf(
+  s: Pick<ReturnType<typeof useApp.getState>, 'landingUtc' | 'slipDays' | 'playOffsetH' | 'view'>,
+): number {
+  const slipMs = SLIPPED_VIEWS.has(s.view) ? s.slipDays * DAY_MS : 0;
+  return Date.parse(s.landingUtc) + slipMs + s.playOffsetH * HOUR_MS;
+}
+
+/** The time the current 3D view is lit for (`lightingUtcMsOf`). */
 export function useLightingUtcMs(): number {
-  const landingUtc = useApp((s) => s.landingUtc);
-  const slipDays = useApp((s) => s.slipDays);
-  const playOffsetH = useApp((s) => s.playOffsetH);
-  return Date.parse(landingUtc) + slipDays * DAY_MS + playOffsetH * HOUR_MS;
+  return useApp(lightingUtcMsOf);
 }
 
 /**

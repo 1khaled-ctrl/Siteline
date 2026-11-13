@@ -4,7 +4,7 @@
 // Usage: node tests/e2e/smoke.mjs [url] [screenshot-prefix]
 import { chromium } from 'playwright';
 
-const url = process.argv[2] || 'http://localhost:5173/?view=globe&t=2028-03-03T00:00:00.000Z&lat=-89.68&lon=-166';
+const url = process.argv[2] || 'http://localhost:5173/?open=globe&t=2028-03-03T00:00:00.000Z&lat=-89.68&lon=-166';
 const shots = process.argv[3];
 const errors = [];
 
@@ -16,7 +16,7 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
 // Solar system first: the planets draw, then flying to the Moon lands on the globe. The Earth comes first.
-await page.goto(url.replace('view=globe', 'view=solar'), { waitUntil: 'networkidle' });
+await page.goto(url.replace('open=globe', 'open=solar'), { waitUntil: 'networkidle' });
 await page.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
 await page.getByLabel('Date and time (UTC)').waitFor({ timeout: 5_000 });
 if (
@@ -212,7 +212,7 @@ await page.getByRole('button', { name: 'Plan this site in 3D' }).click();
 await page.waitForSelector('[data-testid="pole-map"] canvas', { timeout: 60_000 });
 const planned = Number(new URL(page.url()).searchParams.get('lat'));
 if (Math.abs(planned + 84.79) > 0.01) throw new Error(`Plan this site went to latitude ${planned}`);
-await page.goto(`${new URL(url).origin}/?view=mars&mission=curiosity`, { waitUntil: 'networkidle' });
+await page.goto(`${new URL(url).origin}/?open=mars&mission=curiosity`, { waitUntil: 'networkidle' });
 await page.getByTestId('mission-card').getByText('38.16 km').waitFor({ timeout: 30_000 });
 
 if (errors.length) {

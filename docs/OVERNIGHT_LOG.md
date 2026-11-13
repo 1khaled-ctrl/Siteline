@@ -62,7 +62,7 @@ Every item below is committed locally on `main`. Nothing was pushed or deployed,
 
 - `git log --oneline 8887a5e..HEAD` lists tonight's commits, one per item.
 - Read **Needs your decision** below: eight calls I made so I could keep going, all easy to reverse.
-- To see the headline features: open the south pole (`?view=pole&t=2028-04-08T00:00:00Z&lat=-85.4&lon=31.7`) and try **Simulate the journey**, **Share**, the day strip, the badges, **Ask SiteLine** and **Sources & methods** in the header. Pin a few Artemis regions to see the compare table.
+- To see the headline features: open the south pole (`?open=pole&t=2028-04-08T00:00:00Z&lat=-85.4&lon=31.7`) and try **Simulate the journey**, **Share**, the day strip, the badges, **Ask SiteLine** and **Sources & methods** in the header. Pin a few Artemis regions to see the compare table.
 
 ## Needs your decision
 

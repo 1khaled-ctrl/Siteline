@@ -1,3 +1,4 @@
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { findLander } from '../landers';
 import { type MoonView, useApp } from '../store';
@@ -11,8 +12,15 @@ interface Crumb {
 
 const to = (view: MoonView) => () => useApp.getState().set({ view });
 
+const SPRING = { type: 'spring', stiffness: 480, damping: 38 } as const;
+
+/**
+ * Where you are, as a trail back to the solar system. The crumb you are on sits in a lit pill that glides along as you
+ * go deeper or come back, and crumbs slide in and out from the trail's start.
+ */
 export function Breadcrumbs() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const from = i18n.dir() === 'rtl' ? 10 : -10;
   const view = useApp((s) => s.view);
   const place = useApp((s) => s.earthPlace);
   const marsPlace = useApp((s) => s.marsPlace);
@@ -63,29 +71,50 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label={t('crumbs.label')}>
-      <ol className="flex flex-wrap items-center gap-0.5 text-[13px]">
-        {trail.map((c, i) => {
-          const last = i === trail.length - 1;
-          return (
-            <li key={c.id} className="flex items-center gap-1">
-              {i > 0 && (
-                <span aria-hidden="true" className="text-quiet">
-                  ›
-                </span>
-              )}
-              {last ? (
-                <span aria-current="page" className="px-1.5">
-                  {c.text}
-                </span>
-              ) : (
-                <button type="button" className="min-h-9 rounded-md px-1.5 text-quiet hover:text-ink" onClick={c.go}>
-                  {c.text}
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      <LayoutGroup id="crumbs">
+        <ol className="relative flex flex-wrap items-center gap-0.5 text-[13px]">
+          <AnimatePresence initial={false} mode="popLayout">
+            {trail.map((c, i) => {
+              const last = i === trail.length - 1;
+              return (
+                <motion.li
+                  key={c.id}
+                  layout="position"
+                  className="flex items-center gap-1"
+                  initial={{ opacity: 0, x: from }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: from, transition: { duration: 0.15 } }}
+                  transition={SPRING}
+                >
+                  {i > 0 && (
+                    <span aria-hidden="true" className="text-quiet">
+                      ›
+                    </span>
+                  )}
+                  {last ? (
+                    <span aria-current="page" className="relative flex min-h-8 items-center px-2">
+                      <motion.span
+                        layoutId="crumb-here"
+                        className="crumb-here absolute inset-0 rounded-md"
+                        transition={SPRING}
+                      />
+                      <span className="relative">{c.text}</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="min-h-9 rounded-md px-1.5 text-quiet transition-colors hover:text-ink"
+                      onClick={c.go}
+                    >
+                      {c.text}
+                    </button>
+                  )}
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
+        </ol>
+      </LayoutGroup>
     </nav>
   );
 }

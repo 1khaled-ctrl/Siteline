@@ -1,9 +1,10 @@
-import type { Reason } from '@siteline/contracts';
-import { Fragment } from 'react';
+import type { Reason, StayQuery, StayResult } from '@siteline/contracts';
+import { Fragment, useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
 import { DAY_MS, useStay } from '../physics';
+import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
 import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
@@ -67,9 +68,30 @@ function ReportSkeleton() {
   );
 }
 
+/** The last verdict sounded, by site and moment, kept across the report closing and opening again. */
+let lastSounded = '';
+
+/**
+ * Plays the verdict's short phrase when a verdict is new: a site picked, the date or slip changed, Now pressed. Not for
+ * the live clock moving on a minute, and not again for a site and moment already heard, as when the report reopens.
+ * Nothing plays at all before the first tap or key press, nor while the slope is still being measured (it can turn the
+ * verdict). The verdict's icon and word stay on screen; the sound only goes with them.
+ */
+function useVerdictSound(query: StayQuery | undefined, result: StayResult | undefined, slopePending?: boolean) {
+  useEffect(() => {
+    if (!query || !result || slopePending) return;
+    const { live, slipDays } = useApp.getState();
+    const key = `${query.site.latDeg},${query.site.lonDeg}|${live ? `live${slipDays}` : query.landingUtc}`;
+    if (key === lastSounded) return;
+    lastSounded = key;
+    sound.verdict(verdictOf(checksOf(result)));
+  }, [query, result, slopePending]);
+}
+
 export function SiteReport() {
   const { t } = useTranslation();
-  const { query, result, terrain, terrainError, longTerm, error, loading, retry } = useStay();
+  const { query, result, terrain, terrainError, longTerm, slope, slopePending, error, loading, retry } = useStay();
+  useVerdictSound(query, result, slopePending);
   const pins = useApp((s) => s.pins);
   const pinned = query ? pins.some((p) => samePin(p, query.site)) : false;
 
@@ -92,8 +114,12 @@ export function SiteReport() {
     ['earthrise', result.nextEarthriseUtc],
   ] as const;
   const pct = (v: number) => (Number.isFinite(v) ? `${formatNumber(v)}%` : '—');
-  const slopeText = terrain ? t('report.needsFinerTerrain') : t('report.noTerrain');
-  const sure = { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM };
+  const slopeText = slopePending
+    ? t('report.measuringSlope')
+    : terrain
+      ? t('report.needsFinerTerrain')
+      : t('report.noTerrain');
+  const sure = { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM, slopeM: slope?.resolutionM };
   const mark = (reading: Reading) => (
     <ConfidenceBadge level={confidenceOf(reading, sure)} terrainM={sure.terrainM} compact />
   );
@@ -122,6 +148,8 @@ export function SiteReport() {
               result={result}
               terrain={terrain}
               longTerm={longTerm}
+              slope={slope}
+              slopePending={slopePending}
               checks={c}
               verdict={verdict}
               note={terrainNote}
@@ -167,6 +195,16 @@ export function SiteReport() {
           <StatTile label={t('report.groundHeight')} badge={mark('height')}>
             {formatNumber(terrain.groundHeightM, 0)} m
           </StatTile>
+        )}
+        {slope && (
+          <>
+            <StatTile label={t('report.landingSlope')} badge={mark('slope')}>
+              {formatNumber(slope.slope100mDeg)}°
+            </StatTile>
+            <StatTile label={t('report.walkable')} badge={mark('slope')}>
+              {pct(slope.slope2kmPctUnder20)}
+            </StatTile>
+          </>
         )}
         {longTerm && (
           <>

@@ -17,8 +17,10 @@ import {
   useBoot,
 } from '../boot';
 import { measureFrames, perf } from '../perf';
+import { setSoundOn, sound, useSound } from '../sound';
 import { useStage } from '../stage';
 import { useApp } from '../store';
+import { Speaker } from './SoundToggle';
 
 /** The emblem turns at least this long, so a quick load still gets its moment. */
 const MIN_MS = 1700;
@@ -26,8 +28,12 @@ const MIN_MS = 1700;
 const SLOW_MS = 4500;
 /** After this the app opens anyway, and each view shows its own progress. */
 const GIVE_UP_MS = 25_000;
-/** Seconds per turn of the coin. */
-const TURN_S = 3.4;
+/** Asked to tap and not answered: it opens after this long anyway, quietly. */
+const ASK_MS = 10_000;
+/** After the tap, how long the reveal waits for the sound (which loads on that tap) so they start together. */
+const SOUND_WAIT_MS = 1200;
+/** GSAP's power2.inOut, for the browser's own glide. */
+const POWER2_IN_OUT = 'cubic-bezier(0.45, 0, 0.55, 1)';
 /** Points on the gold ring as it becomes the Earth's orbit. */
 const RING_POINTS = 160;
 /** The emblem ring's own gold, so the drawn ring takes over from it without a seam. */
@@ -46,6 +52,32 @@ function lightCoin(coin: HTMLElement | null, band: HTMLElement | null): void {
   const shade = coin.querySelector<HTMLElement>('.intro-shade');
   if (shade) shade.style.opacity = (0.5 * (1 - face)).toFixed(3);
   band.style.transform = `translateX(${(((a + 90) % 180) / 180) * -66.7}%)`;
+}
+
+/** The opening's field and coin, which index.html draws and starts turning before this code has loaded. */
+const splash = typeof document === 'undefined' ? null : document.getElementById('splash');
+const inSplash = <T extends Element>(selector: string): T | null => splash?.querySelector<T>(selector) ?? null;
+
+/** How far the coin has turned, in degrees, since it came to face you; index.html names its turn `coin-turn`. */
+function turnedDeg(coin: HTMLElement): number {
+  const turn = coin.getAnimations().find((a) => a.id === 'coin-turn');
+  const timing = turn?.effect?.getComputedTiming();
+  if (!timing || timing.progress == null) return 0;
+  return ((timing.currentIteration ?? 0) + timing.progress) * 360;
+}
+
+/** The fonts' stylesheet loads alongside the first paint (see index.html); the fonts it names are ready after it. */
+function fontsReady(): Promise<unknown> {
+  const link = document.getElementById('fonts-css') as HTMLLinkElement | null;
+  const sheet =
+    link && !link.sheet
+      ? new Promise((done) => {
+          link.addEventListener('load', done, { once: true });
+          link.addEventListener('error', done, { once: true });
+        })
+      : Promise.resolve();
+  // A frame after the stylesheet applies, the page has asked for the fonts it shows.
+  return sheet.then(() => new Promise((done) => requestAnimationFrame(done))).then(() => document.fonts.ready);
 }
 
 /** Where the emblem's parts sit on the page while the coin faces front, its middle at `centre`. */
@@ -73,6 +105,12 @@ const circle = (c: Point, r: number): Point[] =>
     return { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) };
   });
 
+/** The share of the counted loads that have settled, 0 to 1: the dots under the emblem, as a number. */
+function loadShare(tasks: Partial<Record<BootTask, string>>): number {
+  const counted = ORDER.filter((task) => tasks[task] !== undefined);
+  return counted.length ? counted.filter((task) => tasks[task] !== 'pending').length / counted.length : 0;
+}
+
 /**
  * The opening. The emblem turns like a coin in the light for as long as the real data takes to arrive (the dots are the
  * loads it waits for), then it opens: the coin rushes past, its gold ring becomes the Earth's orbit as the camera pulls
@@ -84,52 +122,50 @@ export function Intro() {
   const [phase, setPhase] = useState<'loading' | 'leaving' | 'gone'>(INTRO_MODE === 'none' ? 'gone' : 'loading');
   const [slow, setSlow] = useState(false);
   const tasks = useBoot((s) => s.tasks);
+  const soundOn = useSound((s) => s.on);
+  const soundReady = useSound((s) => s.ready);
+  const hearing = soundOn && soundReady;
+  const progress = loadShare(tasks);
+  // Ready and waiting for the one tap that lets it open with sound (browsers allow no sound before a tap).
+  const [asking, setAsking] = useState(false);
+  const askingNow = useRef(false);
+  askingNow.current = asking;
+  const tapped = useRef(false);
+  const entering = useRef(false);
   const root = useRef<HTMLDivElement>(null);
-  const field = useRef<HTMLDivElement>(null);
-  const wrap = useRef<HTMLDivElement>(null);
-  const coin = useRef<HTMLDivElement>(null);
-  const sheen = useRef<HTMLSpanElement>(null);
+  const field = useRef(inSplash<HTMLDivElement>('.intro-field'));
+  const wrap = useRef(inSplash<HTMLDivElement>('.intro-wrap'));
+  const coin = useRef(inSplash<HTMLDivElement>('.intro-coin'));
+  const sheen = useRef(inSplash<HTMLSpanElement>('.intro-band'));
   const ring = useRef<SVGPathElement>(null);
   const lander = useRef<HTMLImageElement>(null);
   const star = useRef<HTMLImageElement>(null);
   const pulse = useRef<HTMLDivElement>(null);
   const status = useRef<HTMLDivElement>(null);
-  const started = useRef(performance.now());
+  // Times count from the page's start, when the coin first showed.
+  const started = useRef(0);
   const leaving = useRef(false);
-  const spin = useRef<gsap.core.Tween | null>(null);
+  const slide = useRef<Animation | null>(null);
   const finale = useRef<gsap.core.Timeline | null>(null);
   const ticking = useRef<(() => void) | null>(null);
   const cinematic = INTRO_MODE === 'cinematic';
 
-  // The loads the opening itself makes, and the coin's entrance and turn.
+  // The loads the opening itself waits for. The coin is already turning: index.html started it.
   useEffect(() => {
     if (INTRO_MODE === 'none') return;
-    track('fonts', document.fonts.ready);
-    const img = new Image();
-    img.src = emblemUrl;
-    track('emblem', img.decode());
-    const slowTimer = setTimeout(() => setSlow(true), SLOW_MS);
-    if (!cinematic || !coin.current || !wrap.current) return () => clearTimeout(slowTimer);
-    gsap.set(wrap.current, { xPercent: -50, yPercent: -50 });
-    gsap.fromTo(
-      coin.current,
-      { opacity: 0, scale: 0.86, rotationY: -70 },
-      { opacity: 1, scale: 1, rotationY: 0, duration: 1.1, ease: 'power3.out' },
-    );
-    // The pace of this device, read while the coin turns: a slow one gets a lighter flight.
-    void measureFrames(1500);
-    const light = () => lightCoin(coin.current, sheen.current);
-    spin.current = gsap.to(coin.current, {
-      rotationY: '+=360',
-      duration: TURN_S,
-      ease: 'none',
-      repeat: -1,
-      delay: 1.1,
-      onUpdate: light,
-    });
+    track('fonts', fontsReady());
+    const face = inSplash<HTMLImageElement>('.intro-face') ?? Object.assign(new Image(), { src: emblemUrl });
+    track('emblem', face.decode());
+    const slowTimer = setTimeout(() => setSlow(true), Math.max(0, SLOW_MS - performance.now()));
+    if (cinematic && wrap.current) {
+      // GSAP moves the coin from here on, starting from the middle of the page, where index.html put it.
+      gsap.set(wrap.current, { xPercent: -50, yPercent: -50, x: 0, y: 0 });
+      // The pace of this device, read while the coin turns: a slow one gets a lighter flight.
+      void measureFrames(1500);
+    }
     return () => {
       clearTimeout(slowTimer);
-      spin.current?.kill();
+      slide.current?.cancel();
       finale.current?.kill();
       if (ticking.current) gsap.ticker.remove(ticking.current);
     };
@@ -141,13 +177,18 @@ export function Intro() {
     const place = (solar: ReturnType<typeof useStage.getState>['solar']) => {
       if (!solar || !wrap.current || leaving.current) return;
       const sun = solar.projectBody('sun');
-      const quick = performance.now() - started.current < 400;
-      gsap.to(wrap.current, {
-        x: sun.x - window.innerWidth / 2,
-        y: sun.y - window.innerHeight / 2,
-        duration: quick ? 0 : 0.9,
-        ease: 'power2.inOut',
-      });
+      // Straight there while the coin cannot be seen yet; a glide once it can.
+      const quick = !coin.current || Number(getComputedStyle(coin.current).opacity) < 0.02;
+      // GSAP keeps where the coin is going; the browser glides it there on the compositor, like the turn.
+      const from = getComputedStyle(wrap.current).transform;
+      gsap.set(wrap.current, { x: sun.x - window.innerWidth / 2, y: sun.y - window.innerHeight / 2 });
+      slide.current?.cancel();
+      slide.current = quick
+        ? null
+        : wrap.current.animate([{ transform: from }, { transform: getComputedStyle(wrap.current).transform }], {
+            duration: 900,
+            easing: POWER2_IN_OUT,
+          });
     };
     place(useStage.getState().solar);
     return useStage.subscribe((s, before) => {
@@ -155,21 +196,95 @@ export function Intro() {
     });
   }, [cinematic]);
 
-  // Open once everything counted has settled and the coin has had its time, or when it has waited too long.
+  // Open once everything counted has settled and the coin has had its time, or when it has waited too long. Someone
+  // who has tapped already, or has the sound off, goes straight in; anyone else is asked for the tap that opens it with
+  // sound.
   useEffect(() => {
-    if (phase !== 'loading') return;
+    if (phase !== 'loading' || asking) return;
     const elapsed = performance.now() - started.current;
     const settled = allSettled(tasks) && tasks.view !== undefined;
+    const failed = Object.values(tasks).includes('failed');
     const wait = settled ? Math.max(0, MIN_MS - elapsed) : Math.max(0, GIVE_UP_MS - elapsed);
-    const timer = setTimeout(() => leave(!settled || Object.values(tasks).includes('failed')), wait);
+    const timer = setTimeout(() => {
+      if (!settled || failed || tapped.current || !useSound.getState().on) leave(!settled || failed);
+      else setAsking(true);
+    }, wait);
     return () => clearTimeout(timer);
   });
 
+  // Asked and not answered: it opens anyway after a while, quietly, so no one is left waiting at a closed door.
+  useEffect(() => {
+    if (!asking || phase !== 'loading') return;
+    const timer = setTimeout(() => leave(false), ASK_MS);
+    return () => clearTimeout(timer);
+  });
+
+  // Any tap or key press during the opening counts (Escape skips it instead).
+  useEffect(() => {
+    if (phase !== 'loading') return;
+    const onKey = (e: KeyboardEvent) => e.key !== 'Escape' && enter();
+    window.addEventListener('click', enter);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', enter);
+      window.removeEventListener('keydown', onKey);
+    };
+  });
+
+  // The glint: each time the turning emblem comes round to face you, the light catches it. Timed from the coin's own
+  // animation and played on the audio clock, so a busy page cannot pull it off the picture.
+  useEffect(() => {
+    if (phase !== 'loading' || !hearing || !cinematic || !coin.current) return;
+    const turn = coin.current.getAnimations().find((a) => a.id === 'coin-turn');
+    const timing = turn?.effect?.getTiming();
+    if (!turn || turn.startTime === null || !timing) return;
+    const firstMs = Number(turn.startTime) + Number(timing.delay ?? 0);
+    const periodMs = Number(timing.duration);
+    let planned = Number.NaN;
+    const plan = () => {
+      const nowMs = Number(document.timeline.currentTime ?? performance.now());
+      const nextMs = firstMs + Math.max(0, Math.ceil((nowMs - firstMs) / periodMs)) * periodMs;
+      if (nextMs !== planned && nextMs - nowMs < 700) {
+        planned = nextMs;
+        sound.intro.glint((nextMs - nowMs) / 1000);
+      }
+    };
+    plan();
+    const timer = setInterval(plan, 250);
+    return () => clearInterval(timer);
+  }, [phase, hearing, cinematic]);
+
+  // The hum under the turning emblem. It starts once a tap or key press has let the page make sound (the button below
+  // is there for it), and builds with the same loads as the dots.
+  useEffect(() => {
+    if (phase === 'loading' && hearing) sound.drone.start(progress);
+  }, [phase, hearing, progress]);
+
+  /** The tap: during loading it is noted (the opening goes on when the data is in); when asked, it opens. */
+  function enter() {
+    tapped.current = true;
+    if (!askingNow.current || entering.current) return;
+    entering.current = true;
+    setAsking(false);
+    // The sound loads on this very tap; give it a moment so the reveal and its sounds begin together.
+    const go = () => leave(false);
+    if (!useSound.getState().on || useSound.getState().ready) return go();
+    const timer = setTimeout(go, SOUND_WAIT_MS);
+    const stop = useSound.subscribe((st) => {
+      if (!st.ready) return;
+      clearTimeout(timer);
+      stop();
+      go();
+    });
+  }
+
   function finish() {
+    sound.drone.stop();
     if (ticking.current) gsap.ticker.remove(ticking.current);
     ticking.current = null;
     useStage.getState().solar?.endIntro();
     markIntroSeen();
+    splash?.remove();
     useBoot.getState().open();
     setPhase('gone');
   }
@@ -179,24 +294,46 @@ export function Intro() {
     if (leaving.current) return;
     leaving.current = true;
     setPhase('leaving');
+    // The hum swells into the reveal and fades out over the flight.
+    sound.drone.swell();
     const solar = useStage.getState().solar;
     const toSolar = cinematic && !plain && useApp.getState().view === 'solar' && solar !== null;
     if (!cinematic || !coin.current) {
-      gsap.to(root.current, { opacity: 0, duration: 0.45, ease: 'power1.out', onComplete: finish });
+      sound.intro.reveal('fade');
+      gsap.to(layers(), { opacity: 0, duration: 0.45, ease: 'power1.out', onComplete: finish });
       return;
     }
-    // Let the coin finish its turn and come to rest facing you, then open.
-    spin.current?.kill();
-    const now = Number(gsap.getProperty(coin.current, 'rotationY'));
+    // GSAP takes the turning coin over from the page's own animation exactly where it is, every part of its turn named
+    // so none is read back from the animated matrix, then lets it finish its turn and come to rest facing you.
+    const now = turnedDeg(coin.current);
+    gsap.set(coin.current, {
+      x: 0,
+      y: 0,
+      z: 0,
+      rotationX: 0,
+      rotationZ: 0,
+      skewX: 0,
+      skewY: 0,
+      scale: 1,
+      opacity: 1,
+      rotationY: now,
+    });
+    lightCoin(coin.current, sheen.current);
+    for (const a of coin.current.getAnimations({ subtree: true })) a.cancel();
     let rest = Math.ceil(now / 360) * 360;
     if (rest - now < 50) rest += 360;
     gsap.to(coin.current, {
       rotationY: rest,
-      duration: 0.4 + ((rest - now) / 360) * 0.9,
+      duration: 0.5 + ((rest - now) / 360) * 1.2,
       ease: 'power3.out',
       onUpdate: () => lightCoin(coin.current, sheen.current),
       onComplete: () => (toSolar ? flyIn() : rushPast()),
     });
+  }
+
+  /** The opening's two layers: the splash's field and coin, and this overlay with the parts, dots and button. */
+  function layers(): HTMLElement[] {
+    return [root.current, splash].filter((el): el is HTMLElement => el !== null);
   }
 
   function centre(): Point {
@@ -217,12 +354,13 @@ export function Intro() {
     ring.current?.setAttribute('d', pathOf(circle(parts.ring, RING_PX)));
     ring.current?.setAttribute('stroke-width', parts.ringWidth.toFixed(1));
     gsap.set(ring.current, { opacity: 1 });
-    gsap.set(root.current, { pointerEvents: 'none' });
+    gsap.set(layers(), { pointerEvents: 'none' });
     return parts;
   }
 
   /** The flight into the solar system: the coin rushes past, the ring becomes the orbit, the lander goes to the Moon. */
   function flyIn() {
+    sound.intro.reveal('flight');
     const parts = detach();
     const start = { x: parts.lander.x + parts.lander.w / 2, y: parts.lander.y + parts.lander.h / 2 };
     const from = circle(parts.ring, RING_PX);
@@ -279,6 +417,7 @@ export function Intro() {
 
   /** The opening for any other first view: the coin rushes past and the lander lifts away. */
   function rushPast() {
+    sound.intro.reveal('rush');
     const parts = detach();
     const r = { v: RING_PX };
     finale.current = gsap
@@ -314,10 +453,10 @@ export function Intro() {
   });
 
   function skip() {
-    spin.current?.kill();
+    sound.drone.stop();
     finale.current?.kill();
     leaving.current = true;
-    gsap.to(root.current, { opacity: 0, duration: 0.25, onComplete: finish });
+    gsap.to(layers(), { opacity: 0, duration: 0.25, onComplete: finish });
   }
 
   if (phase === 'gone') return null;
@@ -329,43 +468,30 @@ export function Intro() {
   return (
     // The parts move to places on the page worked out from the 3D view, so the stage never mirrors.
     <div ref={root} className="intro fixed inset-0 z-50 overflow-hidden" data-testid="intro" dir="ltr">
-      <div ref={field} className="intro-field absolute inset-0" />
-      <div
-        ref={wrap}
-        className="absolute start-1/2 top-1/2"
-        // The flight centres the coin itself (and moves it over the Sun); the fade only needs it centred.
-        style={{ perspective: '1100px', transform: cinematic ? undefined : 'translate(-50%, -50%)' }}
-      >
-        <div
-          ref={coin}
-          className="intro-coin relative"
-          style={{ width: COIN_PX, height: COIN_PX, opacity: cinematic ? 0 : 1 }}
-          aria-hidden="true"
-        >
-          {cinematic &&
-            Array.from({ length: 6 }, (_, i) => (
-              // The coin's milled edge: stacked rims that show as a gold band when it turns side-on.
-              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed stack of identical rims.
-              <span key={i} className="intro-rim" style={{ transform: `translateZ(${(i - 2.5) * 1.4}px)` }} />
-            ))}
-          <img src={emblemUrl} alt="" className="intro-face" draggable={false} />
-          {cinematic && <img src={emblemUrl} alt="" className="intro-face intro-back" draggable={false} />}
-          {/* Shade and a band of light over the face, moved by opacity and transform alone. */}
-          <div className="intro-light">
-            <span className="intro-shade" />
-            <span ref={sheen} className="intro-band" />
-          </div>
-        </div>
-      </div>
+      {/* The field and the coin are underneath, in index.html (#splash), so they show from the first paint. */}
       <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true">
         <path ref={ring} fill="none" stroke={GOLD} strokeLinejoin="round" opacity="0" />
       </svg>
       <img ref={star} src={starUrl} alt="" aria-hidden="true" className="intro-part" draggable={false} />
       <img ref={lander} src={landerUrl} alt="" aria-hidden="true" className="intro-part" draggable={false} />
       <div ref={pulse} className="intro-pulse" aria-hidden="true" />
+      {asking && (
+        <div className="absolute inset-x-0 bottom-[12vh] flex justify-center px-4" dir={i18n.dir()}>
+          <button
+            type="button"
+            // biome-ignore lint/a11y/noAutofocus: it is the one thing to do on this screen, and Enter presses it.
+            autoFocus
+            onClick={enter}
+            className="intro-enter flex min-h-12 items-center gap-2.5 rounded-pill px-6 text-[15px] text-ink"
+          >
+            <Speaker on={soundOn} />
+            {t('intro.enter')}
+          </button>
+        </div>
+      )}
       <div
         ref={status}
-        className="absolute inset-x-0 bottom-[12vh] flex flex-col items-center gap-3 px-4 text-center"
+        className={`absolute inset-x-0 bottom-[12vh] flex flex-col items-center gap-3 px-4 text-center ${asking ? 'invisible' : ''}`}
         role="status"
         dir={i18n.dir()}
       >
@@ -389,6 +515,17 @@ export function Intro() {
           {slow && pending ? t('intro.slow', { what: pendingText }) : ''}
         </p>
       </div>
+      {phase === 'loading' && (
+        <button
+          type="button"
+          aria-pressed={soundOn}
+          onClick={() => setSoundOn(!soundOn)}
+          className="intro-skip absolute inset-s-5 bottom-5 flex min-h-11 items-center gap-2 rounded-pill px-4 text-sm text-quiet hover:text-ink"
+        >
+          <Speaker on={soundOn} />
+          {t(soundOn ? 'intro.soundOn' : 'intro.soundOff')}
+        </button>
+      )}
       {phase === 'loading' && (
         <button
           type="button"

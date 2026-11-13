@@ -3,9 +3,10 @@ import type { SolarBodyKey } from '@siteline/physics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { INTRO_MODE, RING_PX, track, useBoot } from '../boot';
+import { findLander } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useActiveView, useStage, useStageInsets, useWide } from '../stage';
-import { type MoonView, useApp } from '../store';
+import { cameFrom, type MoonView, useApp } from '../store';
 import { type Callout, CalloutLayer } from './Callouts';
 import { ViewHint } from './ViewPills';
 import { useLoad, ViewStatus } from './ViewStatus';
@@ -35,6 +36,16 @@ const KEYS: SolarLabelKey[] = [
   'neptune',
 ];
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** The world whose own view you have just left for this one, if you have: the solar system opens by pulling back from it. */
+function leftWorld(): SolarBodyKey | undefined {
+  const from = cameFrom();
+  if (from === 'globe' || from === 'pole') return 'moon';
+  if (from === 'earth' || from === 'mars') return from;
+  if (from !== 'site') return undefined;
+  const body = findLander(useApp.getState().missionId ?? '')?.body;
+  return body === 'Mars' ? 'mars' : body === 'Moon' ? 'moon' : undefined;
+}
 
 /** Fly the camera to a body, then open that body's own view if it has one. */
 function fly(target: SolarView, body: SolarBodyKey, setFlying: (on: boolean) => void) {
@@ -88,6 +99,10 @@ export function SolarMap() {
   const load = useLoad();
   const { ready, fail } = load;
   const [flying, setFlying] = useState(false);
+  // Back from a world's own view, the camera pulls back out from that world first; the cards wait for it to finish.
+  const [arriveFrom] = useState(leftWorld);
+  const [arriving, setArriving] = useState(arriveFrom !== undefined);
+  const moving = flying || arriving;
   const lightingUtcMs = useLightingUtcMs();
   const command = useApp((s) => s.solarCommand);
   // A flight asked for before this view opened is old news: only later asks from the Worlds list count.
@@ -122,6 +137,8 @@ export function SolarMap() {
       onPoint: (body) => setPicked((p) => (p === body ? null : body)),
       // The opening holds the camera over the Sun and flies it out from there.
       introRingPx: INTRO_MODE === 'cinematic' && !useBoot.getState().opened ? RING_PX : undefined,
+      arriveFrom,
+      onArrive: () => setArriving(false),
     });
     setView(created);
     useStage.getState().setSolar(created);
@@ -133,7 +150,7 @@ export function SolarMap() {
       created.dispose();
       setView(null);
     };
-  }, [t, fail]);
+  }, [t, fail, arriveFrom]);
 
   useEffect(() => {
     if (!view || !command || command.id <= handled.current) return;
@@ -172,10 +189,10 @@ export function SolarMap() {
   );
   // A world with a card does not need its name chip as well.
   useEffect(() => {
-    view?.setHiddenLabels(new Set(wide && !flying ? carded : []));
-  }, [view, carded, wide, flying]);
+    view?.setHiddenLabels(new Set(wide && !moving ? carded : []));
+  }, [view, carded, wide, moving]);
   const callouts: Callout[] =
-    view && !flying
+    view && !moving
       ? carded.map((world) => ({
           id: world,
           anchor: () => view.projectBody(world),

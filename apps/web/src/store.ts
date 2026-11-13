@@ -21,6 +21,11 @@ export interface Pin {
 
 export interface View {
   landingUtc: string;
+  /**
+   * True while the date follows the real clock, to the minute. The app opens that way; picking a date stops it and Now
+   * starts it again. Not written into the link: a link with no date is live.
+   */
+  live: boolean;
   slipDays: number;
   latDeg: number;
   lonDeg: number;
@@ -81,8 +86,18 @@ export interface JourneyTarget {
   name?: string;
 }
 
+/** The dates the ephemeris tables cover, the same range the date fields allow. */
+export const FIRST_UTC_MS = Date.parse('2026-01-01T00:00:00Z');
+export const LAST_UTC_MS = Date.parse('2035-12-31T23:00:00Z');
+const MINUTE_MS = 60_000;
+
+/** The real time now, to the minute, kept inside the tables' range. */
+export const nowUtc = (): string =>
+  new Date(Math.min(LAST_UTC_MS, Math.max(FIRST_UTC_MS, Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS))).toISOString();
+
 const DEFAULTS: View = {
-  landingUtc: '2028-03-03T00:00:00.000Z',
+  landingUtc: nowUtc(),
+  live: true,
   slipDays: 0,
   latDeg: -90,
   lonDeg: 0,
@@ -111,6 +126,7 @@ function clean(patch: Partial<View>): Partial<View> {
   if (patch.landingUtc !== undefined && Number.isFinite(Date.parse(patch.landingUtc))) {
     out.landingUtc = new Date(patch.landingUtc).toISOString();
   }
+  if (typeof patch.live === 'boolean') out.live = patch.live;
   if (patch.slipDays !== undefined && Number.isFinite(patch.slipDays)) {
     out.slipDays = clamp(Math.round(patch.slipDays), -MAX_SLIP_DAYS, MAX_SLIP_DAYS);
   }
@@ -127,20 +143,35 @@ function clean(patch: Partial<View>): Partial<View> {
   return out;
 }
 
+/**
+ * The app always opens in the solar system on the live clock. Only a link made to be followed (the Share button's,
+ * with `open=pole`) starts elsewhere, at its own date and slip, and it is used once: the address bar drops those, so a
+ * reload starts over. The address bar never keeps the view, date or slip itself, and old ones left in it are ignored.
+ */
 function fromUrl(): Partial<View> {
   const p = new URLSearchParams(window.location.search);
   const num = (k: string) => (p.get(k) ? Number(p.get(k)) : undefined);
+  const shared = p.has('open');
+  const view = (p.get('open') as MoonView | null) ?? undefined;
+  const landingUtc = shared ? (p.get('t') ?? undefined) : undefined;
+  const slipDays = shared ? num('slip') : undefined;
+  if (['open', 'view', 't', 'slip'].some((k) => p.has(k))) {
+    for (const k of ['open', 'view', 't', 'slip']) p.delete(k);
+    window.history.replaceState(null, '', `?${p}`);
+  }
   const pins = (p.get('pins') ?? '')
     .split(';')
     .filter(Boolean)
     .map((s) => s.split(',').map(Number))
     .map(([latDeg, lonDeg]) => ({ latDeg, lonDeg }));
   const link = clean({
-    landingUtc: p.get('t') ?? undefined,
-    slipDays: num('slip'),
+    landingUtc,
+    // A shared link that names a date holds it; everything else follows the clock.
+    live: landingUtc ? false : undefined,
+    slipDays,
     latDeg: num('lat'),
     lonDeg: num('lon'),
-    view: (p.get('view') as MoonView | null) ?? undefined,
+    view,
     layer: (p.get('layer') as Layer | null) ?? undefined,
     missionId: p.get('mission'),
     pins,
@@ -186,7 +217,9 @@ export const useApp = create<AppState>((set) => ({
   playOffsetH: 0,
   playing: false,
   speedHPerS: PLAY_SPEEDS_H_PER_S[1],
-  set: (patch) => set(clean(patch)),
+  // Picking a date stops the clock, unless the change says otherwise (Now, and the clock's own ticks).
+  set: (patch) =>
+    set(clean(patch.landingUtc !== undefined && patch.live === undefined ? { ...patch, live: false } : patch)),
   focusSite: (latDeg, lonDeg) => set((s) => ({ ...clean({ latDeg, lonDeg }), view: 'pole', focusSeq: s.focusSeq + 1 })),
   togglePin: (pin) =>
     set((s) => {
@@ -202,11 +235,10 @@ export const useApp = create<AppState>((set) => ({
   setJourney: (journey) => set({ journey }),
 }));
 
+// The address bar keeps the site, pins, layer and lander, but not the view, date or slip, so opening the app again
+// starts in the solar system on the live clock; the Share button's link carries its own view, date and slip.
 useApp.subscribe((s) => {
   const p = new URLSearchParams({
-    view: s.view,
-    t: s.landingUtc,
-    slip: String(s.slipDays),
     lat: String(s.latDeg),
     lon: String(s.lonDeg),
   });
@@ -215,3 +247,31 @@ useApp.subscribe((s) => {
   if (s.pins.length) p.set('pins', s.pins.map((x) => `${x.latDeg},${x.lonDeg}`).join(';'));
   window.history.replaceState(null, '', `?${p}`);
 });
+
+// The view shown before the current one, and when that changed, so a view that opens can begin with the move back out
+// of the one you left.
+let shown: { view: MoonView; previous: MoonView | null; atMs: number } = {
+  view: useApp.getState().view,
+  previous: null,
+  atMs: Number.NEGATIVE_INFINITY,
+};
+useApp.subscribe((s) => {
+  if (s.view !== shown.view) shown = { view: s.view, previous: shown.view, atMs: performance.now() };
+});
+
+/** The view you have just left for this one; null if the view did not change a moment ago (as on a reload or a retry). */
+export function cameFrom(): MoonView | null {
+  return performance.now() - shown.atMs < 1000 ? shown.previous : null;
+}
+
+// While the date is live it follows the real clock: day and night on the Earth, the planets and the Moon's light all
+// match the moment you are looking.
+if (typeof window !== 'undefined') {
+  const tick = () => {
+    const s = useApp.getState();
+    const now = nowUtc();
+    if (s.live && s.landingUtc !== now) s.set({ landingUtc: now, live: true });
+  };
+  setInterval(tick, 10_000);
+  document.addEventListener('visibilitychange', tick);
+}

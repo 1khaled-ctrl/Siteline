@@ -31,12 +31,31 @@ function localData(): Plugin {
   };
 }
 
+/**
+ * NASA's PGDA server, for LOLA's 10 m south pole terrain (the slope): it lets no other site's page read the file, so
+ * the dev server passes the app's byte-range reads through to it.
+ */
+const PGDA_PROXY = {
+  '/pgda': {
+    target: 'https://pgda.gsfc.nasa.gov',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/pgda/, ''),
+  },
+};
+
 export default defineConfig(({ mode }) => {
   // Read from the shell or from apps/web/.env.local (git ignores it), with no prefix filter.
   const env = loadEnv(mode, process.cwd(), '');
   const base = env.DATA_BASE_URL?.replace(/\/+$/, '');
   return {
     plugins: [react(), tailwindcss(), localData()],
+    // The sound libraries load on the first tap and the GeoTIFF reader with the first slope, not with the app; named
+    // here, the dev server bundles them up front instead of finding them mid-session and reloading the page.
+    optimizeDeps: { include: ['tone', 'howler', 'geotiff'] },
+    server: { proxy: PGDA_PROXY },
+    // The physics worker is a module worker; built as one too, it can leave the GeoTIFF reader in a chunk of its own
+    // that loads with the first slope, rather than with the app.
+    worker: { format: 'es' },
     define: base
       ? {
           'import.meta.env.VITE_DATA_URL': JSON.stringify(env.VITE_DATA_URL || `${base}/out`),

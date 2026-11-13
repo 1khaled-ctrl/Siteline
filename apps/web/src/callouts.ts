@@ -6,6 +6,13 @@ export interface Rect {
   h: number;
 }
 
+/** A circle on the page, such as a globe on screen. */
+export interface Disc {
+  x: number;
+  y: number;
+  r: number;
+}
+
 /** The eight places a card can sit around the point it describes. */
 export const SIDES = ['ne', 'e', 'se', 'nw', 'w', 'sw', 'n', 's'] as const;
 export type Side = (typeof SIDES)[number];
@@ -20,6 +27,8 @@ export interface CalloutInput {
   h: number;
   /** Where this card would rather sit; it still moves if that spot is taken. */
   prefer?: Side;
+  /** A globe the card must not cover: it sits beside it, or is left out when there is no room. */
+  keepOff?: Disc;
 }
 
 export interface Placement extends Rect {
@@ -58,11 +67,64 @@ export const overlap = (a: Rect, b: Rect): number =>
   Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
   Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
+/** About how much of `r` lies inside the circle `d`, as an area, counted on a 6 × 6 grid of points. */
+export function discOverlap(r: Rect, d: Disc): number {
+  let inside = 0;
+  for (let i = 0; i < 6; i++) {
+    for (let j = 0; j < 6; j++) {
+      const x = r.x + ((i + 0.5) / 6) * r.w;
+      const y = r.y + ((j + 0.5) / 6) * r.h;
+      if ((x - d.x) ** 2 + (y - d.y) ** 2 < d.r ** 2) inside++;
+    }
+  }
+  return (inside / 36) * r.w * r.h;
+}
+
+/** The share of a card that may lie over the globe it keeps off: a corner over the rim, no more. */
+const KEEP_OFF_SHARE = 0.06;
+
 /** The part of `r` outside `bounds`, as an area. */
 const outside = (r: Rect, bounds: Rect): number => r.w * r.h - overlap(r, bounds);
 
 const covers = (r: Rect, x: number, y: number, margin: number) =>
   x > r.x - margin && x < r.x + r.w + margin && y > r.y - margin && y < r.y + r.h + margin;
+
+interface Segment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** The leader line of a card at `r` for the point (ax, ay): from the point to where it meets the card's edge. */
+function leaderOf(ax: number, ay: number, r: Rect): Segment {
+  const end = edgePoint(r, ax, ay);
+  return { x1: ax, y1: ay, x2: end.x, y2: end.y };
+}
+
+const turn = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
+  Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
+
+/** Whether two leader lines cross each other (touching at an end does not count). */
+export function linesCross(a: Segment, b: Segment): boolean {
+  return (
+    turn(a.x1, a.y1, a.x2, a.y2, b.x1, b.y1) * turn(a.x1, a.y1, a.x2, a.y2, b.x2, b.y2) < 0 &&
+    turn(b.x1, b.y1, b.x2, b.y2, a.x1, a.y1) * turn(b.x1, b.y1, b.x2, b.y2, a.x2, a.y2) < 0
+  );
+}
+
+/** Whether a leader line runs across a card's box. */
+function lineCrossesBox(l: Segment, r: Rect): boolean {
+  const inside = (x: number, y: number) => x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h;
+  if (inside(l.x1, l.y1) || inside(l.x2, l.y2)) return true;
+  const corners = [
+    [r.x, r.y, r.x + r.w, r.y],
+    [r.x + r.w, r.y, r.x + r.w, r.y + r.h],
+    [r.x + r.w, r.y + r.h, r.x, r.y + r.h],
+    [r.x, r.y + r.h, r.x, r.y],
+  ];
+  return corners.some(([x1, y1, x2, y2]) => linesCross(l, { x1, y1, x2, y2 }));
+}
 
 /** Slides `r` back inside `bounds` where it can. */
 function clampInto(r: Rect, bounds: Rect): Rect {
@@ -75,7 +137,9 @@ function clampInto(r: Rect, bounds: Rect): Rect {
  * Places each card beside its point so that no two cards overlap, none covers another's point or one of the `avoid`
  * boxes (toolbars, hints), and all stay inside `bounds`. Cards go in the order given, each to the free side it likes
  * best; a card keeps last frame's side (`previous`) unless that side has become clearly worse, so cards do not flip
- * back and forth as the camera moves. A last few passes push apart any cards that still touch.
+ * back and forth as the camera moves. A card with a globe to keep off sits clear of it, or is left out when no side
+ * has room. Leader lines keep from crossing one another and from running under other cards. A last few passes push
+ * apart any cards that still touch.
  */
 export function placeCallouts(
   items: readonly CalloutInput[],
@@ -84,6 +148,7 @@ export function placeCallouts(
   previous: ReadonlyMap<string, Side> = new Map(),
 ): Placement[] {
   const placed: Placement[] = [];
+  const lines: Segment[] = [];
   for (const c of items) {
     const order = c.prefer ? [c.prefer, ...SIDES.filter((s) => s !== c.prefer)] : [...SIDES];
     let best: Placement | undefined;
@@ -92,7 +157,15 @@ export function placeCallouts(
       const r = slot(c, side);
       let cost = rank * 30 + outside(r, bounds) * 8;
       for (const p of placed) cost += overlap(r, p) * 6;
+      // Lines that cross, or run under a card, are hard to follow back to their points.
+      const line = leaderOf(c.ax, c.ay, r);
+      for (let i = 0; i < placed.length; i++) {
+        if (linesCross(line, lines[i])) cost += 2400;
+        if (lineCrossesBox(line, placed[i])) cost += 1200;
+        if (lineCrossesBox(lines[i], r)) cost += 1200;
+      }
       for (const a of avoid) cost += overlap(r, a) * 4;
+      if (c.keepOff) cost += discOverlap(r, c.keepOff) * 8;
       for (const other of items) if (other !== c && covers(r, other.ax, other.ay, 8)) cost += 4000;
       // Worth more than any preference, so only a real clash moves a card off last frame's side.
       if (previous.get(c.id) === side) cost -= 260;
@@ -101,7 +174,11 @@ export function placeCallouts(
         best = { id: c.id, side, ...r };
       }
     });
-    if (best) placed.push({ ...best, ...clampInto(best, bounds) });
+    if (!best) continue;
+    const spot = { ...best, ...clampInto(best, bounds) };
+    if (c.keepOff && discOverlap(spot, c.keepOff) > KEEP_OFF_SHARE * spot.w * spot.h) continue;
+    placed.push(spot);
+    lines.push(leaderOf(c.ax, c.ay, spot));
   }
   // Push apart whatever still touches, half each way along the shorter overlap, then back inside the bounds.
   for (let pass = 0; pass < 6; pass++) {

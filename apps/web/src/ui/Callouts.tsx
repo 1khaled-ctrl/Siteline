@@ -2,7 +2,7 @@ import type { FrameSource, ScreenPoint } from '@siteline/engine';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
-import { depthLook, edgePoint, type Placement, placeCallouts, type Rect, type Side } from '../callouts';
+import { type Disc, depthLook, edgePoint, type Placement, placeCallouts, type Rect, type Side } from '../callouts';
 import { perf } from '../perf';
 import { useWide } from '../stage';
 
@@ -14,6 +14,8 @@ export interface Callout {
   anchor: () => ScreenPoint | null;
   /** The side the card would rather sit on. */
   prefer?: Side;
+  /** The globe the card describes, read once a frame: the card sits beside it, never over it. */
+  keepOff?: () => Disc | null;
   tone?: CalloutTone;
   /** What the card is about, for screen readers. */
   label: string;
@@ -102,6 +104,7 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
         placeCallouts(
           shown.map(({ item, x, y }) => {
             const el = cards.current.get(item.id);
+            const disc = item.keepOff?.();
             return {
               id: item.id,
               ax: x,
@@ -109,6 +112,7 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
               w: el?.offsetWidth ?? 200,
               h: el?.offsetHeight ?? 80,
               prefer: item.prefer,
+              keepOff: disc ? { x: disc.x - box.left, y: disc.y - box.top, r: disc.r } : undefined,
             };
           }),
           { x: EDGE, y: EDGE, w: box.width - 2 * EDGE, h: box.height - 2 * EDGE },
@@ -136,7 +140,8 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
           l.y += (spot.y - l.y) * k;
           l.side = spot.side;
         }
-        l.shown = Math.min(1, Math.max(0, l.shown + (point ? 1 : -1) * (still ? 1 : dt * 4)));
+        // A card with no room (one that would cover its globe) fades out like one whose point has gone.
+        l.shown = Math.min(1, Math.max(0, l.shown + (point && spot ? 1 : -1) * (still ? 1 : dt * 4)));
         const drift = calmDrift ? 0 : 1;
         const dx = drift * 2.2 * Math.sin((t * 2 * Math.PI) / l.beat + l.phase);
         const dy = drift * 1.8 * Math.cos((t * 2 * Math.PI) / (l.beat * 1.3) + l.phase);

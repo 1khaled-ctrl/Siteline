@@ -9,6 +9,7 @@ export {
   type OceanKey,
   PICK_CITY_KM,
 } from './earthView';
+export { type Flight, onFlight } from './flights';
 export { type GlobeTextures, GlobeView, type GlobeViewOptions } from './globeView';
 export {
   type Bilingual,

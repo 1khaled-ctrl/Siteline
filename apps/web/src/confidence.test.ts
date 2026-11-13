@@ -22,6 +22,11 @@ describe('confidenceOf', () => {
     expect(confidenceOf('slope', { terrainM: SLOPE_NEEDS_M })).toBe('high');
   });
 
+  it('trusts a slope measured on the 10 m terrain, whatever the coarser terrain under the horizon', () => {
+    expect(confidenceOf('slope', { ...loaded, slopeM: 10 })).toBe('high');
+    expect(confidenceOf('slope', { terrainM: 60, slopeM: 240 })).toBe('notMeasured');
+  });
+
   it('trusts the Artemis zone whatever the terrain, since only the latitude matters', () => {
     expect(confidenceOf('zone', {})).toBe('high');
     expect(confidenceOf('zone', loaded)).toBe('high');

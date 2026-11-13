@@ -2,10 +2,13 @@ import { DEFAULT_STAY } from '@siteline/contracts';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
+import { DAY_MS, HOUR_MS, useSunTrack } from '../physics';
 import { REGIONS } from '../regions';
+import { sunAt } from '../sound/maps';
 import { MAX_SLIP_DAYS, PLAY_SPEEDS_H_PER_S, useApp } from '../store';
 import { BestSpots } from './BestSpots';
 import { Compare } from './Compare';
+import { useSonifying } from './SoundEffects';
 
 /** One section of the floating panel: unboxed, as in the demo, so only its heading and spacing set it apart. */
 export const panel = 'min-w-0';
@@ -46,6 +49,11 @@ export function LandingTime() {
   const { t } = useTranslation();
   const { landingUtc, slipDays, set, playing, speedHPerS, playOffsetH, setPlay } = useApp();
   const slipId = useId();
+  const lapse = playing || playOffsetH > 0;
+  const sonifying = useSonifying();
+  const track = useSunTrack(lapse);
+  // The share of the Sun's disc above the site's horizon at the time-lapse's moment: what the tone follows, on screen.
+  const sunNow = track ? sunAt(track, Date.parse(landingUtc) + slipDays * DAY_MS + playOffsetH * HOUR_MS) : Number.NaN;
 
   return (
     <section className={`${box} flex flex-col gap-4`}>
@@ -102,6 +110,18 @@ export function LandingTime() {
           </button>
         )}
       </div>
+      {lapse && Number.isFinite(sunNow) && (
+        <div className="flex flex-col gap-1.5">
+          <p className="flex flex-wrap justify-between gap-x-2 text-sm">
+            <span>{t('time.sunNow')}</span>
+            <span className="font-mono text-sun">{formatNumber(sunNow * 100, 0)}%</span>
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-pill bg-panel-sunk" aria-hidden="true">
+            <div className="h-full rounded-pill bg-sun" style={{ width: `${Math.round(sunNow * 100)}%` }} />
+          </div>
+          {sonifying && <p className="text-xs text-quiet">{t('time.heard')}</p>}
+        </div>
+      )}
       <p className="text-xs text-quiet">
         {playOffsetH > 0
           ? t('time.lightingAt', { days: formatNumber(playOffsetH / 24, 1) })

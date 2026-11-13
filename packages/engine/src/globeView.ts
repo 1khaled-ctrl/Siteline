@@ -1,6 +1,7 @@
 import { MOON_RADIUS_M, siteFrame, unitToLatLon, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { angleBetween, reportFlight, zoomSize } from './flights';
 import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
@@ -157,6 +158,7 @@ export class GlobeView {
     const q = new THREE.Quaternion();
     const r0 = startPos.length();
     const r1 = endPos.length();
+    reportFlight({ durationMs, zoom: zoomSize(r0, r1), turnRad: angleBetween(startPos, endPos) });
     this.flying = true;
     this.controls.enabled = false;
     return new Promise((resolve) => {
@@ -219,6 +221,7 @@ export class GlobeView {
     const still = new THREE.Quaternion();
     const q = new THREE.Quaternion();
     const r0 = startPos.length();
+    reportFlight({ durationMs, zoom: zoomSize(r0, r1), turnRad: angleBetween(startPos, endDir) });
     const origin = new THREE.Vector3();
     cancelAnimationFrame(this.frame);
     this.frame = 0;

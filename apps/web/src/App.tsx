@@ -1,11 +1,10 @@
-import { type ReactNode, useCallback } from 'react';
+import { MotionConfig } from 'motion/react';
+import { type CSSProperties, type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
 import { useBoot } from './boot';
-import { findLander } from './landers';
 import { useStage, useWide } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
-import { BodyClock } from './ui/BodyClock';
 import { BodyFacts } from './ui/BodyFacts';
 import { MarsSide, MoonSide, SiteSide } from './ui/BodySide';
 import { Breadcrumbs } from './ui/Breadcrumbs';
@@ -14,6 +13,7 @@ import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
 import { useGlassLight } from './ui/glass';
+import { HeaderBrand } from './ui/HeaderBrand';
 import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
@@ -21,6 +21,8 @@ import { OrbitDial } from './ui/OrbitDial';
 import { Peek } from './ui/Peek';
 import { Sheet } from './ui/Sheet';
 import { SiteReport } from './ui/SiteReport';
+import { SoundEffects } from './ui/SoundEffects';
+import { SoundToggle } from './ui/SoundToggle';
 import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
 import { TiltButton } from './ui/Tilt';
 import { OfflineBanner } from './ui/ViewStatus';
@@ -38,13 +40,13 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
   const factsCard = facts && <BodyFacts key={facts} body={facts} />;
   switch (view) {
     case 'solar':
-      return [<BodyClock key="clock" />, <WorldsList key="worlds" />];
+      return <WorldsList key="worlds" />;
     case 'earth':
-      return [<BodyClock key="clock" />, factsCard, <EarthPanel key="side" />];
+      return [factsCard, <EarthPanel key="side" />];
     case 'mars':
-      return [<BodyClock key="clock" />, factsCard, <MarsSide key="side" />];
+      return [factsCard, <MarsSide key="side" />];
     case 'site':
-      return [<BodyClock key="clock" />, <SiteSide key="side" />];
+      return <SiteSide key="side" />;
     case 'globe':
       return [factsCard, <LandingTime key="time" />, <MoonSide key="side" />, <Controls key="controls" />];
     default:
@@ -52,20 +54,10 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
   }
 }
 
-/** The header's tagline names the world in view; a lander's close-up names the lander's world. */
-function Tagline() {
-  const { t } = useTranslation();
-  const key = useApp((s) => {
-    if (s.view !== 'site') return s.view;
-    const body = findLander(s.missionId ?? '')?.body;
-    return body && `site${body}`;
-  });
-  return key ? <p className="text-xs text-quiet max-lg:hidden">{t(`app.tagline.${key}`)}</p> : null;
-}
-
 /**
- * Watches whether the floating panel has anything in it: when every card in it is empty (the solar system's clock card
- * hides while no slip or time-lapse is set), the 3D view takes the whole width and centres in it.
+ * Watches whether the floating panel has anything in it: when every card in it is empty (on a wide screen the solar
+ * system's worlds carry their cards in the scene, so its panel is empty), the 3D view takes the whole width and centres
+ * in it.
  */
 function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
   return useCallback((el: HTMLElement | null) => {
@@ -103,6 +95,7 @@ export function App() {
   return (
     <>
       <Intro />
+      <SoundEffects />
       {/* Out of reach of the keyboard and screen readers until the opening hands over. */}
       <div className="flex h-dvh flex-col" inert={!opened}>
         <a
@@ -111,20 +104,28 @@ export function App() {
         >
           {t('app.skipToPanel')}
         </a>
-        <header className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bar px-3.5 py-2">
-          <div className="flex flex-wrap items-baseline gap-x-2.5">
-            <h1 className="text-[21px]">SiteLine</h1>
-            <Tagline />
-          </div>
-          <Breadcrumbs />
-          {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
-          <div className="ms-auto">
-            <SourcesButton />
-          </div>
-          <div className="max-sm:w-full">
-            <DateStepper />
-          </div>
-        </header>
+        {/* The header assembles itself piece by piece as the opening hands over (`bar-in`, in order of `--i`). */}
+        <MotionConfig reducedMotion="user">
+          <header className="bar relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2">
+            <div className="bar-in" style={{ '--i': 0 } as CSSProperties}>
+              <HeaderBrand />
+            </div>
+            <div className="bar-in" style={{ '--i': 1 } as CSSProperties}>
+              <Breadcrumbs />
+            </div>
+            {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
+            <div className="bar-in ms-auto flex items-center gap-1.5" style={{ '--i': 2 } as CSSProperties}>
+              <SoundToggle />
+              <SourcesButton />
+            </div>
+            <div className="bar-in max-sm:w-full" style={{ '--i': 3 } as CSSProperties}>
+              <DateStepper />
+            </div>
+            <div className="bar-edge" aria-hidden="true">
+              <span className="bar-comet" />
+            </div>
+          </header>
+        </MotionConfig>
         <SourcesDialog />
         <JourneyDialog />
         <OfflineBanner />

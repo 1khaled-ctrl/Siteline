@@ -27,7 +27,7 @@ const pageLink = () =>
  * Share one site check three ways: a link that opens the same check, a picture of it for a slide or a post, and a
  * printable page (or PDF) of the same picture on white.
  */
-export function ShareReport({ query, result, terrain, longTerm, checks, verdict, note }: Props) {
+export function ShareReport({ query, result, terrain, longTerm, slope, slopePending, checks, verdict, note }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [said, setSaid] = useState<string>();
@@ -74,13 +74,22 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
       { label: t('report.earthPct'), value: pct(result.earthVisiblePct) },
     ];
     if (terrain) stats.push({ label: t('report.groundHeight'), value: `${formatNumber(terrain.groundHeightM, 0)} m` });
+    if (slope)
+      stats.push(
+        { label: t('report.landingSlope'), value: `${formatNumber(slope.slope100mDeg)}°` },
+        { label: t('report.walkable'), value: pct(slope.slope2kmPctUnder20) },
+      );
     if (longTerm)
       stats.push(
         { label: t('report.longTermSun'), value: pct(longTerm.sunPct) },
         { label: t('report.longTermEarth'), value: pct(longTerm.earthPct) },
         { label: t('report.shadowed'), value: longTerm.shadowed ? t('report.yes') : t('report.no') },
       );
-    const slopeWords = terrain ? t('report.needsFinerTerrain') : t('report.noTerrain');
+    const slopeWords = slopePending
+      ? t('report.measuringSlope')
+      : terrain
+        ? t('report.needsFinerTerrain')
+        : t('report.noTerrain');
     return {
       kicker: t('share.kicker'),
       verdict: t(`report.verdict.${verdict}`),
@@ -99,7 +108,11 @@ export function ShareReport({ query, result, terrain, longTerm, checks, verdict,
         .join(' · '),
       checks: CHECK_KEYS.map((k) => {
         // The same confidence word as the report's badge, so a shared picture never reads a first pass as final.
-        const sure = confidenceOf(k, { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM });
+        const sure = confidenceOf(k, {
+          terrainM: terrain?.resolutionM,
+          longTermM: longTerm?.resolutionM,
+          slopeM: slope?.resolutionM,
+        });
         const unmeasuredSlope = checks[k] === 'unknown' && k === 'slope';
         return {
           label: t(`report.${k}`),

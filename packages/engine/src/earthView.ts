@@ -15,6 +15,7 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
+import { angleBetween, reportFlight, zoomSize } from './flights';
 import {
   discToScreen,
   fitCamera,
@@ -314,6 +315,7 @@ export class EarthView {
     const d0 = from.length();
     const d1 = clamp(distance, this.controls.minDistance, this.controls.maxDistance);
     const flight = ++this.flightId;
+    reportFlight({ durationMs, zoom: zoomSize(d0, d1), turnRad: angleBetween(from, to) });
     this.destination = { latDeg, lonDeg, distance: d1 };
     cancelAnimationFrame(this.frame);
     this.flying = true;

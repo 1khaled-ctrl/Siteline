@@ -154,6 +154,7 @@ export function EarthMap() {
                   // On the globe's upper edge, clear of the toolbar, while the whole globe is in view.
                   anchor: () => onOutline(globe.discOnScreen(), -38),
                   prefer: 'ne',
+                  keepOff: () => globe.discOnScreen(),
                   label: t('facts.heading.Earth'),
                   children: <BodyCard body="Earth" />,
                 },

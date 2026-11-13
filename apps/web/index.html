@@ -5,14 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>SiteLine</title>
-    <link rel="icon" type="image/png" href="/src/assets/emblem-64.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Saira+Semi+Condensed:wght@500;600;700&display=swap"
-    />
-    <!-- Dark from the first paint, and a splash until the app replaces it, so the page is never blank or white. -->
+    <!--
+      Dark from the first paint, with the opening's coin already turning (#splash) before any of the app's code has
+      loaded; the app's opening (src/ui/Intro.tsx) takes that same coin over. These styles come first and nothing in
+      the head blocks them: the fonts load alongside.
+    -->
     <style>
       html,
       body {
@@ -48,9 +45,178 @@
           animation: none;
         }
       }
+
+      /* The opening: the emblem as a coin with a milled gold edge, turning in a light that sweeps across its face. */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        overflow: hidden;
+      }
+      .intro-field {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 50% 46%, #0d1a36 0%, #070c1c 42%, #03060e 100%);
+      }
+      .intro-wrap {
+        position: absolute;
+        inset-inline-start: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        perspective: 1100px;
+      }
+      .intro-coin {
+        position: relative;
+        transform-style: preserve-3d;
+      }
+      .intro-face {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        border-radius: 50%;
+        backface-visibility: hidden;
+        transform: translateZ(4px);
+        user-select: none;
+      }
+      .intro-back {
+        transform: rotateY(180deg) translateZ(4px);
+      }
+      .intro-rim {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 3px solid #a86c06;
+      }
+      .intro-light {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        border-radius: 50%;
+        transform: translateZ(4.5px);
+        backface-visibility: hidden;
+        pointer-events: none;
+      }
+      .intro-shade {
+        position: absolute;
+        inset: 0;
+        background: #000;
+        opacity: 0;
+      }
+      .intro-band {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-start: 0;
+        width: 300%;
+        background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.16) 50%, transparent 60%);
+        will-change: transform;
+      }
     </style>
+    <link rel="icon" type="image/png" href="/src/assets/emblem-64.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Loaded without holding up the first paint; the opening waits for it before it opens. -->
+    <link
+      id="fonts-css"
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Saira+Semi+Condensed:wght@500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
   </head>
   <body>
+    <!-- The stage never mirrors, so the splash is always left to right. -->
+    <div id="splash" dir="ltr" aria-hidden="true">
+      <div class="intro-field"></div>
+      <div class="intro-wrap">
+        <div class="intro-coin" style="opacity: 0">
+          <span class="intro-rim" style="transform: translateZ(-3.5px)"></span>
+          <span class="intro-rim" style="transform: translateZ(-2.1px)"></span>
+          <span class="intro-rim" style="transform: translateZ(-0.7px)"></span>
+          <span class="intro-rim" style="transform: translateZ(0.7px)"></span>
+          <span class="intro-rim" style="transform: translateZ(2.1px)"></span>
+          <span class="intro-rim" style="transform: translateZ(3.5px)"></span>
+          <img class="intro-face" src="/src/assets/emblem.webp" alt="" draggable="false" />
+          <img class="intro-face intro-back" src="/src/assets/emblem.webp" alt="" draggable="false" />
+          <div class="intro-light"><span class="intro-shade"></span><span class="intro-band"></span></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Decides how the app opens (src/boot.ts reads it from data-intro) and starts the coin turning straight away. The
+      // turn runs as the browser's own animation, on the compositor, so it stays smooth while the app loads behind it.
+      (() => {
+        const splash = document.getElementById('splash');
+        let mode = 'cinematic';
+        try {
+          const asked = new URLSearchParams(location.search).get('intro');
+          let seen = false;
+          try {
+            seen = sessionStorage.getItem('siteline.introSeen') === '1';
+          } catch {}
+          if (asked === '0' || (asked !== '1' && seen)) mode = 'none';
+          else if (matchMedia('(prefers-reduced-motion: reduce)').matches) mode = 'fade';
+        } catch {}
+        document.documentElement.dataset.intro = mode;
+        if (mode === 'none') {
+          splash.remove();
+          return;
+        }
+        // The same size as COIN_PX in src/boot.ts.
+        const px = `${Math.round(Math.min(0.62 * Math.min(innerWidth, innerHeight), 360))}px`;
+        const coin = splash.querySelector('.intro-coin');
+        coin.style.width = px;
+        coin.style.height = px;
+        if (mode === 'fade') {
+          coin.style.opacity = '1';
+          return;
+        }
+        const ENTER_MS = 1300;
+        const ENTER_FROM_DEG = -70;
+        const TURN_MS = 4400;
+        const shade = coin.querySelector('.intro-shade');
+        const band = coin.querySelector('.intro-band');
+        const bandAt = (deg) => `translateX(${((((((deg + 90) % 180) + 180) % 180) / 180) * -66.7)}%)`;
+        // The light over a turn from one angle up to another: the face darkens toward edge-on, and the band of light
+        // slides across it, jumping back each time the coin is edge-on (90°, 270°), where its face is dark.
+        const light = (from, to) => {
+          const steps = Math.ceil((to - from) / 7.5);
+          const shadeFrames = [];
+          for (let i = 0; i <= steps; i++) {
+            const deg = from + ((to - from) * i) / steps;
+            shadeFrames.push({ offset: i / steps, opacity: 0.5 * (1 - Math.abs(Math.cos((deg * Math.PI) / 180))) });
+          }
+          const bandFrames = [{ offset: 0, transform: bandAt(from) }];
+          for (let edge = 90 + 180 * Math.floor((from - 90) / 180 + 1); edge < to; edge += 180) {
+            const offset = (edge - from) / (to - from);
+            bandFrames.push({ offset, transform: 'translateX(-66.7%)' }, { offset, transform: 'translateX(0%)' });
+          }
+          bandFrames.push({ offset: 1, transform: bandAt(to) });
+          return { shade: shadeFrames, band: bandFrames };
+        };
+        const start = () => {
+          const enter = { duration: ENTER_MS, easing: 'cubic-bezier(0.33, 1, 0.68, 1)', fill: 'both' };
+          const turn = { duration: TURN_MS, delay: ENTER_MS, iterations: Number.POSITIVE_INFINITY };
+          coin.animate(
+            [
+              { opacity: 0, transform: `scale(0.86) rotateY(${ENTER_FROM_DEG}deg)` },
+              { opacity: 1, transform: 'scale(1) rotateY(0deg)' },
+            ],
+            enter,
+          );
+          coin.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(360deg)' }], { ...turn, id: 'coin-turn' });
+          const entering = light(ENTER_FROM_DEG, 0);
+          const turning = light(0, 360);
+          shade.animate(entering.shade, enter);
+          shade.animate(turning.shade, turn);
+          band.animate(entering.band, enter);
+          band.animate(turning.band, turn);
+        };
+        // The coin comes in once its picture is ready, so it never turns in half drawn.
+        coin.querySelector('.intro-face').decode().then(start, start);
+      })();
+    </script>
     <div id="root">
       <div class="boot" role="status"><span class="boot-ring" aria-hidden="true"></span>SiteLine</div>
     </div>

@@ -30,9 +30,14 @@ export function markIntroSeen(): void {
   }
 }
 
-/** `?intro=1` plays the opening even after it has played in this tab, and `?intro=0` skips it. */
+/**
+ * `?intro=1` plays the opening even after it has played in this tab, and `?intro=0` skips it. The page's own script in
+ * index.html decides first, since it starts the coin before this code loads, and leaves its answer in `data-intro`.
+ */
 function introMode(): IntroMode {
   if (typeof window === 'undefined') return 'none';
+  const decided = document.documentElement.dataset.intro;
+  if (decided === 'cinematic' || decided === 'fade' || decided === 'none') return decided;
   const asked = new URLSearchParams(window.location.search).get('intro');
   if (asked === '0' || (asked !== '1' && readSeen())) return 'none';
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'fade' : 'cinematic';

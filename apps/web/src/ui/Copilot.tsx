@@ -5,6 +5,7 @@ import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, typ
 import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
 import { physics, queryFor, URLS } from '../physics';
+import { sound } from '../sound';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
 import { Spinner } from './ViewStatus';
@@ -53,7 +54,10 @@ export function Copilot() {
     end.current?.scrollIntoView({ block: 'end' });
   }, [log]);
 
-  const say = (m: Omit<Message, 'id'>) => setLog((l) => [...l, { ...m, id: next.current++ }]);
+  const say = (m: Omit<Message, 'id'>) => {
+    setLog((l) => [...l, { ...m, id: next.current++ }]);
+    if (m.from === 'siteline') sound.chime();
+  };
 
   const place = (s: { latDeg: number; lonDeg: number }) =>
     t('share.place', {
