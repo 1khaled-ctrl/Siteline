@@ -330,7 +330,12 @@ export function Intro() {
     // The parts move to places on the page worked out from the 3D view, so the stage never mirrors.
     <div ref={root} className="intro fixed inset-0 z-50 overflow-hidden" data-testid="intro" dir="ltr">
       <div ref={field} className="intro-field absolute inset-0" />
-      <div ref={wrap} className="absolute start-1/2 top-1/2" style={{ perspective: '1100px' }}>
+      <div
+        ref={wrap}
+        className="absolute start-1/2 top-1/2"
+        // The flight centres the coin itself (and moves it over the Sun); the fade only needs it centred.
+        style={{ perspective: '1100px', transform: cinematic ? undefined : 'translate(-50%, -50%)' }}
+      >
         <div
           ref={coin}
           className="intro-coin relative"
