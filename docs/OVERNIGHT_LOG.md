@@ -1,31 +1,53 @@
 # Overnight log, 13 Nov 2026: the spatial redesign
 
-**Brief:** stop treating data as a panel next to the 3D view. A cinematic opening built on the SiteLine Lunar Emblem, glass cards that float in the scene and point at what they describe, and a phone layout of its own (bottom sheet, thumb dial, tilt to look, swipeable compare). Presentation only: no number, source or calculation changed.
+**Status:** done, on branch `ui/spatial-hud` (10 commits on top of `main`, not pushed). Presentation only: no number, data source or calculation changed, and the stay test, compare, copilot, journey and "how we checked it" all work as before. Tests 177/177, typecheck and lint clean (lint's only complaints are the two workflow files' Windows line endings in this checkout; they are LF in git), production build passes, and the Playwright smoke test passes end to end.
 
-**Where it is:** branch `ui/spatial-hud`, one commit per step, not pushed. `corepack pnpm test`, `typecheck` and `lint` passed before each commit (lint's only complaints are the two workflow files' Windows line endings in this checkout, which are LF in git).
+## Start here
+
+1. `git switch ui/spatial-hud`, then `corepack pnpm --filter @siteline/web dev` (or reload the dev server that is already running on that branch).
+2. Open <http://localhost:5173/?intro=1> on a laptop: the emblem turns while the data loads, then flies you into the solar system. `?intro=1` replays it; normally it plays once per tab.
+3. Look at the solar system (cards on Earth, the Moon and Mars; point at any other planet), then fly to the Moon and the south pole (the site's card beside the spot), then Mars (search "Olympus Mons").
+4. In the browser's device mode at a phone size: the bottom sheet, the dial (turn it), tilt (on a real phone), and pin two or three sites at the pole to see the compare deck.
+
+|                                                                            |                                                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| ![The emblem turning](screenshots/spatial-intro-coin.jpg)                  | ![Its ring becomes the Earth's orbit](screenshots/spatial-intro-ring.jpg) |
+| ![The flight out](screenshots/spatial-intro-flight.jpg)                    | ![Cards in the solar system](screenshots/spatial-desktop-solar.jpg)       |
+| ![The site's card at the south pole](screenshots/spatial-desktop-pole.jpg) | ![The Moon's card](screenshots/spatial-desktop-moon.jpg)                  |
+| ![A place on Mars](screenshots/spatial-desktop-mars-place.jpg)             | ![Phone: sheet and dial](screenshots/spatial-phone-solar.jpg)             |
+| ![Phone: the pole](screenshots/spatial-phone-pole.jpg)                     | ![Phone: the compare deck](screenshots/spatial-phone-deck.jpg)            |
+
+## What changed
+
+- **The opening** (`ui/Intro.tsx`, `boot.ts`): the SiteLine Lunar Emblem turns like a coin in the light for as long as the real loads take, with a dot for each load. Then the coin rushes past, its gold ring becomes the Earth's orbit as the camera pulls back from straight over the Sun, the shooting star streaks off and the lander flies to the Moon. GSAP drives it.
+- **Desktop** (`ui/Callouts.tsx`, `callouts.ts`, `ui/SceneCards.tsx`): the 3D scene runs full width under glass cards. Data cards live in the scene beside what they describe, with a leader line to the exact point: the worlds, the picked landing site, a globe's facts, a picked place on Mars or the Earth. They never overlap, look nearer or farther by depth, drift a little, and hold still while you read.
+- **Phones** (`ui/Sheet.tsx`, `ui/Peek.tsx`, `ui/OrbitDial.tsx`, `ui/Tilt.tsx`, `ui/Compare.tsx`): a bottom sheet that peeks with one key number, a thumb dial that scrubs worlds, time or pinned sites, tilt to look, and compare as a swipeable deck. Motion drives the gestures.
+- **Fixed along the way:** Mars, the Earth and the lander close-ups broke when the data moved to R2, because three images read back pixel by pixel were requested without CORS.
 
 ## Calls I made (one line each)
 
-- The emblem source is now in the repo at `docs/brand/siteline-lunar-emblem.png` (1.4 MB, under the 5 MB rule); `apps/web/scripts/emblem.py` cuts it into the web pieces in `apps/web/src/assets` (badge 69 KB, lander, star, 64 px favicon).
-- Libraries: GSAP 3.15.0 for the opening's timeline and Motion 14.8.0 for the phone gestures, both pinned, both at least two weeks old. GSAP's licence is its own free "Standard no-charge" licence (from its package.json), not MIT; fine for a free web app. React Three Fiber is not used: the engine's plain three.js views already expose what the cards need, and a second WebGL stack would cost more than it saves.
-- The opening plays once per browser tab (sessionStorage); `?intro=1` replays it and `?intro=0` skips it. Esc or "Skip intro" also skips.
-- The opening waits on real loads (fonts, the emblem, planet positions, orbits, the planets' colour maps, the first view); at least 1.7 s so it never flashes, a "Still loading …" line after 4.5 s, and after 25 s it opens anyway so each view shows its own progress.
-- The lander flies to the Moon, not the Earth: SiteLine is about landing on the Moon.
-- The 3D canvas now runs on under the floating panel on wide screens, and each view shifts its camera's centre (`setViewOffset`) into the free part, so the world stays centred and the scene shows through the glass. That is a small `setInsets` on all six engine views (World role) plus a shared `fitCamera` helper.
-- Fixed while testing, not part of the brief: the Mars height map, the Earth country-id map and the close-up height patches are read back pixel by pixel, and since the data moved to R2 the browser locked those canvases ("tainted by cross-origin data") because the images were requested without CORS. Each now sets `crossOrigin = 'anonymous'`; R2 already sends the header. This is why Mars hung on "Loading the Mars maps…" and the close-ups failed; the Playwright smoke test passes end to end again.
-- The smoke test now runs with reduced motion: Playwright only clicks elements that have stopped moving, and the panel's cards drift a pixel or two. It also gets the opening's short fade instead of the flight.
-- Desktop callouts are short "spec annotations" (a world's two readings, the site's verdict and checks, a globe's three facts) with a leader line to the exact point; the full cards (site report, facts, controls, lander lists) stay in the panel as glass, each callout has a button that brings its full card into view. Rebuilding the big site report inside a moving card would have risked the features the brief says must keep working exactly as today.
-- On a wide screen the solar view has no panel now: Earth, the Moon and Mars carry cards in the scene, and pointing at or clicking any other planet gives it one. The worlds list is phone-only (it lives in the bottom sheet). When the panel is empty the 3D view takes the whole width.
-- A globe's facts card shows only while the globe leaves room for it (radius under 36 % of the window's height): Mars and the Earth open filling the view, so their cards arrive as you zoom out, instead of covering the surface.
-- The cards' "Fly there" buttons are named "Fly to Earth" etc. for screen readers, and the smoke test clicks those (or the phone list's rows); it reads the verdict from the panel's report, since the site's card repeats it.
-- The site card and the full report share one stay check through a small cache in `physics.ts` (`stayOnce`); the compare table uses it too. Retry still forces a fresh run.
-- Phones (under 1024 px) get their own layout: the 3D view fills the screen, the panel is a glass bottom sheet (drag the handle or tap it; only the handle drags, so the cards inside scroll normally), and the thumb dial sits just above it. The sheet's peek line is the view's key number: the dial's world and its two readings with Fly there, the site's verdict with its two percentages, a globe's signal time (Earth: its sunlight).
-- What the dial turns: the worlds in the solar view (default the Moon; a tap flies there); time everywhere else, an hour a click or a day a click when spun fast, through the same time-lapse offset the Play button uses (a tap goes back to the landing time); and, at the south pole with two or more pinned sites, a "Time / Pinned sites" chip switches it to stepping through the pins. On Mars and the Moon globe it could have stepped through landers instead; I chose time so the dial means the same thing on every body view.
-- On a phone the copilot button shrinks to its star and sits beside the dial.
-- Tilt to look: a button beside the dial (phones only, hidden for reduced motion) asks for motion access on the tap itself, never on load, then turns the camera up to about 6° from wherever the phone was held when tapped (20° of tilt turns the view about 4.6°), smoothed, on top of dragging. If access is refused or no sensor answers within 1.5 s, it says so for five seconds and turns itself off. The engine gained a `LookOffset` that every view applies just before it draws, so labels, pins and callouts tilt with the picture.
-- Compare on a phone is a deck of site cards in the table's own ranking (best first, with its badge); swipe the top card either way to send it to the back, or use the arrows. Every row of the table is on each card with the same stars. Wide screens keep the table.
-- Picking a place on Mars or the Earth (a click or a search) now also gives it a callout at the exact spot: Mars says the feature, its height above the areoid and its coordinates, the Earth the country and nearest city, worded as the panel words them. A hovered planet's card stays while the pointer travels onto it and while you read it.
-- Performance on a mid-range phone, measured with Chrome's CPU throttling (4× slower) on a 390 × 844 screen and software WebGL (so real phones do better). Before tuning, the coin turned at about 30 fps and the flight ran at 15 to 20. Four fixes: the hidden solar view no longer draws behind the opaque opening (one warm-up frame per change only); the coin's light and sheen move by opacity and transform instead of a repainted filter and gradient; the orbit projection reads the canvas's box once per frame instead of 365 times; and matching the orbit to the ring is one sorted sweep instead of about 175,000 trig calls a frame. Now the coin turns at 60 fps and the flight runs at 30. On top of that, a governor times the frames while the coin turns and again for two seconds after the app opens: if the median runs slower than 30 fps, the effects get lighter rather than switched off (no blur in the flight, no drift on the cards, thinner frosting on the glass), marked `data-low-power` on the page.
+- The emblem's source is in the repo at `docs/brand/siteline-lunar-emblem.png` (1.4 MB); `apps/web/scripts/emblem.py` cuts it into the badge, lander, star and favicon in `apps/web/src/assets`.
+- GSAP 3.15.0 and Motion 14.8.0, pinned and over two weeks old; GSAP's licence is its own free "Standard no-charge" licence, not MIT. No React Three Fiber: the engine's views already give the cards what they need.
+- The opening plays once per tab; `?intro=1` replays it, `?intro=0`, Esc or "Skip intro" skip it, and reduced motion gets a still emblem and a fade.
+- It waits on real loads, at least 1.7 s, says "Still loading …" after 4.5 s, and opens anyway after 25 s (an opening straight onto the pole waits for the terrain, about 20 s on this machine's software rendering).
+- The lander flies to the Moon rather than the Earth, since SiteLine is about landing on the Moon.
+- The 3D canvas runs on under the panel and each view shifts its centre into the free part (`setInsets` on all six engine views, World role); when the panel is empty the view takes the full width.
+- Callouts are short spec annotations with a button to their full card; the big cards (report, facts, controls, lists) stay in the panel as glass, so nothing that works today was rebuilt.
+- The solar view on a laptop has no panel now: the worlds list lives in the phone's sheet, and the scene's cards replace it.
+- A globe's facts card only shows while the globe leaves room for it, so Mars and the Earth (which open filling the view) get theirs as you zoom out.
+- The site card and the report share one stay check through a cache in `physics.ts`, which the compare table now uses too.
+- The dial turns worlds in the solar view, time elsewhere (the Play button's offset: an hour a click, a day when spun), or pinned sites at the pole; I chose time over landers on Mars and the Moon so it means one thing on every globe.
+- Tilt to look asks for motion access only on its tap, turns the view at most about 6°, and turns itself off if refused or if no sensor answers.
+- Compare on a phone is a deck in the table's own ranking; wide screens keep the table.
+- The smoke test runs with reduced motion (Playwright only clicks what has stopped moving) and clicks "Fly to Earth" etc., the cards' accessible names.
+- Mid-range phone test (4× CPU throttling, software WebGL): the coin went from 30 to 60 fps and the flight from 15–20 to 30. A governor lightens effects (no blur, no drift, thinner frosting) on a device under 30 fps rather than cutting them.
+- English only, as you asked: about 50 new strings need Arabic, and the callouts and dial need an RTL pass when Arabic arrives.
+
+## Not done, or worth a look
+
+- Not tested on a real phone (only Chrome's device mode with fake orientation events); tilt on an iPhone needs a real device and HTTPS.
+- The lander close-up has no callout of its own; its pins already label the landers.
+- With pins at the pole, a phone shows the deck in the sheet; a laptop still shows the table in the panel, not cards in the scene.
 
 ---
 
