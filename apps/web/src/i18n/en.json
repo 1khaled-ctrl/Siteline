@@ -735,7 +735,9 @@
       "zone": "Near the pole"
     },
     "flyTo": "Fly to {{name}}",
-    "place": "The place you picked"
+    "place": "The place you picked",
+    "fold": "Fold this card away",
+    "unfold": "Open this card"
   },
   "sheet": {
     "open": "Show the panel",
@@ -766,5 +768,12 @@
     "label": "Sound",
     "muteHint": "Sound is on. Press to mute everything (or press M).",
     "unmuteHint": "Sound is off. Press to turn it on (or press M)."
+  },
+  "orb": {
+    "open": "Open the SiteLine menu",
+    "close": "Close the menu",
+    "ask": "Ask SiteLine",
+    "hide": "Hide the interface",
+    "show": "Show the interface"
   }
 }

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
 import { type Disc, depthLook, edgePoint, type Placement, placeCallouts, type Rect, type Side } from '../callouts';
 import { perf } from '../perf';
-import { useWide } from '../stage';
+import { useStage, useWide } from '../stage';
 
 export type CalloutTone = 'accent' | 'sun' | 'pass' | 'fail' | 'warn';
 
@@ -56,8 +56,35 @@ export function CalloutLayer({ source, items }: { source: FrameSource | null; it
   return <Layer source={source} items={items} />;
 }
 
+/** A card's arrow: folds it down to its title, and opens it again. */
+function FoldButton({ id, folded }: { id: string; folded: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      className="callout-fold"
+      aria-expanded={!folded}
+      aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
+      onClick={() => useStage.getState().toggleFolded(`callout:${id}`)}
+    >
+      <svg
+        viewBox="0 0 12 12"
+        width="12"
+        height="12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        aria-hidden="true"
+      >
+        <path d={folded ? 'M4 2l4 4-4 4' : 'M8 2L4 6l4 4'} />
+      </svg>
+    </button>
+  );
+}
+
 function Layer({ source, items }: { source: FrameSource; items: readonly Callout[] }) {
   const { i18n } = useTranslation();
+  const folded = useStage((s) => s.folded);
   const layer = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLElement>());
   const lines = useRef(new Map<string, SVGPathElement>());
@@ -236,8 +263,19 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
           onPointerLeave={() => hold(false)}
           onFocus={() => hold(true)}
           onBlur={() => hold(false)}
+          data-folded={folded.has(`callout:${item.id}`) || undefined}
         >
-          {item.children}
+          {folded.has(`callout:${item.id}`) ? (
+            <div className="flex items-center gap-1.5">
+              <span className="font-display text-[14px] leading-none">{item.label}</span>
+              <FoldButton id={item.id} folded />
+            </div>
+          ) : (
+            <>
+              <FoldButton id={item.id} folded={false} />
+              {item.children}
+            </>
+          )}
         </section>
       ))}
     </div>

@@ -476,7 +476,7 @@ export function Intro() {
       <img ref={lander} src={landerUrl} alt="" aria-hidden="true" className="intro-part" draggable={false} />
       <div ref={pulse} className="intro-pulse" aria-hidden="true" />
       {asking && (
-        <div className="absolute inset-x-0 bottom-[12vh] flex justify-center px-4" dir={i18n.dir()}>
+        <div className="absolute inset-x-0 bottom-[8vh] flex justify-center px-4" dir={i18n.dir()}>
           <button
             type="button"
             // biome-ignore lint/a11y/noAutofocus: it is the one thing to do on this screen, and Enter presses it.
@@ -491,7 +491,7 @@ export function Intro() {
       )}
       <div
         ref={status}
-        className={`absolute inset-x-0 bottom-[12vh] flex flex-col items-center gap-3 px-4 text-center ${asking ? 'invisible' : ''}`}
+        className={`absolute inset-x-0 bottom-[8vh] flex flex-col items-center gap-3 px-4 text-center ${asking ? 'invisible' : ''}`}
         role="status"
         dir={i18n.dir()}
       >

@@ -18,6 +18,7 @@ import {
 } from '../bodyFacts';
 import { formatNumber } from '../format';
 import { usePlanetsAtHour } from '../physics';
+import { useStage } from '../stage';
 import { panel } from './Controls';
 
 function Ext({ href, children }: { href: string; children?: ReactNode }) {
@@ -99,44 +100,70 @@ export function BodyFacts({ body }: { body: FactBody }) {
   const mbar =
     c.surfacePressureMbar === null ? '' : formatNumber(c.surfacePressureMbar, c.surfacePressureMbar < 100 ? 1 : 0);
 
+  const folded = useStage((s) => s.folded.has('facts'));
+
   return (
     <section className={panel} data-testid="body-facts" id="body-facts" tabIndex={-1}>
-      <h2 className="mb-2 text-2xl">{t(`facts.heading.${body}`)}</h2>
-      <dl className="grid grid-cols-2 gap-2">
-        <StatTile label={t('facts.gravity')}>{r.gravity}</StatTile>
-        <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
-        <StatTile label={t('facts.rotation')}>{r.rotation}</StatTile>
-        <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
-        <StatTile label={t('facts.sunlight')} edge="sun">
-          {r.sunlight}
-        </StatTile>
-        {body !== 'Earth' && (
-          <StatTile label={t('facts.signal')} edge="earth">
-            {r.signal}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-2xl">{t(`facts.heading.${body}`)}</h2>
+        <button
+          type="button"
+          className="grid size-8 place-items-center rounded-md border border-line bg-panel-raised text-quiet hover:border-line-hover hover:text-ink"
+          aria-expanded={!folded}
+          aria-controls="body-facts-body"
+          aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
+          onClick={() => useStage.getState().toggleFolded('facts')}
+        >
+          <svg
+            viewBox="0 0 12 12"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+          >
+            <path d={folded ? 'M2 4l4 4 4-4' : 'M2 8l4-4 4 4'} />
+          </svg>
+        </button>
+      </div>
+      <div id="body-facts-body" hidden={folded}>
+        <dl className="grid grid-cols-2 gap-2">
+          <StatTile label={t('facts.gravity')}>{r.gravity}</StatTile>
+          <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
+          <StatTile label={t('facts.rotation')}>{r.rotation}</StatTile>
+          <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
+          <StatTile label={t('facts.sunlight')} edge="sun">
+            {r.sunlight}
           </StatTile>
-        )}
-        <StatTile label={t('facts.temperature')} text>
-          {t(`facts.temp.${body}`, {
-            mean: celsius(c.temperatureK.meanK),
-            low: celsius(c.temperatureK.rangeK?.[0]),
-            high: celsius(c.temperatureK.rangeK?.[1]),
-            coldest: celsius(c.temperatureK.coldestK),
-          })}
-        </StatTile>
-        <StatTile label={t('facts.surface')} text>
-          {t(`facts.surfaceKind.${body}`, { mbar })}
-        </StatTile>
-      </dl>
-      <p className="mt-3 text-xs text-quiet">
-        <Trans
-          i18nKey={`facts.sources.${body}`}
-          components={{
-            fact: <Ext href={FACT_SOURCES[c.factSheet][1]} />,
-            gm: <Ext href={FACT_SOURCES.spiceGm[1]} />,
-            paige: <Ext href={FACT_SOURCES.paige2010[1]} />,
-          }}
-        />
-      </p>
+          {body !== 'Earth' && (
+            <StatTile label={t('facts.signal')} edge="earth">
+              {r.signal}
+            </StatTile>
+          )}
+          <StatTile label={t('facts.temperature')} text>
+            {t(`facts.temp.${body}`, {
+              mean: celsius(c.temperatureK.meanK),
+              low: celsius(c.temperatureK.rangeK?.[0]),
+              high: celsius(c.temperatureK.rangeK?.[1]),
+              coldest: celsius(c.temperatureK.coldestK),
+            })}
+          </StatTile>
+          <StatTile label={t('facts.surface')} text>
+            {t(`facts.surfaceKind.${body}`, { mbar })}
+          </StatTile>
+        </dl>
+        <p className="mt-3 text-xs text-quiet">
+          <Trans
+            i18nKey={`facts.sources.${body}`}
+            components={{
+              fact: <Ext href={FACT_SOURCES[c.factSheet][1]} />,
+              gm: <Ext href={FACT_SOURCES.spiceGm[1]} />,
+              paige: <Ext href={FACT_SOURCES.paige2010[1]} />,
+            }}
+          />
+        </p>
+      </div>
     </section>
   );
 }

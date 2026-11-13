@@ -17,6 +17,7 @@ import { HeaderBrand } from './ui/HeaderBrand';
 import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
+import { Orb } from './ui/Orb';
 import { OrbitDial } from './ui/OrbitDial';
 import { Peek } from './ui/Peek';
 import { Sheet } from './ui/Sheet';
@@ -136,6 +137,7 @@ export function App() {
         <main className="relative min-h-0 flex-1 overflow-hidden">
           <MoonView />
           <Copilot />
+          <Orb />
           {wide ? (
             <aside
               ref={panelRef}
