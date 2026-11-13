@@ -154,7 +154,7 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
           id={menuId}
           role="menu"
           aria-label={t('crumbs.sitesMenu', { name: bodyName })}
-          className="absolute start-0 top-full z-30 mt-1.5 max-h-[min(70vh,30rem)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[10px] border border-line bg-panel p-1.5 shadow-2xl"
+          className="absolute start-0 top-full z-30 mt-1.5 max-h-[min(70vh,30rem)] w-80 max-w-[calc(100vw-2rem)] overflow-x-hidden overflow-y-auto overscroll-contain rounded-[10px] [scrollbar-color:var(--color-line-hover)_transparent] [scrollbar-width:thin] border border-line bg-panel p-1.5 shadow-2xl"
           onKeyDown={onMenuKey}
         >
           <button
@@ -171,13 +171,13 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
             {t('crumbs.wholeBody', { name: bodyName })}
           </button>
           {closeUps.length > 0 && (
-            <fieldset className="m-0 mt-3 border-0 p-0">
+            <fieldset className="m-0 mt-3 min-w-0 border-0 p-0">
               <legend className="px-2.5 pb-1 text-xs text-quiet">{t('crumbs.closeUps')}</legend>
               {closeUps.map(item)}
             </fieldset>
           )}
           {others.length > 0 && (
-            <fieldset className="m-0 mt-3 border-0 p-0">
+            <fieldset className="m-0 mt-3 min-w-0 border-0 p-0">
               <legend className="px-2.5 pb-1 text-xs text-quiet">{t('crumbs.onGlobe')}</legend>
               {others.map(item)}
             </fieldset>

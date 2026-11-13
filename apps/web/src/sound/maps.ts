@@ -1,24 +1,11 @@
 /**
  * How data becomes sound, kept apart from the audio code so it can be tested and read on its own. Every sound here is a
- * plain function of a number the app already has: the share of the Sun's disc above a site's horizon, a camera move's
- * size and length, the opening's load progress, a stay's verdict.
+ * plain function of a number the app already has: a camera move's size and length, the opening's load progress, a
+ * stay's verdict. `sunAt` reads the share of the Sun's disc above a site's horizon, shown beside the time-lapse.
  */
 import type { Verdict } from '../verdict';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
-/** The time-lapse tone's lowest and highest pitch: G3 in the dark, two octaves up to G5 with the whole Sun up. */
-export const SUN_TONE_LOW_HZ = 196;
-export const SUN_TONE_OCTAVES = 2;
-
-/**
- * The sunlight sonification. Pitch rises with the share of the Sun's disc above the site's horizon (0 to 1), evenly
- * by ear (an octave per half of the disc), and so does loudness: nearly silent in the dark, quiet in full Sun.
- */
-export function sunTone(fraction: number): { hz: number; db: number } {
-  const f = Number.isFinite(fraction) ? clamp(fraction, 0, 1) : 0;
-  return { hz: SUN_TONE_LOW_HZ * 2 ** (SUN_TONE_OCTAVES * f), db: -44 + 26 * f };
-}
 
 /** The share of the Sun's disc above the horizon at a moment, from a stay series; NaN outside it or where unknown. */
 export function sunAt(series: { tUtcMs: ArrayLike<number>; sun: ArrayLike<number> }, tUtcMs: number): number {

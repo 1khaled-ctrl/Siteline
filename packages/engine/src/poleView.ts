@@ -74,6 +74,9 @@ function terrainGeometry(dem: Dem, stride: number, exaggeration: number): THREE.
   return geometry;
 }
 
+/** The shadow map's size at rest: grazing polar light needs it to keep shadows sharp. */
+const SHADOW_MAP_PX = 4096;
+
 export class PoleView {
   private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
@@ -90,6 +93,8 @@ export class PoleView {
   private readonly onPick?: (latDeg: number, lonDeg: number) => void;
   private down?: { x: number; y: number };
   private frame = 0;
+  /** True while the light moves every frame (the time-lapse): see `setMotion`. */
+  private moving = false;
 
   private insets: Insets = NO_INSETS;
   private readonly look = new LookOffset();
@@ -105,6 +110,10 @@ export class PoleView {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // The shadows depend only on the Sun (the terrain never moves), so the shadow map is drawn when the Sun moves, not on
+    // every frame: turning or zooming the camera then costs one pass instead of two, the larger one 4096 × 4096.
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     container.appendChild(this.renderer.domElement);
 
     this.camera.position.set(0, 420, 470);
@@ -123,7 +132,7 @@ export class PoleView {
     this.terrain.castShadow = true;
     this.terrain.receiveShadow = true;
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(4096, 4096);
+    this.sun.shadow.mapSize.set(SHADOW_MAP_PX, SHADOW_MAP_PX);
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.4;
     this.scene.add(
@@ -152,7 +161,24 @@ export class PoleView {
     this.sun.position.copy(dir).multiplyScalar(2000);
     this.sun.target.position.set(0, 0, 0);
     this.fitShadow();
+    this.renderer.shadowMap.needsUpdate = true;
     this.requestRender();
+  }
+
+  /**
+   * While the light moves every frame (the time-lapse), draw lighter: one pixel per CSS pixel and a 2048 × 2048 shadow
+   * map, a quarter of the work, which nobody sees while the shadows sweep. Back to full detail as soon as it stops.
+   */
+  setMotion(moving: boolean): void {
+    if (moving === this.moving) return;
+    this.moving = moving;
+    const size = moving ? 2048 : SHADOW_MAP_PX;
+    this.sun.shadow.mapSize.set(size, size);
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
+    this.renderer.shadowMap.needsUpdate = true;
+    this.renderer.setPixelRatio(moving ? 1 : Math.min(window.devicePixelRatio, 2));
+    this.fit();
   }
 
   setSite(latDeg: number, lonDeg: number): void {

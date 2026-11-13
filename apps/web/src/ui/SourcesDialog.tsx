@@ -4,17 +4,11 @@ import { type MouseEvent, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CREDITS, FONTS_NOTE, LIBRARIES_NOTE, type Span, spans } from '../credits';
 import { formatNumber } from '../format';
-import { SUN_TONE_LOW_HZ, SUN_TONE_OCTAVES } from '../sound/maps';
 import { useApp } from '../store';
 import { Checks } from './Checks';
 
-/** What the sound section explains, in order: the sonification first, then the cues, the opening and the controls. */
-const SOUND_NOTES = ['sonification', 'cues', 'opening', 'control'] as const;
-/** The sonification's pitch range, from the same constants the sound uses. */
-const soundValues = {
-  lowHz: formatNumber(SUN_TONE_LOW_HZ, 0),
-  highHz: formatNumber(SUN_TONE_LOW_HZ * 2 ** SUN_TONE_OCTAVES, 0),
-};
+/** What the sound section explains, in order: the cues, the opening and the controls. */
+const SOUND_NOTES = ['cues', 'opening', 'control'] as const;
 
 /** Each step of the site check, and the datasets (CREDITS.md ids) it reads. */
 const METHODS: { key: string; ids: string[] }[] = [
@@ -161,7 +155,7 @@ function SourcesBody() {
           <ul className="flex flex-col gap-2">
             {SOUND_NOTES.map((k) => (
               <li key={k} className="rounded-lg border border-line bg-panel-raised px-3 py-2">
-                <p>{t(`sources.sound.${k}`, soundValues)}</p>
+                <p>{t(`sources.sound.${k}`)}</p>
               </li>
             ))}
           </ul>

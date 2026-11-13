@@ -62,6 +62,7 @@ export function PoleMap() {
   const focusSeq = useApp((s) => s.focusSeq);
   const layer = useApp((s) => s.layer);
   const pins = useApp((s) => s.pins);
+  const playing = useApp((s) => s.playing);
   const lightingUtcMs = useLightingUtcMs();
 
   useEffect(() => {
@@ -102,6 +103,11 @@ export function PoleMap() {
   useEffect(() => {
     view?.setPins(pins);
   }, [view, pins]);
+
+  // The time-lapse moves the light every frame: the view draws lighter while it plays.
+  useEffect(() => {
+    view?.setMotion(playing);
+  }, [view, playing]);
 
   useEffect(() => {
     if (view && focusSeq > 0) {

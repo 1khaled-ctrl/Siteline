@@ -1,6 +1,6 @@
 /**
  * The audio itself, loaded on the first gesture. Tone.js makes everything that follows data or the picture (the
- * sunlight tone, the verdict phrase, the flight whoosh and the pull back out to the solar system, and the opening: its
+ * verdict phrase, the flight whoosh and the pull back out to the solar system, and the opening: its
  * hum, the glint of light on the emblem and the sounds of its reveal) from oscillators and noise, with no files; Howler
  * plays the two fixed sounds (the copilot's chime and the dial's tick).
  *
@@ -32,8 +32,6 @@ import {
   HOME_CHORD,
   OPENING_CHORD,
   pullBackShape,
-  SUN_TONE_LOW_HZ,
-  sunTone,
   VERDICT_NOTES,
   whooshShape,
 } from './maps';
@@ -46,8 +44,7 @@ let master: Volume;
 let chimeSound: Howl;
 let tickSound: Howl;
 let lastTickMs = 0;
-let muted = false;
-/** What has played since the audio started, and the sunlight tone's last reading: for checking, not for the app. */
+/** What has played since the audio started: for checking, not for the app. */
 export const played = {
   whoosh: 0,
   pullBack: 0,
@@ -57,8 +54,6 @@ export const played = {
   drone: 0,
   glint: 0,
   reveal: [] as Reveal[],
-  sunFraction: Number.NaN,
-  sunAtMs: Number.NaN,
 };
 
 /** Builds the output on the context the gesture started, and loads the two short sounds. */
@@ -72,67 +67,9 @@ export async function init(context: AudioContext): Promise<void> {
 
 /** Mutes everything at once, and stops what is running so nothing resumes mid-phrase on unmuting. */
 export function setMuted(mute: boolean): void {
-  muted = mute;
   getDestination().mute = mute;
   Howler.mute(mute);
-  if (mute) {
-    sonifyStop();
-    droneStop(0.15);
-  }
-}
-
-// The sunlight sonification -----------------------------------------------------------------------------------------
-
-let sun: { tone: Oscillator; body: Oscillator; level: Volume; running: boolean } | null = null;
-
-function sunVoice() {
-  if (!sun) {
-    const level = new Volume(SILENT_DB).connect(master);
-    const soft = new Filter(2600, 'lowpass').connect(level);
-    const tone = new Oscillator(SUN_TONE_LOW_HZ, 'sine').connect(soft);
-    // An octave below, quieter, for warmth.
-    const bodyGain = new Gain(0.16).connect(soft);
-    const body = new Oscillator(SUN_TONE_LOW_HZ / 2, 'triangle').connect(bodyGain);
-    sun = { tone, body, level, running: false };
-  }
-  return sun;
-}
-
-/** Sets the tone for a share of the Sun's disc above the site's horizon, starting it if it is not running. */
-export function sonifySet(fraction: number, atMs = Number.NaN): void {
-  const s = sunVoice();
-  const { hz, db } = sunTone(fraction);
-  played.sunFraction = fraction;
-  played.sunAtMs = atMs;
-  if (!s.running) {
-    s.running = true;
-    s.tone.frequency.value = hz;
-    s.body.frequency.value = hz / 2;
-    s.tone.start();
-    s.body.start();
-  }
-  s.tone.frequency.rampTo(hz, 0.08);
-  s.body.frequency.rampTo(hz / 2, 0.08);
-  s.level.volume.rampTo(db, 0.15);
-}
-
-export function sonifyStop(): void {
-  if (!sun?.running) return;
-  sun.running = false;
-  sun.level.volume.rampTo(SILENT_DB, 0.4);
-  const end = now() + 0.5;
-  sun.tone.stop(end);
-  sun.body.stop(end);
-}
-
-/** What the sunlight tone is doing right now, for checking that it follows the data. */
-export function sonifyNow(): { running: boolean; hz: number; db: number; muted: boolean } {
-  return {
-    muted,
-    running: !!sun?.running,
-    hz: Number(sun?.tone.frequency.getValueAtTime(now()) ?? 0),
-    db: Number(sun?.level.volume.getValueAtTime(now()) ?? SILENT_DB),
-  };
+  if (mute) droneStop(0.15);
 }
 
 // The verdict phrase --------------------------------------------------------------------------------------------------

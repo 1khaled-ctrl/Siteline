@@ -15,6 +15,8 @@ function usePlayClock() {
   const playing = useApp((s) => s.playing);
   useEffect(() => {
     if (!playing) return;
+    // Marks the page while the scene changes every frame, so the glass stops re-blurring it (index.css).
+    document.documentElement.setAttribute('data-playing', '');
     let frame = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -26,7 +28,10 @@ function usePlayClock() {
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.documentElement.removeAttribute('data-playing');
+    };
   }, [playing]);
 }
 

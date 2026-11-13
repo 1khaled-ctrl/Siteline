@@ -575,6 +575,17 @@ body {
 :root[data-low-power] :is(.glass, .hud > *) {
   backdrop-filter: blur(8px);
 }
+/* While the time-lapse plays, the scene under the glass changes every frame, and blurring it again each time is the
+   costliest thing the page does. The glass turns a little more opaque instead, and the cards hold still, until it stops. */
+:root[data-playing] :is(.glass, .hud > *) {
+  backdrop-filter: none;
+  background:
+    radial-gradient(420px circle at var(--mx) var(--my), rgb(255 255 255 / 0.05), transparent 62%),
+    linear-gradient(155deg, rgb(18 27 48 / 0.93), rgb(8 13 26 / 0.88));
+}
+:root[data-playing] .hud > * {
+  animation-play-state: running, paused;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .callout-ping {

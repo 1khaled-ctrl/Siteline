@@ -8,7 +8,6 @@ import { sunAt } from '../sound/maps';
 import { MAX_SLIP_DAYS, PLAY_SPEEDS_H_PER_S, useApp } from '../store';
 import { BestSpots } from './BestSpots';
 import { Compare } from './Compare';
-import { useSonifying } from './SoundEffects';
 
 /** One section of the floating panel: unboxed, as in the demo, so only its heading and spacing set it apart. */
 export const panel = 'min-w-0';
@@ -50,9 +49,8 @@ export function LandingTime() {
   const { landingUtc, slipDays, set, playing, speedHPerS, playOffsetH, setPlay } = useApp();
   const slipId = useId();
   const lapse = playing || playOffsetH > 0;
-  const sonifying = useSonifying();
   const track = useSunTrack(lapse);
-  // The share of the Sun's disc above the site's horizon at the time-lapse's moment: what the tone follows, on screen.
+  // The share of the Sun's disc above the site's horizon at the time-lapse's moment, shown beside Play.
   const sunNow = track ? sunAt(track, Date.parse(landingUtc) + slipDays * DAY_MS + playOffsetH * HOUR_MS) : Number.NaN;
 
   return (
@@ -119,7 +117,6 @@ export function LandingTime() {
           <div className="h-1.5 overflow-hidden rounded-pill bg-panel-sunk" aria-hidden="true">
             <div className="h-full rounded-pill bg-sun" style={{ width: `${Math.round(sunNow * 100)}%` }} />
           </div>
-          {sonifying && <p className="text-xs text-quiet">{t('time.heard')}</p>}
         </div>
       )}
       <p className="text-xs text-quiet">

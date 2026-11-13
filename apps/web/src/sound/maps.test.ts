@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  droneLevel,
-  HOME_CHORD,
-  OPENING_CHORD,
-  pullBackShape,
-  SUN_TONE_LOW_HZ,
-  sunAt,
-  sunTone,
-  VERDICT_NOTES,
-  whooshShape,
-} from './maps';
+import { droneLevel, HOME_CHORD, OPENING_CHORD, pullBackShape, sunAt, VERDICT_NOTES, whooshShape } from './maps';
 
 /** A note name such as G#5 as its pitch in Hz (A4 = 440 Hz, equal temperament). */
 function hz(note: string): number {
@@ -18,33 +8,6 @@ function hz(note: string): number {
   const semitone = { C: -9, D: -7, E: -5, F: -4, G: -2, A: 0, B: 2 }[m[1] as 'C'] + (m[2] ? 1 : 0);
   return 440 * 2 ** ((semitone + 12 * (Number(m[3]) - 4)) / 12);
 }
-
-describe('the sunlight tone', () => {
-  it('runs two octaves, from G3 in the dark to G5 in full Sun, getting louder as it rises', () => {
-    expect(sunTone(0).hz).toBeCloseTo(SUN_TONE_LOW_HZ, 9);
-    expect(sunTone(0).hz).toBeCloseTo(hz('G3'), 0);
-    expect(sunTone(1).hz).toBeCloseTo(hz('G5'), 0);
-    expect(sunTone(0.5).hz).toBeCloseTo(hz('G4'), 0);
-    expect(sunTone(1).db).toBeGreaterThan(sunTone(0).db);
-  });
-
-  it('only ever rises as more of the Sun shows, and never gets loud', () => {
-    let last = sunTone(0);
-    for (let f = 0.05; f <= 1.0001; f += 0.05) {
-      const now = sunTone(f);
-      expect(now.hz).toBeGreaterThan(last.hz);
-      expect(now.db).toBeGreaterThan(last.db);
-      expect(now.db).toBeLessThanOrEqual(-18);
-      last = now;
-    }
-  });
-
-  it('treats a reading outside 0 to 1, or none at all, as the nearest it can be', () => {
-    expect(sunTone(1.4)).toEqual(sunTone(1));
-    expect(sunTone(-0.2)).toEqual(sunTone(0));
-    expect(sunTone(Number.NaN)).toEqual(sunTone(0));
-  });
-});
 
 describe('reading the sunlight at a moment', () => {
   // Three hours of a stay series at 20-minute steps: the Sun rises from 0 to the whole disc and stays up.
@@ -63,12 +26,6 @@ describe('reading the sunlight at a moment', () => {
     expect(sunAt(series, t0 - 1)).toBeNaN();
     expect(sunAt(series, t0 + 10 * step)).toBeNaN();
     expect(sunAt({ tUtcMs: new Float64Array(), sun: new Float32Array() }, t0)).toBeNaN();
-  });
-
-  it('turns a sunrise into a rising tone', () => {
-    const tones = [0, 1, 2, 3, 4].map((i) => sunTone(sunAt(series, t0 + i * step)).hz);
-    for (let i = 1; i < tones.length; i++) expect(tones[i]).toBeGreaterThanOrEqual(tones[i - 1]);
-    expect(tones[4]).toBeCloseTo(4 * tones[0], 6);
   });
 });
 
