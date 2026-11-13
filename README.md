@@ -14,6 +14,8 @@ corepack pnpm dev         # http://localhost:5173
 corepack pnpm test
 ```
 
+The app's data (textures, terrain, ephemeris tables, the 10 m slope terrain) comes from the project's R2 bucket, so a fresh clone runs with no setup: `corepack pnpm install`, then `corepack pnpm --filter @siteline/web dev`. The ephemeris and Mars steps above are only needed to rebuild that data locally; to use a local pipeline instead of R2, put `DATA_BASE_URL=local` in `apps/web/.env.local`.
+
 ## Deploy
 
 The site is on Cloudflare Pages at https://siteline-a1a.pages.dev. Cloudflare builds `main` from GitHub on every merge (`pnpm --filter @siteline/web build`, published from `apps/web/dist`), and gives every other branch a preview of its own.
