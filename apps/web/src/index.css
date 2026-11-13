@@ -492,10 +492,18 @@ body {
 
 /* The panel is a stack of floating glass cards: each direct child is one, with the 3D view showing through. They
    float in once the app has opened, then drift a few pixels, each on its own beat, and hold still the moment the
-   pointer or the keyboard is in the panel, or something is open to read. */
+   pointer or the keyboard is in the panel, or something is open to read.
+   Only the cards take the pointer. The column's empty space (all of it on the solar system, whose worlds carry their
+   cards in the scene) belongs to the 3D view under it, so a drag there still turns the view. A panel too tall for the
+   window (`data-scrolls`, set in App.tsx) takes the pointer back, for its scrollbar. */
 .hud {
+  pointer-events: none;
   scrollbar-width: thin;
   scrollbar-color: var(--color-line-hover) transparent;
+}
+.hud > *,
+.hud[data-scrolls] {
+  pointer-events: auto;
 }
 .hud > * {
   padding: 16px;
