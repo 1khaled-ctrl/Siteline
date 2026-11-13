@@ -18,5 +18,13 @@ const shortDateTime = new Intl.DateTimeFormat(LOCALE, {
 /** Day, month and time without the year, for a narrow table cell. */
 export const formatUtcShort = (iso: string): string => shortDateTime.format(new Date(iso));
 
-export const formatNumber = (value: number, maximumFractionDigits = 1): string =>
-  new Intl.NumberFormat(LOCALE, { maximumFractionDigits }).format(value);
+// Building an Intl.NumberFormat costs far more than using one, and the time-lapse formats numbers on every frame.
+const numberFormats = new Map<number, Intl.NumberFormat>();
+export const formatNumber = (value: number, maximumFractionDigits = 1): string => {
+  let format = numberFormats.get(maximumFractionDigits);
+  if (!format) {
+    format = new Intl.NumberFormat(LOCALE, { maximumFractionDigits });
+    numberFormats.set(maximumFractionDigits, format);
+  }
+  return format.format(value);
+};

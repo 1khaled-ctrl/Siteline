@@ -29,7 +29,8 @@ export function OrbitDial() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
   const pins = useApp((s) => s.pins);
-  const playOffsetH = useApp((s) => s.playOffsetH);
+  // Only the whole hour it shows, so the time-lapse re-renders the dial once an hour rather than every frame.
+  const hours = useApp((s) => Math.round(s.playOffsetH));
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
   const world = useStage((s) => s.dialWorld);
@@ -56,7 +57,7 @@ export function OrbitDial() {
       useStage.getState().solar?.highlight(next === 'sun' ? null : next);
     } else if (mode === 'time') {
       const { setPlay } = useApp.getState();
-      const next = playOffsetH + n * (fast ? 24 : 1);
+      const next = useApp.getState().playOffsetH + n * (fast ? 24 : 1);
       setPlay({ playing: false, playOffsetH: ((next % LOOP_HOURS) + LOOP_HOURS) % LOOP_HOURS });
     } else {
       const here = pins.findIndex((p) => samePin(p, { latDeg, lonDeg }));
@@ -111,7 +112,6 @@ export function OrbitDial() {
     setAngle((v) => Math.round(v / STEP_DEG) * STEP_DEG);
   };
 
-  const hours = Math.round(playOffsetH);
   const value =
     mode === 'worlds'
       ? t(`bodies.${world}`)

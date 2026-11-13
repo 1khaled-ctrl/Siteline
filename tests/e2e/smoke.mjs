@@ -204,7 +204,9 @@ await page.getByRole('button', { name: '❚❚ Pause' }).click();
 if (shots) await page.screenshot({ path: `${shots}-layers.png` });
 
 // A lander in the polar region opens the landing-site check there, and a shared link opens a lander's card.
+// The Moon crumb opens a menu of the Moon's landing sites; its first item goes back to the whole Moon.
 await page.getByRole('navigation').getByRole('button', { name: 'Moon' }).click();
+await page.getByRole('menuitem', { name: 'Whole Moon' }).click();
 await page.waitForSelector('[data-testid="globe-map"] canvas', { timeout: 60_000 });
 await page.getByTestId('side-landers').click();
 await page.getByTestId('mission-im2').click();

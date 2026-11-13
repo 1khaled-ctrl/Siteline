@@ -1,5 +1,5 @@
 /**
- * SiteLine's sound: a few short, quiet sounds that confirm and inform, and the sunlight sonification. Nothing plays until
+ * SiteLine's sound: a few short, quiet sounds that confirm and inform. Nothing plays until
  * a tap or a key press lets the page make sound (browsers allow none before), the M key or the header's button mutes it
  * all at once, and every sound sits beside something visible, never instead of it.
  *
@@ -114,22 +114,17 @@ export const sound = {
     glint: (inS: number) => use((e) => e.introGlint(inS)),
     reveal: (kind: Reveal) => use((e) => e.introReveal(kind)),
   },
-  /** The sunlight sonification: the share of the Sun's disc above the site's horizon, as pitch and loudness. */
-  sonify: {
-    /** `atMs` is the moment the reading is for, kept for checking. */
-    set: (fraction: number, atMs?: number) => use((e) => e.sonifySet(fraction, atMs)),
-    stop: () => use((e) => e.sonifyStop()),
-  },
 };
 
-// For checking in development: what has played, and what the sunlight tone is doing. Not in the built app.
+// For checking in development: what has played, and the running engine itself. Not in the built app.
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as Window & { __sitelineSound?: unknown }).__sitelineSound = {
     context: () => context?.state ?? 'none',
+    engine: () => engine,
     state: () => useSound.getState(),
     report: async () => {
       const e = await engine;
-      return e ? { ...e.played, verdict: [...e.played.verdict], sonify: e.sonifyNow() } : null;
+      return e ? { ...e.played, verdict: [...e.played.verdict] } : null;
     },
   };
 }
@@ -141,8 +136,10 @@ function typing(target: EventTarget | null): boolean {
 }
 
 if (typeof window !== 'undefined') {
-  // A touch only counts as a gesture as the finger lifts, so try again then, and on clicks and key presses.
-  for (const type of ['pointerdown', 'pointerup', 'click'] as const) window.addEventListener(type, unlockSound, true);
+  // As the pointer lifts, on clicks and on key presses, not as it goes down: starting the audio device can hold the page
+  // for half a second (on Windows), and at the start of a drag that froze the 3D view. A touch only counts as a gesture
+  // as the finger lifts anyway.
+  for (const type of ['pointerup', 'click'] as const) window.addEventListener(type, unlockSound, true);
   window.addEventListener(
     'keydown',
     (e) => {

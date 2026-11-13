@@ -267,7 +267,6 @@
     "more": "The same list is CREDITS.md in the project, and each panel names its own sources too.",
     "soundHeading": "Sound",
     "sound": {
-      "sonification": "The time-lapse is sonified. As it plays over the Moon, a tone follows the share of the Sun's disc above the selected site's horizon: the same number the stay check works out from the DE440 ephemeris and the LOLA terrain, read at each moment of the time-lapse. Its pitch rises from {{lowHz}} Hz in the dark to {{highHz}} Hz in full Sun, evenly by ear, and it grows louder as more of the Sun shows. It is the idea behind NASA's own data sonifications, such as the Chandra X-ray Center's and the radio sounds of Juno's Waves instrument.",
       "cues": "A few short sounds go with what you see, never instead of it: a rising major third when a site passes, one soft note while it is not decided yet, and a single low note when it fails; air for each camera flight, longer and brighter the faster the camera moves; on the way back out to the solar system, air that falls away as the worlds recede, then the opening's chord an octave lower as the whole system comes into view; a very quiet tick for each click of the phone's dial; and a small chime when the copilot answers.",
       "control": "Browsers allow no sound until you tap or press a key, so once everything has loaded the opening asks for one tap to enter, and plays its sound with it. The speaker button in the header, or the M key, turns every sound off or on at once, and the choice is remembered in this browser.",
       "opening": "The opening has its own sound, made to follow the picture: a low hum that builds with the loading, a glint each time the light catches the turning emblem, then air as it rushes past, a quick glide as the shooting star streaks off, a soft chord as its gold ring opens into the Earth’s orbit, and a small ping as the lander reaches the Moon."
@@ -292,8 +291,7 @@
     "speedOption": "{{hours}} h per second",
     "lightingLanding": "The 3D view is lit for the landing time.",
     "lightingAt": "The 3D view is lit for {{days}} days after landing.",
-    "sunNow": "Sun above the site's horizon",
-    "heard": "You are hearing this: the tone's pitch and loudness follow it."
+    "sunNow": "Sun above the site's horizon"
   },
   "worlds": {
     "heading": "Worlds",

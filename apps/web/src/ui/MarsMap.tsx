@@ -2,7 +2,7 @@ import { findFeature, type MarsFeature, MarsView, marsRoutes } from '@siteline/e
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MISSIONS, PINNED } from '../landers';
-import { physics, URLS, useLightingUtcMs } from '../physics';
+import { followLighting, physics, URLS } from '../physics';
 import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
@@ -39,7 +39,6 @@ export function MarsMap() {
   const [notFound, setNotFound] = useState(false);
   const place = useApp((s) => s.marsPlace);
   const command = useApp((s) => s.marsCommand);
-  const lightingUtcMs = useLightingUtcMs();
   const shownMs = useShownUtcMs();
   const { tracks } = useLanderFiles();
   const load = useLoad();
@@ -84,16 +83,14 @@ export function MarsMap() {
       useApp.getState().setMarsPlace(globe.describe(place.latDeg, place.lonDeg));
   }, [globe, heightsReady, place]);
 
+  // The light follows the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {
     if (!globe || !realLight) return;
-    let live = true;
-    physics.marsSun(lightingUtcMs, URLS.data).then((p) => {
-      if (live) globe.setSubsolar(p.latDeg, p.lonDeg);
-    });
-    return () => {
-      live = false;
-    };
-  }, [globe, realLight, lightingUtcMs]);
+    return followLighting(
+      (tUtcMs) => physics.marsSun(tUtcMs, URLS.data),
+      (p) => globe.setSubsolar(p.latDeg, p.lonDeg),
+    );
+  }, [globe, realLight]);
 
   // The breadcrumbs and the panel ask the camera to move.
   useEffect(() => {
