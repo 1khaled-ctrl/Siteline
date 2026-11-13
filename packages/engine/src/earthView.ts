@@ -15,7 +15,16 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
-import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
+import {
+  discToScreen,
+  fitCamera,
+  type Insets,
+  LookOffset,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+  toScreen,
+} from './screen';
 
 export type EarthStyle = 'map' | 'satellite' | 'night';
 
@@ -374,6 +383,16 @@ export class EarthView {
   /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
   setLook(yawRad: number, pitchRad: number): void {
     if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** Where a place on the globe is on the page; null on the far side. */
+  placeOnScreen(latDeg: number, lonDeg: number): ScreenPoint | null {
+    const dir = dirOf(latDeg, lonDeg);
+    const d = this.camera.position.length();
+    // On the near side when within the horizon angle of the camera's direction, plus a margin.
+    if (dir.dot(this.camera.position.clone().normalize()) < 1 / d + 0.01) return null;
+    this.camera.updateMatrixWorld();
+    return toScreen(dir.multiplyScalar(1.003), this.camera, this.renderer.domElement, new THREE.Vector3());
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */

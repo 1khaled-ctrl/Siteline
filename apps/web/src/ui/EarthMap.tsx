@@ -12,7 +12,7 @@ import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { CalloutLayer } from './Callouts';
-import { BodyCard, onOutline } from './SceneCards';
+import { BodyCard, EarthPlaceCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -157,6 +157,18 @@ export function EarthMap() {
                   label: t('facts.heading.Earth'),
                   children: <BodyCard body="Earth" />,
                 },
+                ...(place
+                  ? [
+                      {
+                        id: 'place',
+                        anchor: () => globe.placeOnScreen(place.latDeg, place.lonDeg),
+                        prefer: 'ne' as const,
+                        tone: 'sun' as const,
+                        label: t('callout.place'),
+                        children: <EarthPlaceCard />,
+                      },
+                    ]
+                  : []),
               ]
             : []
         }

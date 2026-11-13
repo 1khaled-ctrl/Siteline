@@ -716,7 +716,8 @@
       "slope": "Slope",
       "zone": "Near the pole"
     },
-    "flyTo": "Fly to {{name}}"
+    "flyTo": "Fly to {{name}}",
+    "place": "The place you picked"
   },
   "sheet": {
     "open": "Show the panel",

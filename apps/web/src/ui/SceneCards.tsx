@@ -108,6 +108,59 @@ export function SiteCard() {
   );
 }
 
+/** The place you clicked on Mars, beside the spot: its name, its height and where it is, as the panel words them. */
+export function MarsPlaceCard() {
+  const { t } = useTranslation();
+  const place = useApp((s) => s.marsPlace);
+  if (!place) return null;
+  const side = (v: number, positive: string, negative: string) =>
+    `${formatNumber(Math.abs(v), 2)}° ${t(v >= 0 ? positive : negative)}`;
+  return (
+    <>
+      <p className="text-[10.5px] tracking-[0.12em] text-quiet uppercase">{t('callout.place')}</p>
+      <h3 className="mt-0.5 font-display text-[15px] leading-tight">{place.feature?.name ?? t('mars.panel.open')}</h3>
+      <dl className="callout-readings mt-2">
+        <dt>{t('mars.panel.elevation')}</dt>
+        <dd>
+          {place.elevationM === undefined
+            ? t('mars.panel.elevationPending')
+            : t('mars.panel.elevationValue', { m: formatNumber(place.elevationM, 0) })}
+        </dd>
+        <dt>{t('mars.panel.coords')}</dt>
+        <dd dir="ltr">
+          {side(place.latDeg, 'mars.panel.north', 'mars.panel.south')},{' '}
+          {side(place.lonDeg, 'mars.panel.east', 'mars.panel.west')}
+        </dd>
+      </dl>
+    </>
+  );
+}
+
+/** The place you clicked on the Earth, beside the spot: its country and the nearest city. */
+export function EarthPlaceCard() {
+  const { t } = useTranslation();
+  const place = useApp((s) => s.earthPlace);
+  if (!place) return null;
+  return (
+    <>
+      <p className="text-[10.5px] tracking-[0.12em] text-quiet uppercase">{t('callout.place')}</p>
+      <h3 className="mt-0.5 font-display text-[15px] leading-tight">{place.country?.name ?? t('earth.panel.sea')}</h3>
+      {place.city && (
+        <dl className="callout-readings mt-2">
+          <dt>{t('earth.panel.nearestCity')}</dt>
+          <dd data-text>{place.city.name}</dd>
+          {place.cityDistKm !== undefined && (
+            <>
+              <dt />
+              <dd className="text-quiet">{t('earth.panel.cityAway', { km: formatNumber(place.cityDistKm, 0) })}</dd>
+            </>
+          )}
+        </dl>
+      )}
+    </>
+  );
+}
+
 /** A world's card beside its globe: three readings from its facts card, and a way to the rest of them. */
 export function BodyCard({ body }: { body: FactBody }) {
   const { t } = useTranslation();

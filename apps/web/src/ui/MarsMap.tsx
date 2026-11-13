@@ -8,7 +8,7 @@ import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
 import { CalloutLayer } from './Callouts';
 import { LanderPins } from './LanderPins';
-import { BodyCard, onOutline } from './SceneCards';
+import { BodyCard, MarsPlaceCard, onOutline } from './SceneCards';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
 import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
@@ -137,6 +137,18 @@ export function MarsMap() {
                   label: t('facts.heading.Mars'),
                   children: <BodyCard body="Mars" />,
                 },
+                ...(place
+                  ? [
+                      {
+                        id: 'place',
+                        anchor: () => globe.placeOnScreen(place.latDeg, place.lonDeg),
+                        prefer: 'ne' as const,
+                        tone: 'sun' as const,
+                        label: t('callout.place'),
+                        children: <MarsPlaceCard />,
+                      },
+                    ]
+                  : []),
               ]
             : []
         }

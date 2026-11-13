@@ -13,7 +13,15 @@ import {
   type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
-import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
+import {
+  discToScreen,
+  fitCamera,
+  type Insets,
+  LookOffset,
+  NO_INSETS,
+  type ScreenDisc,
+  type ScreenPoint,
+} from './screen';
 
 export interface MarsAssets {
   /** Optional small colour map shown while the full one loads. */
@@ -387,6 +395,14 @@ export class MarsView {
   /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
   setLook(yawRad: number, pitchRad: number): void {
     if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
+  /** Where a place on the globe is on the page; null on the far side. */
+  placeOnScreen(latDeg: number, lonDeg: number): ScreenPoint | null {
+    const p = this.project(latDeg, lonDeg);
+    if (!p) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + p.xPx, y: rect.top + p.yPx, depth: 0, visible: true };
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */

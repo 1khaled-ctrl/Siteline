@@ -1,5 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBoot } from '../boot';
 import { useStage } from '../stage';
 import { samePin, useApp } from '../store';
 import { FLYABLE, type Flyable, WORLDS, type World, worldColour } from './WorldsList';
@@ -29,6 +30,7 @@ export function OrbitDial() {
   const lonDeg = useApp((s) => s.lonDeg);
   const world = useStage((s) => s.dialWorld);
   const sheetOpen = useStage((s) => s.sheetOpen);
+  const opened = useBoot((s) => s.opened);
   const [sitesMode, setSitesMode] = useState(false);
   const mode: Mode = view === 'solar' ? 'worlds' : view === 'pole' && sitesMode && pins.length > 1 ? 'sites' : 'time';
   const [angle, setAngle] = useState(0);
@@ -120,7 +122,7 @@ export function OrbitDial() {
 
   return (
     <div
-      className={`dial-wrap pointer-events-none absolute inset-x-0 z-30 flex items-end justify-center transition-opacity duration-300 ${sheetOpen ? 'opacity-0' : 'opacity-100'}`}
+      className={`dial-wrap pointer-events-none absolute inset-x-0 z-30 flex items-end justify-center transition-[opacity,translate] duration-500 ${sheetOpen || !opened ? 'translate-y-3 opacity-0' : 'opacity-100'}`}
       data-testid="dial"
       inert={sheetOpen}
     >

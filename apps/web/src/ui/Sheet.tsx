@@ -1,6 +1,7 @@
 import { animate, motion, useDragControls, useMotionValue } from 'motion/react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBoot } from '../boot';
 import { useStage } from '../stage';
 
 /** How much of the sheet shows when it is down: its handle and the one line about the view. */
@@ -45,9 +46,18 @@ export function Sheet({ peek, label, children }: { peek: ReactNode; label: strin
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const opened = useBoot((s) => s.opened);
+  // The stop, for the size effect below to read without re-running on every stop change (go() animates those).
+  const at = useRef<Stop>('peek');
+  at.current = stop;
   useEffect(() => {
-    if (height) y.set(yOf(stop));
-  }, [height, stop, y, yOf]);
+    if (!height) return;
+    // Below the screen until the opening hands over, then up into place; after that, a new size keeps the stop.
+    if (!opened) y.set(height);
+    else if (y.get() >= height - 1 && !calm())
+      animate(y, yOf(at.current), { type: 'spring', stiffness: 260, damping: 30 });
+    else y.set(yOf(at.current));
+  }, [height, y, yOf, opened]);
   useEffect(() => () => setSheetOpen(false), [setSheetOpen]);
 
   /** Where a flick ends: the stop nearest to where the sheet would coast to. */

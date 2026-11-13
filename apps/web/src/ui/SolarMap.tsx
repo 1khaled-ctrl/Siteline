@@ -100,12 +100,25 @@ export function SolarMap() {
   useEffect(() => {
     if (!ref.current) return;
     const labels = Object.fromEntries(KEYS.map((k) => [k, t(`bodies.${k}`)])) as Record<SolarLabelKey, string>;
+    let leaving: ReturnType<typeof setTimeout> | undefined;
     const created: SolarView = new SolarView(ref.current, {
       labels,
       navigable: NAVIGABLE,
       textures: TEXTURES,
       onSelect: (body) => fly(created, body, setFlying),
-      onHover: setHovered,
+      onHover: (body) => {
+        clearTimeout(leaving);
+        if (body) {
+          setHovered(body);
+          return;
+        }
+        // Give the pointer a moment to reach the card, and keep the card while it is being read.
+        const clear = () => {
+          if (document.documentElement.dataset.reading !== undefined) leaving = setTimeout(clear, 300);
+          else setHovered(null);
+        };
+        leaving = setTimeout(clear, 450);
+      },
       onPoint: (body) => setPicked((p) => (p === body ? null : body)),
       // The opening holds the camera over the Sun and flies it out from there.
       introRingPx: INTRO_MODE === 'cinematic' && !useBoot.getState().opened ? RING_PX : undefined,
@@ -115,6 +128,7 @@ export function SolarMap() {
     track('imagery', created.texturesReady());
     track('orbits', physics.planetOrbits(URLS.data)).then((orbits) => created.setOrbits(orbits), fail);
     return () => {
+      clearTimeout(leaving);
       if (useStage.getState().solar === created) useStage.getState().setSolar(null);
       created.dispose();
       setView(null);

@@ -650,6 +650,14 @@ body {
 .tilt-wrap {
   bottom: calc(var(--peek) + 40px);
 }
+/* The phone's buttons arrive with the dial, once the opening has handed over. */
+.tilt-wrap,
+.copilot-open {
+  transition: opacity 0.5s ease 0.15s;
+}
+:root:not([data-opened]) :is(.tilt-wrap, .copilot-open) {
+  opacity: 0;
+}
 .tilt {
   color: var(--color-quiet);
 }
