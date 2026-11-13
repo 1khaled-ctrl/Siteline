@@ -1,7 +1,7 @@
 import { KM_PER_AU, PLANET_NAMES, type PlanetName, type SolarBodyKey, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { fitCamera, type Insets, NO_INSETS, type ScreenPoint, toScreen } from './screen';
+import { fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenPoint, toScreen } from './screen';
 
 /** Everything the overview draws; the Sun is fixed at the origin. */
 export type SolarLabelKey = SolarBodyKey | 'sun';
@@ -179,6 +179,7 @@ export class SolarView {
   /** True while the opening moves the camera and draws each frame itself. */
   private introDriven = false;
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly loads: Promise<void>[] = [];
   private readonly scratch = new THREE.Vector3();
   private readonly frameListeners = new Set<() => void>();
@@ -324,6 +325,11 @@ export class SolarView {
   setHiddenLabels(keys: ReadonlySet<SolarLabelKey>): void {
     this.hiddenLabels = keys;
     this.requestRender();
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
   }
 
   /** How much of the canvas the app's panels cover; the Sun moves to the middle of the rest. */
@@ -787,6 +793,7 @@ export class SolarView {
   }
 
   private draw(): void {
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     const { clientWidth: w, clientHeight: h } = this.container;
     const p = new THREE.Vector3();

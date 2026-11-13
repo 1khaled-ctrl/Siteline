@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { INTRO_MODE, RING_PX, track, useBoot } from '../boot';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useStage, useStageInsets, useWide } from '../stage';
+import { useActiveView, useStage, useStageInsets, useWide } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { type Callout, CalloutLayer } from './Callouts';
 import { ViewHint } from './ViewPills';
@@ -146,6 +146,7 @@ export function SolarMap() {
   }, [view, lightingUtcMs, ready, fail]);
 
   const insets = useStageInsets();
+  useActiveView(view);
   useEffect(() => {
     view?.setInsets(insets);
   }, [view, insets]);

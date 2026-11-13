@@ -731,5 +731,11 @@
     "tapReset": "Tap: landing",
     "modeTime": "Time",
     "modeSites": "Pinned sites"
+  },
+  "tilt": {
+    "on": "Tilt to look: on",
+    "off": "Tilt to look",
+    "denied": "Motion access was turned down; the view still drags.",
+    "none": "This phone has no motion sensor the browser can read."
   }
 }

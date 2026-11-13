@@ -22,6 +22,7 @@ import { Peek } from './ui/Peek';
 import { Sheet } from './ui/Sheet';
 import { SiteReport } from './ui/SiteReport';
 import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
+import { TiltButton } from './ui/Tilt';
 import { OfflineBanner } from './ui/ViewStatus';
 import { WorldsList } from './ui/WorldsList';
 
@@ -148,6 +149,7 @@ export function App() {
                 <PanelContent view={view} />
               </Sheet>
               <OrbitDial />
+              <TiltButton />
             </>
           )}
         </main>

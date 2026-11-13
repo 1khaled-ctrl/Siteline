@@ -22,6 +22,7 @@
 - Phones (under 1024 px) get their own layout: the 3D view fills the screen, the panel is a glass bottom sheet (drag the handle or tap it; only the handle drags, so the cards inside scroll normally), and the thumb dial sits just above it. The sheet's peek line is the view's key number: the dial's world and its two readings with Fly there, the site's verdict with its two percentages, a globe's signal time (Earth: its sunlight).
 - What the dial turns: the worlds in the solar view (default the Moon; a tap flies there); time everywhere else, an hour a click or a day a click when spun fast, through the same time-lapse offset the Play button uses (a tap goes back to the landing time); and, at the south pole with two or more pinned sites, a "Time / Pinned sites" chip switches it to stepping through the pins. On Mars and the Moon globe it could have stepped through landers instead; I chose time so the dial means the same thing on every body view.
 - On a phone the copilot button shrinks to its star and sits beside the dial.
+- Tilt to look: a button beside the dial (phones only, hidden for reduced motion) asks for motion access on the tap itself, never on load, then turns the camera up to about 6° from wherever the phone was held when tapped (20° of tilt turns the view about 4.6°), smoothed, on top of dragging. If access is refused or no sensor answers within 1.5 s, it says so for five seconds and turns itself off. The engine gained a `LookOffset` that every view applies just before it draws, so labels, pins and callouts tilt with the picture.
 
 ---
 

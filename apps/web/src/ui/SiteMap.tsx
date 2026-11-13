@@ -14,7 +14,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { COLOUR_URL, findLander, MISSIONS, patchImageUrl } from '../landers';
-import { useStageInsets } from '../stage';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
 import { LanderPins } from './LanderPins';
@@ -117,6 +117,7 @@ export function SiteMap() {
   }, [mission, meta, tracks, shownMs]);
 
   const insets = useStageInsets();
+  useActiveView(view);
   useEffect(() => {
     view?.setInsets(insets);
   }, [view, insets]);

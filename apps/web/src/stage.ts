@@ -14,6 +14,13 @@ interface StageState {
   setDialWorld: (world: SolarLabelKey) => void;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
+  /** The 3D view on screen, for what turns its camera from outside (the phone's tilt-to-look). */
+  active: Lookable | null;
+  setActive: (view: Lookable | null) => void;
+}
+
+export interface Lookable {
+  setLook(yawRad: number, pitchRad: number): void;
 }
 
 export const useStage = create<StageState>((set) => ({
@@ -25,7 +32,20 @@ export const useStage = create<StageState>((set) => ({
   setDialWorld: (dialWorld) => set({ dialWorld }),
   sheetOpen: false,
   setSheetOpen: (sheetOpen) => set({ sheetOpen }),
+  active: null,
+  setActive: (active) => set({ active }),
 }));
+
+/** Puts a 3D view on the stage while it is mounted. */
+export function useActiveView(view: Lookable | null): void {
+  useEffect(() => {
+    if (!view) return;
+    useStage.getState().setActive(view);
+    return () => {
+      if (useStage.getState().active === view) useStage.getState().setActive(null);
+    };
+  }, [view]);
+}
 
 /** True on a screen wide enough for the floating panel and the callouts in the scene (Tailwind's `lg`). */
 export function useWide(): boolean {

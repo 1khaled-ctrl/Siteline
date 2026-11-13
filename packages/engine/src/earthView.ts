@@ -15,7 +15,7 @@ import {
   parseCountries,
   sceneToLonLat,
 } from './earthData';
-import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
+import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
 
 export type EarthStyle = 'map' | 'satellite' | 'night';
 
@@ -194,6 +194,7 @@ export class EarthView {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly frameListeners = new Set<() => void>();
 
   constructor(
@@ -368,6 +369,11 @@ export class EarthView {
   /** The globe's outline on the page; null when the camera is inside it. */
   discOnScreen(): ScreenDisc | null {
     return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
@@ -599,6 +605,7 @@ export class EarthView {
     // A fixed share of the view: the marker's size follows the camera's height above the ground.
     this.marker.scale.setScalar(Math.max(0.00015, (D - 1) * 0.004));
     if (D < 1.9) void this.loadDetail();
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     for (const listener of this.frameListeners) listener();
     this.placeLabels(D);

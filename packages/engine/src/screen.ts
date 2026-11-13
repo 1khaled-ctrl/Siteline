@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 
 /** A point of a 3D view on the page, in CSS pixels from the window's top left. */
 export interface ScreenPoint {
@@ -78,4 +78,36 @@ export function discToScreen(
 export interface FrameSource {
   /** Calls `listener` after every draw; returns a function that stops it. */
   addFrameListener(listener: () => void): () => void;
+}
+
+/**
+ * A small turn of the camera on top of where its controls point it, for looking around a view as if through a window
+ * (the phone's tilt-to-look). Safe to apply before every draw: it undoes its own last turn first, so it never builds up.
+ */
+export class LookOffset {
+  private yaw = 0;
+  private pitch = 0;
+  private applied = false;
+  private readonly base = new THREE.Quaternion();
+  private readonly result = new THREE.Quaternion();
+
+  /** The turn, in radians: yaw to the left, pitch up. Returns true if it changed. */
+  set(yaw: number, pitch: number): boolean {
+    if (yaw === this.yaw && pitch === this.pitch) return false;
+    this.yaw = yaw;
+    this.pitch = pitch;
+    return true;
+  }
+
+  apply(camera: THREE.PerspectiveCamera): void {
+    if (this.applied && camera.quaternion.equals(this.result)) camera.quaternion.copy(this.base);
+    this.applied = false;
+    if (!this.yaw && !this.pitch) return;
+    this.base.copy(camera.quaternion);
+    camera.rotateY(this.yaw);
+    camera.rotateX(this.pitch);
+    camera.updateMatrixWorld();
+    this.result.copy(camera.quaternion);
+    this.applied = true;
+  }
 }

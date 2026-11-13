@@ -9,7 +9,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useStageInsets } from '../stage';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { CalloutLayer } from './Callouts';
 import { BodyCard, onOutline } from './SceneCards';
@@ -136,6 +136,7 @@ export function EarthMap() {
   };
 
   const insets = useStageInsets();
+  useActiveView(globe);
   useEffect(() => {
     globe?.setInsets(insets);
   }, [globe, insets]);

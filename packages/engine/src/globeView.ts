@@ -1,7 +1,7 @@
 import { MOON_RADIUS_M, siteFrame, unitToLatLon, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
+import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -76,6 +76,7 @@ export class GlobeView {
   private frameListener?: () => void;
 
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly frameListeners = new Set<() => void>();
 
   constructor(
@@ -171,6 +172,7 @@ export class GlobeView {
           .multiplyScalar(r0 + (r1 - r0) * e);
         this.controls.target.lerpVectors(startTarget, endTarget, e);
         this.camera.lookAt(this.controls.target);
+        this.look.apply(this.camera);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
         for (const listener of this.frameListeners) listener();
@@ -236,6 +238,7 @@ export class GlobeView {
           .multiplyScalar(r0 + (r1 - r0) * e);
         this.controls.target.lerpVectors(startTarget, origin, e);
         this.camera.lookAt(this.controls.target);
+        this.look.apply(this.camera);
         this.renderer.render(this.scene, this.camera);
         this.frameListener?.();
         for (const listener of this.frameListeners) listener();
@@ -261,6 +264,11 @@ export class GlobeView {
   /** The globe's outline on the page; null when the camera is inside it. */
   discOnScreen(): ScreenDisc | null {
     return discToScreen(R_KM, this.camera, this.renderer.domElement, new THREE.Vector3());
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
@@ -314,6 +322,7 @@ export class GlobeView {
     if (this.frame || this.flying) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      this.look.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
       this.frameListener?.();
     });

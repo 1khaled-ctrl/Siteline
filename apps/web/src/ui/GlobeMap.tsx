@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useStageInsets } from '../stage';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
 import { CalloutLayer } from './Callouts';
@@ -90,6 +90,7 @@ export function GlobeMap() {
   }, [globe, lightingUtcMs]);
 
   const insets = useStageInsets();
+  useActiveView(globe);
   useEffect(() => {
     globe?.setInsets(insets);
   }, [globe, insets]);

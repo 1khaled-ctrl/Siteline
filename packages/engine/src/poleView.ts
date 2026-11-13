@@ -10,7 +10,7 @@ import {
 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { fitCamera, type Insets, NO_INSETS, type ScreenPoint, toScreen } from './screen';
+import { fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenPoint, toScreen } from './screen';
 
 const R_KM = MOON_RADIUS_M / 1000;
 const ACCENT = 0x5aa9ff;
@@ -92,6 +92,7 @@ export class PoleView {
   private frame = 0;
 
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly frameListeners = new Set<() => void>();
 
   constructor(
@@ -234,6 +235,11 @@ export class PoleView {
     return toScreen(this.marker.position, this.camera, this.renderer.domElement, new THREE.Vector3());
   }
 
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
   setInsets(insets: Insets): void {
     this.insets = insets;
@@ -263,6 +269,7 @@ export class PoleView {
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
+      this.look.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
       for (const listener of this.frameListeners) listener();
     });

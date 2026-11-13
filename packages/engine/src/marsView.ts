@@ -13,7 +13,7 @@ import {
   type MarsNamesJson,
   parseMarsFeatures,
 } from './marsData';
-import { discToScreen, fitCamera, type Insets, NO_INSETS, type ScreenDisc } from './screen';
+import { discToScreen, fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenDisc } from './screen';
 
 export interface MarsAssets {
   /** Optional small colour map shown while the full one loads. */
@@ -156,6 +156,7 @@ export class MarsView {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly frameListeners = new Set<() => void>();
 
   constructor(
@@ -383,6 +384,11 @@ export class MarsView {
     return discToScreen(1, this.camera, this.renderer.domElement, new THREE.Vector3());
   }
 
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
+  }
+
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
   setInsets(insets: Insets): void {
     this.insets = insets;
@@ -588,6 +594,7 @@ export class MarsView {
       .addScaledVector(up, 0.6)
       .addScaledVector(right, 0.5)
       .normalize();
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     this.placeLabels(D);
     this.frameListener?.();

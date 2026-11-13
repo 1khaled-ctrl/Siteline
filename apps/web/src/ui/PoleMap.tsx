@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs, useStay } from '../physics';
 import { REGIONS } from '../regions';
-import { useStageInsets } from '../stage';
+import { useActiveView, useStageInsets } from '../stage';
 import { LAYERS, type Layer, useApp } from '../store';
 import { checksOf, verdictOf } from '../verdict';
 import { CalloutLayer } from './Callouts';
@@ -127,6 +127,7 @@ export function PoleMap() {
   }, [view, lightingUtcMs]);
 
   const insets = useStageInsets();
+  useActiveView(view);
   useEffect(() => {
     view?.setInsets(insets);
   }, [view, insets]);

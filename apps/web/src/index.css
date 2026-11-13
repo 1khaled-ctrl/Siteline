@@ -629,6 +629,17 @@ body {
     bottom: calc(var(--peek) + 40px);
   }
 }
+.tilt-wrap {
+  bottom: calc(var(--peek) + 40px);
+}
+.tilt {
+  color: var(--color-quiet);
+}
+.tilt[aria-pressed="true"] {
+  color: var(--color-sun-ink);
+  border-color: var(--color-sun);
+  box-shadow: 0 0 16px rgb(244 182 63 / 0.35);
+}
 .dial {
   border-radius: 50%;
   box-shadow:

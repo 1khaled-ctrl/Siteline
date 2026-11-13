@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MISSIONS, PINNED } from '../landers';
 import { physics, URLS, useLightingUtcMs } from '../physics';
-import { useStageInsets } from '../stage';
+import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useLanderFiles, useShownUtcMs } from '../useLanders';
 import { CalloutLayer } from './Callouts';
@@ -116,6 +116,7 @@ export function MarsMap() {
   };
 
   const insets = useStageInsets();
+  useActiveView(globe);
   useEffect(() => {
     globe?.setInsets(insets);
   }, [globe, insets]);

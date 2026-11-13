@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { lonLatToScene } from './earthData';
 import type { SurfaceLine } from './landerData';
-import { fitCamera, type Insets, NO_INSETS } from './screen';
+import { fitCamera, type Insets, LookOffset, NO_INSETS } from './screen';
 import { patchHeightM, patchSlopes, type SitePatch } from './sitePatch';
 
 export type SiteBody = 'Moon' | 'Mars';
@@ -87,6 +87,7 @@ export class SiteView implements PinHost {
   private disposed = false;
 
   private insets: Insets = NO_INSETS;
+  private readonly look = new LookOffset();
   private readonly frameListeners = new Set<() => void>();
 
   constructor(
@@ -219,6 +220,11 @@ export class SiteView implements PinHost {
   addFrameListener(listener: () => void): () => void {
     this.frameListeners.add(listener);
     return () => this.frameListeners.delete(listener);
+  }
+
+  /** Turns the camera a little on top of its controls, as the phone's tilt-to-look asks; zero for none. */
+  setLook(yawRad: number, pitchRad: number): void {
+    if (this.look.set(yawRad, pitchRad)) this.requestRender();
   }
 
   /** How much of the canvas the app's panels cover; the view centres itself in the rest. */
@@ -393,6 +399,7 @@ export class SiteView implements PinHost {
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();
     this.controls.rotateSpeed = 0.6;
+    this.look.apply(this.camera);
     this.renderer.render(this.scene, this.camera);
     this.frameListener?.();
     for (const listener of this.frameListeners) listener();
