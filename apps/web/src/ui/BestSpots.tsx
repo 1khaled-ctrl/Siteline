@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
 import { DAY_MS, physics, URLS } from '../physics';
 import { useApp } from '../store';
+import { PanelError } from './ViewStatus';
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
@@ -38,8 +39,10 @@ export function BestSpots({ region }: { region: Region }) {
       <button
         type="button"
         disabled={busy}
-        aria-label={t('best.find', { region: region.name })}
-        title={t('best.find', { region: region.name })}
+        aria-busy={busy}
+        aria-expanded={Boolean(spots || error)}
+        aria-label={spots ? t('best.close', { region: region.name }) : t('best.find', { region: region.name })}
+        title={spots ? t('best.close', { region: region.name }) : t('best.find', { region: region.name })}
         className="min-h-9 rounded-md border border-line bg-panel-raised px-2.5 text-xs hover:border-line-hover disabled:opacity-60"
         onClick={() => (spots ? setSpots(undefined) : void run())}
       >
@@ -47,7 +50,11 @@ export function BestSpots({ region }: { region: Region }) {
       </button>
       {(spots || error) && (
         <ol className="absolute inset-e-0 top-10 z-10 w-72 rounded-lg border border-line bg-panel p-2 text-sm shadow-xl">
-          {error && <li className="text-fail">{error}</li>}
+          {error && (
+            <li>
+              <PanelError title={t('status.panel.best')} reason={error} onRetry={() => void run()} />
+            </li>
+          )}
           {spots?.map((s, i) => (
             <li key={`${s.latDeg},${s.lonDeg}`}>
               <button

@@ -115,7 +115,7 @@ interface Label {
 
 /** A relief globe of Mars: MOLA heights on the mesh, shaded by slope, with IAU feature names. One scene unit is one Mars radius. */
 export class MarsView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.0004, 50);
   private readonly controls: OrbitControls;
@@ -133,6 +133,8 @@ export class MarsView {
   private readonly resize: ResizeObserver;
   private readonly textures: THREE.Texture[] = [];
   private readonly ranks: Partial<Record<'map' | 'slopes', number>> = {};
+  /** Settles once a colour map is on Mars; fails only when every colour map failed to load. */
+  readonly ready: Promise<void>;
   private readonly tmp = { camera: new THREE.Vector3(), p: new THREE.Vector3(), light: new THREE.Vector3() };
   private features: MarsFeature[] = [];
   private featureDirs: THREE.Vector3[] = [];
@@ -158,7 +160,6 @@ export class MarsView {
   ) {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x05070a);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
@@ -207,9 +208,10 @@ export class MarsView {
     container.appendChild(this.labelLayer);
     for (let i = 0; i < LABEL_POOL; i++) this.pool.push(this.makeLabel());
 
-    if (opts.assets.preview) this.loadTexture(opts.assets.preview, 'map', 0);
-    this.loadTexture(opts.assets.color, 'map', 1);
-    this.loadTexture(opts.assets.normal, 'slopes', 1);
+    const maps = [this.loadTexture(opts.assets.color, 'map', 1)];
+    if (opts.assets.preview) maps.push(this.loadTexture(opts.assets.preview, 'map', 0));
+    this.loadTexture(opts.assets.normal, 'slopes', 1).catch(() => {});
+    this.ready = Promise.any(maps);
     void this.loadHeights(opts.assets.height);
     void this.loadNames(opts.assets.names);
 
@@ -458,16 +460,24 @@ export class MarsView {
   }
 
   /** Higher `rank` wins, so a small preview never replaces a high-resolution map that arrived first. */
-  private loadTexture(url: string, uniform: 'map' | 'slopes', rank: number): void {
-    new THREE.TextureLoader().load(url, (texture) => {
-      if (this.disposed) return texture.dispose();
-      texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-      this.textures.push(texture);
-      if ((this.ranks[uniform] ?? -1) > rank) return;
-      this.ranks[uniform] = rank;
-      this.material.uniforms[uniform].value = texture;
-      if (uniform === 'slopes') this.material.uniforms.hasSlopes.value = 1;
-      this.requestRender();
+  private loadTexture(url: string, uniform: 'map' | 'slopes', rank: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      new THREE.TextureLoader().load(
+        url,
+        (texture) => {
+          resolve();
+          if (this.disposed) return texture.dispose();
+          texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+          this.textures.push(texture);
+          if ((this.ranks[uniform] ?? -1) > rank) return;
+          this.ranks[uniform] = rank;
+          this.material.uniforms[uniform].value = texture;
+          if (uniform === 'slopes') this.material.uniforms.hasSlopes.value = 1;
+          this.requestRender();
+        },
+        undefined,
+        () => reject(new Error(`${url} did not load`)),
+      );
     });
   }
 

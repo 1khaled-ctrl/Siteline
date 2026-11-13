@@ -2,9 +2,10 @@ import type { SolarBodyKey } from '@siteline/physics';
 import { useTranslation } from 'react-i18next';
 import { distancesOf, lightTimeS, type Measure, signalDelay } from '../bodyFacts';
 import { formatNumber } from '../format';
-import { usePlanetsAtHour } from '../physics';
+import { usePlanetsAtHourState } from '../physics';
 import { useApp } from '../store';
 import { panel } from './Controls';
+import { PanelError } from './ViewStatus';
 
 const WORLDS = ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'] as const;
 /** The worlds that have a view of their own to fly into. */
@@ -13,7 +14,7 @@ const FLYABLE = new Set<string>(['earth', 'moon', 'mars']);
 /** The solar-system view's panel: every world, how far it is from the Sun and how long a signal takes from Earth. */
 export function WorldsList() {
   const { t } = useTranslation();
-  const positions = usePlanetsAtHour();
+  const { positions, error, retry } = usePlanetsAtHourState();
   const commandSolar = useApp((s) => s.commandSolar);
   const none = t('worlds.none');
   const unit = (m: Measure<string>) => t(`facts.units.${m.unit}`, { n: formatNumber(m.n, m.digits) });
@@ -21,6 +22,11 @@ export function WorldsList() {
   return (
     <section className={panel} data-testid="worlds">
       <h2 className="text-2xl">{t('worlds.heading')}</h2>
+      {error && (
+        <div className="mt-3">
+          <PanelError title={t('status.panel.worlds')} reason={error} onRetry={retry} />
+        </div>
+      )}
       {/* The demo's list of worlds: one raised row each, the name at the start and the two readings at the end. */}
       <div className="mt-3 grid grid-cols-[1fr_6rem_5rem] gap-x-3 px-2.5 text-xs text-quiet" aria-hidden="true">
         <span>{t('worlds.world')}</span>

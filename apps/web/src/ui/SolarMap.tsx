@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { type MoonView, useApp } from '../store';
 import { ViewHint } from './ViewPills';
+import { useLoad, ViewStatus } from './ViewStatus';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 /** The same colour maps the Earth, Moon and Mars views use; the other planets have none, so stay a flat colour. */
@@ -44,7 +45,8 @@ export function SolarMap() {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<SolarView | null>(null);
-  const [error, setError] = useState<string>();
+  const load = useLoad();
+  const { ready, fail } = load;
   const [flying, setFlying] = useState(false);
   const lightingUtcMs = useLightingUtcMs();
   const command = useApp((s) => s.solarCommand);
@@ -61,15 +63,12 @@ export function SolarMap() {
       onSelect: (body) => fly(created, body, setFlying),
     });
     setView(created);
-    physics.planetOrbits(URLS.data).then(
-      (orbits) => created.setOrbits(orbits),
-      (e: unknown) => setError(e instanceof Error ? e.message : String(e)),
-    );
+    physics.planetOrbits(URLS.data).then((orbits) => created.setOrbits(orbits), fail);
     return () => {
       created.dispose();
       setView(null);
     };
-  }, [t]);
+  }, [t, fail]);
 
   useEffect(() => {
     if (!view || !command || command.id <= handled.current) return;
@@ -82,21 +81,24 @@ export function SolarMap() {
     let live = true;
     physics.planetsAt(lightingUtcMs, URLS.data).then(
       (positionsKm) => {
-        if (live) view.setSnapshot({ positionsKm });
+        if (!live) return;
+        view.setSnapshot({ positionsKm });
+        ready();
       },
       (e: unknown) => {
-        if (live) setError(e instanceof Error ? e.message : String(e));
+        if (live) fail(e);
       },
     );
     return () => {
       live = false;
     };
-  }, [view, lightingUtcMs]);
+  }, [view, lightingUtcMs, ready, fail]);
 
   return (
     <section className="fade-in absolute inset-0 overflow-hidden">
       <div ref={ref} className="absolute inset-0" data-testid="solar-map" />
-      <ViewHint>{error ? t('solar.error', { message: error }) : flying ? t('solar.flying') : t('solar.hint')}</ViewHint>
+      <ViewHint>{flying ? t('solar.flying') : t('solar.hint')}</ViewHint>
+      <ViewStatus view="solar" load={load} />
     </section>
   );
 }

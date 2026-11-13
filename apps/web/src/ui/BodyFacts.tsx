@@ -37,16 +37,22 @@ export function StatTile({
   children,
   text,
   edge,
+  badge,
 }: {
   label: string;
   children: ReactNode;
   text?: boolean;
   edge?: 'sun' | 'earth';
+  /** A mark at the end of the label, such as how far to trust the reading. */
+  badge?: ReactNode;
 }) {
   const edgeClass = edge === 'sun' ? 'border-s-3 border-s-sun' : edge === 'earth' ? 'border-s-3 border-s-accent' : '';
   return (
     <div className={`min-w-0 rounded-lg border border-line bg-panel-raised px-2.5 py-2 ${edgeClass}`}>
-      <dt className="text-xs text-quiet">{label}</dt>
+      <dt className="flex items-start justify-between gap-1 text-xs text-quiet">
+        <span>{label}</span>
+        {badge}
+      </dt>
       {text ? (
         <dd className="mt-0.5 text-sm" data-text>
           {children}

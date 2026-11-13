@@ -1,14 +1,20 @@
-import type { Reason, StayResult } from '@siteline/contracts';
+import type { Reason } from '@siteline/contracts';
+import { Fragment } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
-import { useStay } from '../physics';
+import { DAY_MS, useStay } from '../physics';
 import { MAX_PINS, samePin, useApp } from '../store';
+import { type Check, checksOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
+import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
 import { panel, smallButton } from './Controls';
+import { DayStripPanel } from './DayStrip';
+import { JourneyButton } from './Journey';
+import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
-
-type Check = 'yes' | 'no' | 'unknown';
+import { PanelError, Spinner } from './ViewStatus';
 
 /** The verdict's box and the check chips, tinted like the demo's pass and fail boxes. */
 const VERDICT_BOX = {
@@ -27,18 +33,6 @@ const STYLE: Record<Check, { icon: string; color: string }> = {
   unknown: { icon: '?', color: 'text-warn' },
 };
 
-function checks(r: StayResult) {
-  const has = (code: Reason['code']) => r.reasons.some((x) => x.code === code);
-  const noEphemeris = r.reasons.some((x) => x.code === 'NO_DATA' && x.detail.missing === 'ephemeris');
-  const light = (code: Reason['code']): Check => (noEphemeris ? 'unknown' : has(code) ? 'no' : 'yes');
-  return {
-    sun: light('SUN_BELOW_HORIZON'),
-    earth: light('EARTH_BELOW_HORIZON'),
-    slope: (Number.isFinite(r.slope100mDeg) ? (has('SLOPE_TOO_STEEP') ? 'no' : 'yes') : 'unknown') as Check,
-    zone: (has('OUTSIDE_ZONE') ? 'no' : 'yes') as Check,
-  };
-}
-
 function ReasonLine({ reason }: { reason: Reason }) {
   const key = reason.code === 'NO_DATA' ? `reason.NO_DATA_${reason.detail.missing}` : `reason.${reason.code}`;
   const values = {
@@ -52,18 +46,44 @@ function ReasonLine({ reason }: { reason: Reason }) {
   );
 }
 
+/** The report's shape in grey while the first check runs, so the panel does not jump when it lands. */
+function ReportSkeleton() {
+  const { t } = useTranslation();
+  const bar = 'rounded-lg bg-panel-raised motion-safe:animate-pulse';
+  return (
+    <section className={`${panel} flex flex-col gap-4`} aria-busy="true">
+      <h2 className="text-2xl">{t('report.heading')}</h2>
+      <p role="status" className="flex items-center gap-2 text-sm text-quiet">
+        <Spinner />
+        {t('report.loading')}
+      </p>
+      <div className={`h-20 ${bar}`} />
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`h-16 ${bar}`} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function SiteReport() {
   const { t } = useTranslation();
-  const { query, result, terrain, terrainError, longTerm, error, loading } = useStay();
+  const { query, result, terrain, terrainError, longTerm, error, loading, retry } = useStay();
   const pins = useApp((s) => s.pins);
   const pinned = query ? pins.some((p) => samePin(p, query.site)) : false;
 
-  if (error) return <section className={panel}>{t('report.error', { message: error })}</section>;
-  if (!result || !query) return <section className={panel}>{t('report.loading')}</section>;
+  if (error)
+    return (
+      <section className={panel}>
+        <h2 className="mb-2 text-2xl">{t('report.heading')}</h2>
+        <PanelError title={t('status.panel.report')} reason={error} onRetry={retry} />
+      </section>
+    );
+  if (!result || !query) return <ReportSkeleton />;
 
-  const c = checks(result);
-  const all = Object.values(c);
-  const verdict = all.includes('no') ? 'fail' : all.includes('unknown') ? 'undecided' : 'pass';
+  const c = checksOf(result);
+  const verdict = verdictOf(c);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -73,6 +93,15 @@ export function SiteReport() {
   ] as const;
   const pct = (v: number) => (Number.isFinite(v) ? `${formatNumber(v)}%` : '—');
   const slopeText = terrain ? t('report.needsFinerTerrain') : t('report.noTerrain');
+  const sure = { terrainM: terrain?.resolutionM, longTermM: longTerm?.resolutionM };
+  const mark = (reading: Reading) => (
+    <ConfidenceBadge level={confidenceOf(reading, sure)} terrainM={sure.terrainM} compact />
+  );
+  const terrainNote = terrain
+    ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
+    : terrainError
+      ? `${t('report.flatWarning')} (${terrainError})`
+      : t('report.offTerrain');
 
   return (
     <section className={`${panel} flex flex-col gap-4`} aria-busy={loading}>
@@ -87,14 +116,25 @@ export function SiteReport() {
             <span aria-hidden="true">{verdictStyle.icon} </span>
             {t(`report.verdict.${verdict}`)}
           </p>
-          <button
-            type="button"
-            className={smallButton}
-            disabled={!pinned && pins.length >= MAX_PINS}
-            onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
-          >
-            {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <ShareReport
+              query={query}
+              result={result}
+              terrain={terrain}
+              longTerm={longTerm}
+              checks={c}
+              verdict={verdict}
+              note={terrainNote}
+            />
+            <button
+              type="button"
+              className={smallButton}
+              disabled={!pinned && pins.length >= MAX_PINS}
+              onClick={() => useApp.getState().togglePin({ latDeg: query.site.latDeg, lonDeg: query.site.lonDeg })}
+            >
+              {pinned ? t('report.unpin') : t('report.pin', { max: MAX_PINS })}
+            </button>
+          </div>
         </div>
         <ul className="mt-2 flex flex-wrap gap-1.5">
           {(Object.keys(c) as (keyof typeof c)[]).map((k) => (
@@ -104,31 +144,53 @@ export function SiteReport() {
               <strong className="font-semibold">
                 {c[k] === 'unknown' && k === 'slope' ? slopeText : t(`report.${c[k]}`)}
               </strong>
+              {/* An unmeasured slope already says why in its own words. */}
+              {!(k === 'slope' && c[k] === 'unknown') && (
+                <>
+                  {' '}
+                  <ConfidenceBadge level={confidenceOf(k, sure)} terrainM={sure.terrainM} />
+                </>
+              )}
             </li>
           ))}
         </ul>
       </div>
 
       <dl className="grid grid-cols-2 gap-2">
-        <StatTile label={t('report.sunMin')} edge="sun">
+        <StatTile label={t('report.sunMin')} edge="sun" badge={mark('sun')}>
           {pct(result.sunFractionMin * 100)}
         </StatTile>
-        <StatTile label={t('report.earthPct')} edge="earth">
+        <StatTile label={t('report.earthPct')} edge="earth" badge={mark('earth')}>
           {pct(result.earthVisiblePct)}
         </StatTile>
-        {terrain && <StatTile label={t('report.groundHeight')}>{formatNumber(terrain.groundHeightM, 0)} m</StatTile>}
+        {terrain && (
+          <StatTile label={t('report.groundHeight')} badge={mark('height')}>
+            {formatNumber(terrain.groundHeightM, 0)} m
+          </StatTile>
+        )}
         {longTerm && (
           <>
-            <StatTile label={t('report.longTermSun')} edge="sun">
+            <StatTile label={t('report.longTermSun')} edge="sun" badge={mark('longTerm')}>
               {formatNumber(longTerm.sunPct, 0)}%
             </StatTile>
-            <StatTile label={t('report.longTermEarth')} edge="earth">
+            <StatTile label={t('report.longTermEarth')} edge="earth" badge={mark('longTerm')}>
               {formatNumber(longTerm.earthPct, 0)}%
             </StatTile>
-            <StatTile label={t('report.shadowed')}>{longTerm.shadowed ? t('report.yes') : t('report.no')}</StatTile>
+            <StatTile label={t('report.shadowed')} badge={mark('longTerm')}>
+              {longTerm.shadowed ? t('report.yes') : t('report.no')}
+            </StatTile>
           </>
         )}
       </dl>
+
+      <DayStripPanel
+        latDeg={query.site.latDeg}
+        lonDeg={query.site.lonDeg}
+        fromMs={Date.parse(query.landingUtc)}
+        toMs={Date.parse(query.landingUtc) + query.stayDays * DAY_MS}
+      />
+
+      <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
 
       {result.reasons.length > 0 && (
         <ul className="list-disc space-y-1 ps-5 text-sm">
@@ -138,14 +200,7 @@ export function SiteReport() {
         </ul>
       )}
 
-      <p className="rounded-lg border border-warn/50 bg-warn/8 p-3 text-sm text-warn">
-        <span aria-hidden="true">⚠ </span>
-        {terrain
-          ? t('report.terrainCoarse', { km: formatNumber(terrain.resolutionM / 1000) })
-          : terrainError
-            ? `${t('report.flatWarning')} (${terrainError})`
-            : t('report.offTerrain')}
-      </p>
+      <ConfidenceKey terrainM={sure.terrainM} note={terrainNote} />
 
       <div>
         <h3 className="mb-2 text-base">{t('report.events')}</h3>
@@ -163,7 +218,19 @@ export function SiteReport() {
       <Checks />
 
       <p className="text-xs text-quiet">
-        {t('report.sources')}: {[...result.sources, ...(longTerm ? [longTerm.id] : [])].join(', ')}
+        {t('report.sources')}:{' '}
+        {[...result.sources, ...(longTerm ? [longTerm.id] : [])].map((id, i) => (
+          <Fragment key={id}>
+            {i > 0 && ', '}
+            <button
+              type="button"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              onClick={() => useApp.getState().setSources(id)}
+            >
+              {id}
+            </button>
+          </Fragment>
+        ))}
       </p>
     </section>
   );

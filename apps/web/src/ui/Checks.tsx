@@ -9,13 +9,13 @@ interface SunlightRow {
 }
 
 /** The validation table the tests wrote; every number here was measured, none typed by hand. */
-export function Checks() {
+export function Checks({ open }: { open?: boolean }) {
   const { t } = useTranslation();
   const spice = validation.spice as { cases: number; worstDeg: number; toleranceDeg: number; recordedUtc: string };
   const sun = validation.sunlight as { rows: SunlightRow[]; toleranceBusseyPct: number; terrain: string };
 
   return (
-    <details className="rounded-lg border border-line p-3 text-sm">
+    <details open={open} className="rounded-lg border border-line p-3 text-sm">
       <summary className="cursor-pointer font-display text-base font-semibold">{t('checks.heading')}</summary>
       <ul className="mt-3 space-y-3">
         <li>

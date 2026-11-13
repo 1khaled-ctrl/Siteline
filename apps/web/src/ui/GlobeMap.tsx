@@ -8,6 +8,7 @@ import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
 import { LanderPins } from './LanderPins';
 import { ViewHint, ViewPills } from './ViewPills';
+import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 // The loaded terrain reaches about 76°S; anything south of this opens in the south-pole view.
@@ -33,6 +34,8 @@ export function GlobeMap() {
   const lonDeg = useApp((s) => s.lonDeg);
   const lightingUtcMs = useLightingUtcMs();
   const shownMs = useShownUtcMs();
+  const load = useLoad();
+  const { ready, fail } = load;
   useFlyToMission(
     'Moon',
     globe ? (lat, lon) => void globe.flyTo(lat, lon, LANDER_DISTANCE_KM, reducedMotion() ? 0 : 1200) : undefined,
@@ -56,11 +59,17 @@ export function GlobeMap() {
       },
     );
     setGlobe(created);
+    let live = true;
+    created.ready.then(
+      () => live && ready(),
+      (e: unknown) => live && fail(e),
+    );
     return () => {
+      live = false;
       created.dispose();
       setGlobe(null);
     };
-  }, []);
+  }, [ready, fail]);
 
   useEffect(() => {
     globe?.setSite(latDeg, lonDeg);
@@ -79,8 +88,13 @@ export function GlobeMap() {
 
   return (
     <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="globe-map" />
-      <LanderPins host={globe} missions={PINNED.Moon} tracks={undefined} atUtcMs={shownMs} />
+      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="globe-map" />
+      <LanderPins
+        host={load.state === 'ready' ? globe : null}
+        missions={PINNED.Moon}
+        tracks={undefined}
+        atUtcMs={shownMs}
+      />
       <ViewPills>
         {/* The demo's gold call to action: the way down to where the landing sites are. */}
         <button
@@ -93,6 +107,7 @@ export function GlobeMap() {
         </button>
       </ViewPills>
       <ViewHint>{t('globe.hint')}</ViewHint>
+      <ViewStatus view="globe" load={load} />
     </section>
   );
 }

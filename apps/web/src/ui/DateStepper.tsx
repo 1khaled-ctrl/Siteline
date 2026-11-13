@@ -20,7 +20,7 @@ export function DateStepper() {
   const atMs = Date.parse(landingUtc);
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="date-stepper">
+    <div className="flex flex-wrap items-center gap-1.5 max-sm:flex-nowrap" data-testid="date-stepper">
       <button
         type="button"
         dir="ltr"
@@ -41,10 +41,10 @@ export function DateStepper() {
         min="2026-01-01T00:00"
         max="2035-12-31T23:00"
         value={landingUtc.slice(0, 16)}
-        className="min-h-9 rounded-md border border-line bg-panel-raised px-2 text-[13px] text-ink"
+        className="min-h-9 min-w-0 rounded-md border border-line bg-panel-raised px-2 text-[13px] text-ink max-sm:flex-1 max-sm:px-1.5 max-sm:text-[12px]"
         onChange={(e) => setDate(Date.parse(`${e.currentTarget.value}:00Z`))}
       />
-      <span className="font-mono text-xs text-quiet">{t('header.utc')}</span>
+      <span className="font-mono text-xs text-quiet max-sm:hidden">{t('header.utc')}</span>
       <button
         type="button"
         dir="ltr"

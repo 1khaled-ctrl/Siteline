@@ -74,7 +74,7 @@ function terrainGeometry(dem: Dem, stride: number, exaggeration: number): THREE.
 }
 
 export class PoleView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(45, 1, 0.5, 6000);
   private readonly controls: OrbitControls;
@@ -102,7 +102,6 @@ export class PoleView {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(this.renderer.domElement);
 
-    this.scene.background = new THREE.Color(0x05070a);
     this.camera.position.set(0, 420, 470);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.maxPolarAngle = Math.PI * 0.49;

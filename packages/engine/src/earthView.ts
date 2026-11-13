@@ -145,7 +145,7 @@ function lines(b64: string, radius: number, material: THREE.LineBasicMaterial): 
 
 /** A map-style globe of the Earth: NASA imagery, Natural Earth borders and names, and cities and roads up close. */
 export class EarthView {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(38, 1, 0.01, 50);
   private readonly controls: OrbitControls;
@@ -165,6 +165,8 @@ export class EarthView {
   private readonly detailLines: Partial<Record<'prov' | 'roads' | 'rivers' | 'lakes' | 'coast', THREE.LineSegments>> =
     {};
   private readonly textures: Partial<Record<EarthStyle, THREE.Texture>> = {};
+  /** Settles once the map-style imagery is on the globe, or fails if it could not load. */
+  readonly ready: Promise<void>;
   private readonly labelLayer = document.createElement('div');
   private readonly labels: Label[] = [];
   private readonly cityPool: CityLabel[] = [];
@@ -196,7 +198,6 @@ export class EarthView {
   ) {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x05070a);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
@@ -244,7 +245,7 @@ export class EarthView {
     for (let i = 0; i < 110; i++) this.cityPool.push(this.makeCityLabel());
 
     this.applyStyle();
-    void this.loadTexture('map');
+    this.ready = this.loadTexture('map');
     void this.loadTexture('night');
     void this.loadCountries();
     void this.loadIds();
@@ -379,7 +380,9 @@ export class EarthView {
   private async loadTexture(style: EarthStyle): Promise<void> {
     if (this.textures[style]) return;
     const url = this.opts.assets[style];
-    const texture = await new THREE.TextureLoader().loadAsync(url);
+    const texture = await new THREE.TextureLoader().loadAsync(url).catch(() => {
+      throw new Error(`${url} did not load`);
+    });
     if (this.disposed) return texture.dispose();
     texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     this.textures[style] = texture;

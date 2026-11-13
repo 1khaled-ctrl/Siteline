@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useApp } from '../store';
 import { EarthMap } from './EarthMap';
 import { GlobeMap } from './GlobeMap';
@@ -6,6 +6,7 @@ import { MarsMap } from './MarsMap';
 import { PoleMap } from './PoleMap';
 import { SiteMap } from './SiteMap';
 import { SolarMap } from './SolarMap';
+import { RetryView } from './ViewStatus';
 
 const LOOP_HOURS = 30 * 24;
 
@@ -43,9 +44,13 @@ function CurrentView() {
  */
 export function MoonView() {
   usePlayClock();
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
   return (
-    <div className="relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
-      <CurrentView />
+    <div className="space-backdrop relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-[422px] lg:h-auto">
+      <RetryView value={retry}>
+        <CurrentView key={attempt} />
+      </RetryView>
     </div>
   );
 }

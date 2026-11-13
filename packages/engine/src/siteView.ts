@@ -23,7 +23,6 @@ const PIN_LIFT_M = 60;
 const ROUTE_LIFT_M = 80;
 const ROUTE_DOT_LIFT_M = 100;
 const DEG = Math.PI / 180;
-const BACKGROUND = 0x05070a;
 
 const VERTEX = `uniform vec3 centre; attribute vec2 patchUv;
 varying vec2 vP; varying vec3 vDir; varying vec3 vView; varying vec2 vG;
@@ -65,7 +64,7 @@ export interface SiteViewOptions {
 
 /** The terrain around one landing site, drawn from its height patch and orbitable. Distances are in kilometres. */
 export class SiteView implements PinHost {
-  private readonly renderer = new THREE.WebGLRenderer({ antialias: true });
+  private readonly renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   private readonly scene = new THREE.Scene();
   private readonly camera = new THREE.PerspectiveCamera(40, 1, 0.05, 2000);
   private readonly controls: OrbitControls;
@@ -100,7 +99,6 @@ export class SiteView implements PinHost {
 
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(BACKGROUND);
 
     this.slopeTexture = new THREE.DataTexture(
       patchSlopes(patch, this.radiusKm * 1000),

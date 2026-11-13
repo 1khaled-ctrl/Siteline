@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { physics, URLS, useLightingUtcMs } from '../physics';
 import { useApp } from '../store';
 import { ViewHint, ViewPills, viewButton } from './ViewPills';
+import { revealWhen, useLoad, ViewStatus } from './ViewStatus';
 
 const ASSETS = import.meta.env.VITE_ASSETS_URL ?? '/landfall';
 const EARTH_ASSETS: EarthAssets = {
@@ -62,6 +63,8 @@ export function EarthMap() {
   const place = useApp((s) => s.earthPlace);
   const command = useApp((s) => s.earthCommand);
   const lightingUtcMs = useLightingUtcMs();
+  const load = useLoad();
+  const { ready, fail } = load;
   const names = useMemo(
     () =>
       Object.fromEntries([
@@ -80,12 +83,18 @@ export function EarthMap() {
       onCountries: setCountries,
     });
     setGlobe(created);
+    let live = true;
+    created.ready.then(
+      () => live && ready(),
+      (e: unknown) => live && fail(e),
+    );
     return () => {
+      live = false;
       created.dispose();
       setGlobe(null);
       useApp.getState().setEarthPlace(null);
     };
-  }, [names]);
+  }, [names, ready, fail]);
 
   useEffect(() => globe?.setStyle(style), [globe, style]);
   useEffect(() => globe?.setRealLight(realLight), [globe, realLight]);
@@ -125,7 +134,7 @@ export function EarthMap() {
 
   return (
     <section className="fade-in absolute inset-0 overflow-hidden">
-      <div ref={ref} className="absolute inset-0" data-testid="earth-map" />
+      <div ref={ref} className={`absolute inset-0 ${revealWhen(load)}`} data-testid="earth-map" />
       <ViewPills wide>
         <fieldset className="flex gap-1.5">
           <legend className="sr-only">{t('earth.style')}</legend>
@@ -171,6 +180,7 @@ export function EarthMap() {
         </button>
       </ViewPills>
       <ViewHint>{t('earth.hint')}</ViewHint>
+      <ViewStatus view="earth" load={load} />
       <search className="absolute inset-e-3 top-3">
         <form onSubmit={search} className="flex flex-col items-end gap-1">
           <input

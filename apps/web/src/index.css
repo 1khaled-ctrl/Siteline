@@ -44,6 +44,40 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* The 3D views draw on transparent canvases, so every world sits on this one backdrop: a faint blue glow behind the
+   world in the middle, falling off to deep space at the edges. */
+.space-backdrop {
+  background: radial-gradient(ellipse 75% 70% at 50% 46%, #0e1932 0%, #090f20 48%, var(--color-space) 100%);
+}
+
+/* "Print or save as PDF" prints only the site report's summary card, on white, across a landscape page. */
+#print-card {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  body > :not(#print-card) {
+    display: none;
+  }
+
+  #print-card {
+    display: block;
+  }
+
+  #print-card img {
+    width: 100%;
+  }
+}
+
 /* In the base layer so a class on an element (`font-sans`, `text-sm`) still wins. */
 @layer base {
   /* Titles are set in the display face. */
@@ -90,9 +124,18 @@ body {
   animation: fade-in 700ms ease-out both;
 }
 
+/* A loading note waits a quarter second before showing, so a load from the cache never flashes it. */
+.status-in {
+  animation: fade-in 300ms ease-out 250ms both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-in {
     animation: none;
+  }
+
+  .status-in {
+    animation: fade-in 1ms linear 250ms both;
   }
 }
 

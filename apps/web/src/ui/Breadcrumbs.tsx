@@ -69,7 +69,7 @@ export function Breadcrumbs() {
           return (
             <li key={c.id} className="flex items-center gap-1">
               {i > 0 && (
-                <span aria-hidden="true" className="text-quiet/50">
+                <span aria-hidden="true" className="text-quiet">
                   ›
                 </span>
               )}

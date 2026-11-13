@@ -1,6 +1,16 @@
 {
   "app": {
-    "tagline": "Fly down to a landing site and see if you can land there."
+    "skipToPanel": "Skip to the side panel",
+    "panel": "Details for this view",
+    "tagline": {
+      "solar": "Solar system on the landing date",
+      "earth": "Earth map and places",
+      "mars": "Mars landers and places",
+      "globe": "Whole Moon, lit for the landing date",
+      "pole": "Moon south-pole landing check",
+      "siteMoon": "Moon landing site, up close",
+      "siteMars": "Mars landing site, up close"
+    }
   },
   "header": {
     "dateLabel": "Date and time (UTC)",
@@ -10,6 +20,247 @@
     "earlier": "One day earlier",
     "later": "One day later",
     "now": "Now"
+  },
+  "status": {
+    "loading": {
+      "solar": "Loading planet positions…",
+      "earth": "Loading NASA Blue Marble imagery…",
+      "mars": "Loading the Mars maps…",
+      "globe": "Loading the Moon map…",
+      "pole": "Loading NASA LOLA south-pole terrain…",
+      "site": "Loading the terrain around this site…"
+    },
+    "failed": {
+      "solar": "The planet positions didn't arrive",
+      "earth": "The Earth imagery didn't arrive",
+      "mars": "The Mars maps didn't arrive",
+      "globe": "The Moon map didn't arrive",
+      "pole": "The south-pole terrain didn't arrive",
+      "site": "The terrain around this site didn't arrive"
+    },
+    "panel": {
+      "report": "The site check couldn't run",
+      "worlds": "The planet positions didn't arrive",
+      "best": "The search couldn't run"
+    },
+    "help": "Usually a network hiccup. Check the connection and try again.",
+    "retry": "Try again",
+    "reason": "Details: {{message}}",
+    "offline": "You're offline. What has loaded still works; anything new loads once you're back."
+  },
+  "confidence": {
+    "heading": "How sure is each reading",
+    "short": {
+      "high": "high confidence",
+      "firstPass": "first pass",
+      "notMeasured": "not measured",
+      "flatHorizon": "flat horizon"
+    },
+    "why": {
+      "high": "High confidence: needs no terrain, or uses LOLA's terrain at its full {{full}} m detail.",
+      "firstPass": "First pass: worked out on the {{km}} km terrain loaded here, where narrow ridges are smoothed out. Verify with finer terrain.",
+      "notMeasured": "Not measured: needs terrain finer than {{slope}} m, or data this spot is outside of.",
+      "flatHorizon": "Flat horizon: this spot is off the loaded terrain, so hills that could hide the Sun or the Earth are left out."
+    }
+  },
+  "dayStrip": {
+    "heading": "Sun and Earth, every day {{first}}–{{last}}",
+    "sun": "Sun up, as a share of each day",
+    "earth": "Earth in view, as a share of each day",
+    "overall": "{{pct}}% overall",
+    "months": "J,F,M,A,M,J,J,A,S,O,N,D",
+    "aria": {
+      "sun": "Heat map of how much of each day the Sun is up here, one row a year from {{first}} to {{last}}: {{pct}}% of the time overall.",
+      "earth": "Heat map of how much of each day the Earth is in view here, one row a year from {{first}} to {{last}}: {{pct}}% of the time overall."
+    },
+    "day": "{{date}}: Sun up {{sun}}% of the day, Earth {{earth}}%",
+    "note": "Worked out with the stay check's own rules (at least {{pct}}% of the Sun's disc above this spot's horizon; the Earth's centre above it), every {{hours}} hours across every day the ephemeris covers. The gold outline is the stay being checked. The 19-year figures above come from a separate precomputed map over a longer span, so the two can differ a little.",
+    "working": "Working out every day the ephemeris covers…",
+    "failed": "Couldn't work out the daily strip: {{message}}"
+  },
+  "journey": {
+    "button": "Simulate the journey",
+    "title": "Journey to {{name}}",
+    "subtitle": {
+      "Moon": "From Earth to {{place}} on the Moon, landing {{date}}: the site and date of the site report.",
+      "Mars": "From Earth to {{place}} on Mars, landing {{date}}: the place picked and the date set above."
+    },
+    "caption": "Illustrative trajectory from real launch and arrival positions. Simplified, not a guidance-grade path.",
+    "working": "Working out the trajectory from the ephemeris…",
+    "failed": "Couldn't work out a trajectory: {{message}}",
+    "canvasLabel": "Map of the journey seen from above its orbit. Now: {{phase}}.",
+    "depart": {
+      "Moon": "Leaves Earth orbit",
+      "Mars": "Launch"
+    },
+    "arrive": {
+      "Moon": "Lunar orbit",
+      "Mars": "Arrival"
+    },
+    "touchdown": "Touchdown",
+    "notToScale": "Distances to scale; bodies enlarged",
+    "phaseLabel": "Now",
+    "phase": {
+      "start": {
+        "Moon": "Leaving Earth orbit (trans-lunar injection)",
+        "Mars": "Launch from Earth"
+      },
+      "cruise": {
+        "Moon": "Coasting to the Moon",
+        "Mars": "Cruising to Mars"
+      },
+      "arrived": {
+        "Moon": "In lunar orbit, before descent",
+        "Mars": "Entry, descent and landing"
+      },
+      "landed": "Landed at the site"
+    },
+    "time": "Date and time (UTC)",
+    "day": "Mission time",
+    "dayValue": "day {{n}} of {{of}}",
+    "fromEarth": "Distance from Earth",
+    "km": "{{n}} km",
+    "speed": {
+      "Moon": "Speed relative to Earth",
+      "Mars": "Speed around the Sun"
+    },
+    "kms": "{{n}} km/s",
+    "c3": "Launch energy (C3)",
+    "c3Value": "{{n}} km²/s²",
+    "launch": "Cheapest launch for this landing",
+    "arrivalSpeed": "Arrival speed relative to Mars",
+    "window": {
+      "near": "In a launch window: close to the {{ideal}} km²/s² of the ideal (Hohmann) transfer between these two orbits.",
+      "far": "Far from a launch window: the ideal (Hohmann) transfer between these orbits needs about {{ideal}} km²/s². Windows come round about every {{months}} months, when Earth and Mars line up."
+    },
+    "play": "▶ Play",
+    "pause": "❚❚ Pause",
+    "replay": "↺ Replay",
+    "scrub": "Journey time",
+    "assumptions": {
+      "Moon": "Timing modelled on Apollo 11: about {{coast}} days' coast after leaving Earth orbit, then about {{orbit}} day in lunar orbit before landing. The path is a two-body orbit around the Earth (Lambert's problem) from a parking orbit to where the ephemeris puts the Moon; the Moon's own pull and course corrections are left out. The lunar-orbit loops are drawn, not computed.",
+      "Mars": "The launch date is the one that needs the least launch energy for this landing date, searching {{min}} to {{max}} days of flight. The path is a two-body orbit around the Sun (Lambert's problem) between where the ephemeris puts Earth at launch and Mars at landing; the planets' own pulls near departure and arrival are left out."
+    }
+  },
+  "copilot": {
+    "open": "Ask SiteLine",
+    "title": "Ask SiteLine",
+    "badge": "Simple matcher, no AI yet",
+    "close": "Close",
+    "inputLabel": "Message",
+    "placeholder": "Ask about this site, or say where to go",
+    "send": "Send",
+    "thinking": "Checking…",
+    "intro": "Ask about the selected Moon landing site, open a mission, or say where to go. Try one of these:",
+    "example1": "Does this site pass?",
+    "example2": "Why does it fail?",
+    "example3": "When does the Sun set?",
+    "example4": "Fly to Mars",
+    "example5": "Show me Apollo 11",
+    "example6": "How sure is that?",
+    "readingNames": {
+      "zone": "the Artemis zone",
+      "sun": "Sun up",
+      "earth": "Earth in view",
+      "height": "ground height",
+      "longTerm": "the 19-year figures",
+      "slope": "the landing slope"
+    },
+    "confidenceLevels": {
+      "high": "High confidence: {{list}}.",
+      "firstPass": "First pass, from terrain coarser than LOLA's full detail, so worth checking with finer terrain: {{list}}.",
+      "flatHorizon": "Horizon taken as flat, as this spot is off the loaded terrain: {{list}}.",
+      "notMeasured": "Not measured yet: {{list}}."
+    },
+    "note": "Runs in your browser and understands a few kinds of request. It only reads data and moves the view: it changes nothing and calls no outside service. A Claude-powered copilot is planned.",
+    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight over 19 years?\", \"How sure is that?\").",
+    "flying": "Flying to {{place}}.",
+    "places": {
+      "solar": "the solar system",
+      "earth": "Earth",
+      "mars": "Mars",
+      "moon": "the Moon",
+      "pole": "the Moon's south pole"
+    },
+    "mission": "Opening {{name}}; its card is in the side panel.",
+    "failed": "The check couldn't run: {{message}}",
+    "site": "The site at {{place}}, landing {{date}}:",
+    "verdict": {
+      "pass": "It passes every check for the stay.",
+      "fail": "It fails on: {{failed}}.",
+      "undecided": "Nothing fails, but it isn't decided yet: {{unknown}} can't be checked with the data loaded."
+    },
+    "checkNames": {
+      "sun": "Sun up for the whole stay",
+      "earth": "Earth in view",
+      "slope": "the landing slope",
+      "zone": "the Artemis zone"
+    },
+    "firstProblem": "First problem: {{problem}}.",
+    "noProblem": "Nothing goes wrong during the stay.",
+    "sun": "The least of the Sun visible at any moment of the stay is {{pct}}%.",
+    "nextSunset": "Next sunset: {{at}}.",
+    "earth": "Earth is in view {{pct}}% of the stay.",
+    "nextEarthset": "Next earthset: {{at}}.",
+    "slopeUnknown": "The slope can't be judged yet: the rule needs terrain finer than 100 m, and the loaded LOLA terrain is {{km}} km per pixel.",
+    "slopeNoTerrain": "The slope can't be judged: this spot is outside the loaded terrain.",
+    "slope": {
+      "yes": "The ground is flatter than the slope limit.",
+      "no": "The ground is steeper than the slope limit."
+    },
+    "height": "Ground height there: {{m}} m (NASA LOLA terrain).",
+    "heightNone": "This spot is outside the loaded terrain, so there is no ground height.",
+    "longTerm": "Over the 19-year cycle: sunlight {{sun}}% of the time, Earth in view {{earth}}%.{{shadow}}",
+    "shadowed": " It never sees the Sun.",
+    "longTermNone": "This spot is outside the 19-year maps.",
+    "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}."
+  },
+  "share": {
+    "button": "Share",
+    "copy": "Copy a link to this check",
+    "image": "Download as an image (PNG)",
+    "print": "Print or save as PDF",
+    "note": "The link opens this spot, date and launch slip for anyone.",
+    "copied": "Link copied",
+    "copyByHand": "Copy this link:",
+    "saved": "Image saved",
+    "kicker": "SiteLine · Moon south-pole landing check",
+    "place": "{{lat}}° {{northSouth}}, {{lon}}° {{eastWest}}",
+    "when": "Landing {{date}} · {{days}}-day stay",
+    "slip": "launch slip of {{n}} days",
+    "footer": "Made with SiteLine for NASA Space Apps 2026 from public NASA data. A planning aid, not a mission-certified analysis.",
+    "printAlt": "Summary of the site report"
+  },
+  "sources": {
+    "open": "Sources & methods",
+    "openShort": "Sources",
+    "title": "Sources and methods",
+    "close": "Close",
+    "intro": "Every number in SiteLine is worked out from published data by code in this project; none is typed in by hand. This page brings together how each check works, how we tested it, and every dataset with its licence and link.",
+    "methodsHeading": "How the site check works",
+    "methods": {
+      "positions": "Where the Sun and the Earth are, seen from the Moon: NASA JPL's DE440 ephemeris, read with NAIF's SPICE toolkit by our pipeline into a table the app interpolates.",
+      "horizon": "What the ground hides: from each spot, the horizon is traced in every direction across NASA's LRO LOLA south-pole terrain.",
+      "sun": "Sunlight: through the {{days}}-day stay we step through time and measure how much of the Sun's disc clears that horizon. The site fails if less than {{pct}}% of the disc is up at any moment, and the moment it drops is found to the minute.",
+      "earth": "Earth in view, for talking to the lander: the same test for the Earth, counting {{rule}}.",
+      "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. The loaded terrain is too coarse to see 100 m, so the report says it needs finer terrain instead of guessing.",
+      "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
+      "longTerm": "Long-term sunlight and Earth view: maps over a 19-year cycle, computed from the same terrain by the Landfall concept demo, to be replaced by NASA's own product.",
+      "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
+      "facts": "World facts: NASA's planetary fact sheets and NAIF's gravitational parameters. Gravity and escape speed are worked out from them."
+    },
+    "earthRule": {
+      "centre": "the centre of its disc",
+      "rim": "any part of its disc",
+      "margin2deg": "its centre at least 2° above the horizon"
+    },
+    "checksHeading": "How we checked it",
+    "data": "Every dataset ({{n}})",
+    "licence": "Licence",
+    "source": "Source",
+    "fonts": "Fonts",
+    "libraries": "Libraries",
+    "more": "The same list is CREDITS.md in the project, and each panel names its own sources too."
   },
   "site": {
     "heading": "Landing site",
@@ -88,14 +339,37 @@
     "heading_one": "{{count}} pinned site",
     "heading_other": "{{count}} pinned sites",
     "site": "Site",
-    "sun": "Least Sun",
-    "earth": "Earth up",
     "verdict": "Stay",
-    "unpin": "Unpin"
+    "undecided": "Undecided",
+    "unpin": "Unpin",
+    "unpinSite": "Unpin {{site}}",
+    "open": "Check this site",
+    "intro": "Each site re-checked for the landing date and slip above. ★ marks the best value in a row.",
+    "caption": "Pinned sites side by side",
+    "slope": "Slope under {{deg}}°",
+    "firstProblem": "First problem",
+    "noProblem": "none",
+    "problem": {
+      "SUN_BELOW_HORIZON": "Sun sets",
+      "EARTH_BELOW_HORIZON": "Earth sets",
+      "SLOPE_TOO_STEEP": "Too steep",
+      "OUTSIDE_ZONE": "Outside the zone",
+      "NO_DATA_ephemeris": "Dates not covered",
+      "NO_DATA_slope": "Slope not measured"
+    },
+    "atLanding": {
+      "SUN_BELOW_HORIZON": "Sun down at landing",
+      "EARTH_BELOW_HORIZON": "Earth down at landing"
+    },
+    "bestBadge": "Best",
+    "bestValue": "(best in this row)",
+    "winner": "Best of these for this date: {{site}}.",
+    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded."
   },
   "best": {
     "button": "Best spot",
     "find": "Find the best spots in {{region}}",
+    "close": "Close the best spots in {{region}}",
     "sun": "Sun ≥ {{pct}}%",
     "none": "No spots inside the loaded terrain."
   },
@@ -154,8 +428,7 @@
     "flatWarning": "Terrain is not loaded, so the horizon is treated as flat. Hills can hide the Sun and Earth earlier than shown here.",
     "offTerrain": "This spot is outside the loaded terrain, so the horizon is treated as flat.",
     "sources": "Sources",
-    "loading": "Checking the site…",
-    "error": "Could not run the check: {{message}}"
+    "loading": "Checking the site…"
   },
   "reason": {
     "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",
@@ -195,8 +468,7 @@
   },
   "solar": {
     "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there.",
-    "flying": "Flying there…",
-    "error": "Could not load the planets: {{message}}"
+    "flying": "Flying there…"
   },
   "globe": {
     "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
@@ -267,8 +539,7 @@
   "siteView": {
     "crumb": "{{name}}, close up",
     "hint": "Drag to turn the terrain, scroll to zoom. Heights are stretched, so slopes look steeper than they are.",
-    "loading": "Loading the terrain…",
-    "failed": "Could not load the terrain around this site.",
+    "noPatch": "This site has no close-up terrain in the data.",
     "back": "Back to the globe",
     "home": "Reset view",
     "realSun": "Sunlight now",
@@ -287,9 +558,7 @@
   "map": {
     "backToGlobe": "Whole Moon",
     "display": "What the view shows",
-    "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date.",
-    "loading": "Loading south-pole terrain…",
-    "error": "Could not load the terrain: {{message}}"
+    "hint": "Click the terrain to check a spot. Drag to orbit, scroll to zoom. Heights ×{{exag}}, lit by the Sun for the landing date."
   },
   "earth": {
     "hint": "Drag to turn the Earth, scroll to zoom, click a place to name it. Zoom in for provinces, roads and cities.",

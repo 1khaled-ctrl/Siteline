@@ -18,6 +18,7 @@ import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
 import { LanderPins } from './LanderPins';
 import { hintBox, ViewPills, viewButton } from './ViewPills';
+import { useLoad, ViewStatus } from './ViewStatus';
 
 const GLD100 = 'https://wms.lroc.asu.edu/lroc/view_rdr/WAC_GLD100';
 const MEGDR = 'https://pds-geosciences.wustl.edu/missions/mgs/megdr.html';
@@ -59,7 +60,8 @@ export function SiteMap() {
   const subsolar = useSubsolar(mission?.body ?? 'Moon');
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<SiteView | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const load = useLoad();
+  const { ready, fail, restart } = load;
   const [relief, setRelief] = useState(DEFAULT_RELIEF);
   const [sunny, setSunny] = useState(false);
   const [pixels, setPixels] = useState(0);
@@ -69,26 +71,26 @@ export function SiteMap() {
     if (!ref.current || !mission || !meta || !url) return;
     let live = true;
     let created: SiteView | undefined;
-    setState('loading');
+    restart();
     readPatch(url, meta).then(
       (patch) => {
         if (!live || !ref.current) return;
         created = new SiteView(ref.current, { body: mission.body, patch, colourUrl: COLOUR_URL[mission.body] });
         setPixels(patch.width);
         setView(created);
-        setState('ready');
+        ready();
       },
-      () => live && setState('failed'),
+      (e: unknown) => live && fail(e),
     );
     return () => {
       live = false;
       created?.dispose();
       setView(null);
     };
-  }, [mission, meta]);
+  }, [mission, meta, ready, fail, restart]);
   useEffect(() => {
-    if (sites && mission && !meta) setState('failed');
-  }, [sites, mission, meta]);
+    if (sites && mission && !meta) fail(t('siteView.noPatch'));
+  }, [sites, mission, meta, fail, t]);
 
   useEffect(() => view?.setRelief(relief), [view, relief]);
   useEffect(() => view?.setSubsolar(sunny ? subsolar : undefined), [view, sunny, subsolar]);
@@ -192,10 +194,9 @@ export function SiteMap() {
             }}
           />
         </p>
-        <p className={hintBox}>
-          {state === 'loading' ? t('siteView.loading') : state === 'failed' ? t('siteView.failed') : t('siteView.hint')}
-        </p>
+        <p className={`${hintBox} max-sm:hidden`}>{t('siteView.hint')}</p>
       </div>
+      <ViewStatus view="site" load={load} />
     </section>
   );
 }
