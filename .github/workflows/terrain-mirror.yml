@@ -54,10 +54,19 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq aria2
           df -h "$RUNNER_TEMP"
-          aria2c -x 16 -s 16 -k 64M --file-allocation=none --summary-interval=60 --console-log-level=warn \
-            -d "$RUNNER_TEMP" -o terrain.tif "$SOURCE"
-          got="$(stat -c %s "$RUNNER_TEMP/terrain.tif")"
-          [ "$got" = "$SIZE" ] || { echo "::error::Downloaded $got bytes; NASA gave $SIZE."; exit 1; }
+          # Quiet, with its log in a file: aria2c's console output once ended the step with SIGPIPE (exit 141) after a
+          # complete download. Its exit status is reported, but the download is judged by the file: the full size,
+          # and no .aria2 control file, which aria2c deletes only once every piece has arrived.
+          status=0
+          aria2c -q -x 16 -s 16 -k 64M --file-allocation=none --log="$RUNNER_TEMP/aria2.log" --log-level=notice \
+            -d "$RUNNER_TEMP" -o terrain.tif "$SOURCE" || status=$?
+          got="$(stat -c %s "$RUNNER_TEMP/terrain.tif" 2>/dev/null || echo 0)"
+          echo "aria2c exited with $status; the file holds $got bytes."
+          if [ "$got" != "$SIZE" ] || [ -e "$RUNNER_TEMP/terrain.tif.aria2" ]; then
+            tail -n 40 "$RUNNER_TEMP/aria2.log" || true
+            echo "::error::The download is incomplete: $got of $SIZE bytes."
+            exit 1
+          fi
 
       - name: Upload to R2
         if: env.COPIED != '1'
