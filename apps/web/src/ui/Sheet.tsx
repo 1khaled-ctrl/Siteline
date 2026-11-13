@@ -2,10 +2,11 @@ import { animate, motion, useDragControls, useMotionValue } from 'motion/react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
-import { useStage } from '../stage';
+import { useShort, useStage } from '../stage';
 
-/** How much of the sheet shows when it is down: its handle and the one line about the view. */
+/** How much of the sheet shows when it is down: its handle and the one line about the view (less on a short screen). */
 export const PEEK_PX = 104;
+const SHORT_PEEK_PX = 76;
 
 type Stop = 'peek' | 'half' | 'open';
 const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -23,10 +24,11 @@ export function Sheet({ peek, label, children }: { peek: ReactNode; label: strin
   const y = useMotionValue(10_000);
   const drag = useDragControls();
   const setSheetOpen = useStage((s) => s.setSheetOpen);
+  const peekPx = useShort() ? SHORT_PEEK_PX : PEEK_PX;
 
   const yOf = useCallback(
-    (s: Stop) => (s === 'open' ? 0 : s === 'half' ? Math.round(height * 0.48) : Math.max(0, height - PEEK_PX)),
-    [height],
+    (s: Stop) => (s === 'open' ? 0 : s === 'half' ? Math.round(height * 0.48) : Math.max(0, height - peekPx)),
+    [height, peekPx],
   );
 
   const go = useCallback(

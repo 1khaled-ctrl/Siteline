@@ -620,8 +620,33 @@ body {
   --peek: 104px;
 }
 
-/* The phone's sheet: glass, rounded on top, its cards a shade raised inside it. */
+/* On a short screen (a phone held sideways) the sheet peeks less and the dial moves to the corner, smaller. */
+@media (max-height: 520px) {
+  :root {
+    --peek: 76px;
+  }
+  .sheet-handle {
+    padding-top: 2px;
+    padding-bottom: 6px;
+  }
+  .sheet-handle > button {
+    margin-bottom: 0;
+  }
+  .dial-wrap {
+    justify-content: flex-end;
+    padding-inline-end: 64px;
+  }
+  .dial {
+    scale: 0.78;
+    transform-origin: 50% 100%;
+  }
+}
+
+/* The phone's sheet: glass, rounded on top, its cards a shade raised inside it; on a tablet it keeps a phone's
+   width, centred. */
 .sheet {
+  max-width: 680px;
+  margin-inline: auto;
   border-radius: 20px 20px 0 0;
   border-bottom-width: 0;
   box-shadow:

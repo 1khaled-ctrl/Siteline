@@ -59,6 +59,19 @@ export function useWide(): boolean {
   return wide;
 }
 
+/** True on a screen too short for the phone layout's usual sheet and dial, such as a phone held sideways. */
+export function useShort(): boolean {
+  const [short, setShort] = useState(() => window.matchMedia(SHORT).matches);
+  useEffect(() => {
+    const query = window.matchMedia(SHORT);
+    const update = () => setShort(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  return short;
+}
+const SHORT = '(max-height: 520px)';
+
 /** The floating panel and its margin on a wide screen, as `App` lays them out (410 px plus 12 px). */
 export const PANEL_PX = 422;
 const WIDE = '(min-width: 64rem)';

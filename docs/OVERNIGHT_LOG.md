@@ -39,6 +39,7 @@
 - The dial turns worlds in the solar view, time elsewhere (the Play button's offset: an hour a click, a day when spun), or pinned sites at the pole; I chose time over landers on Mars and the Moon so it means one thing on every globe.
 - Tilt to look asks for motion access only on its tap, turns the view at most about 6°, and turns itself off if refused or if no sensor answers.
 - Compare on a phone is a deck in the table's own ranking; wide screens keep the table.
+- On a tablet the sheet keeps a phone's width, centred; on a short screen (a phone held sideways, under 520 px tall) it peeks less and the dial moves to the corner, smaller, so the 3D view keeps most of the screen.
 - The smoke test runs with reduced motion (Playwright only clicks what has stopped moving) and clicks "Fly to Earth" etc., the cards' accessible names.
 - Mid-range phone test (4× CPU throttling, software WebGL): the coin went from 30 to 60 fps and the flight from 15–20 to 30. A governor lightens effects (no blur, no drift, thinner frosting) on a device under 30 fps rather than cutting them.
 - English only, as you asked: about 50 new strings need Arabic, and the callouts and dial need an RTL pass when Arabic arrives.
