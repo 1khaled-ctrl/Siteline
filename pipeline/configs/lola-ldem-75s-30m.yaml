@@ -1,0 +1,24 @@
+# LOLA's 30 m south pole terrain: the skyline a landing site is judged against (PGDA product 90).
+# Read by apps/web/src/physics.worker.ts, by byte ranges, never downloaded whole.
+datasetId: lola-ldem-75s-30m
+what: >-
+  LRO LOLA south polar digital elevation model LDEM_75S_30MPP_ADJ, 30 m a pixel, heights in metres on the 1737.4 km
+  sphere, in LOLA's south polar stereographic grid. 30,496 x 30,496 cells covering 915 km across, about 75 degrees
+  south to the pole, tiled 512 x 512 with 7 overview levels from 30 m to 1,922 m.
+# The project's R2 mirror of NASA's file, byte for byte. NASA's own copy is linked below; its server sends no
+# cross-site reads, which is why the app reads the mirror.
+url: https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/lola/LDEM_75S_30MPP_ADJ.TIF
+bytes: 2802850273
+licence: >-
+  NASA Goddard data (PGDA). NASA content is generally not subject to copyright in the United States. The product page
+  has a "Data Usage Policy" heading with no text under it, and asks that the paper below be cited.
+citation: >-
+  Barker, M. K., Mazarico, E., Neumann, G. A., Smith, D. E., Zuber, M. T., and Head, J. W. (2023), Improved LOLA
+  elevation maps for south pole landing sites, Planetary Science Journal 4, 183, doi:10.3847/PSJ/acf3e1;
+  data doi:10.60903/gsfcpgda-lola-spole.
+links:
+  - https://pgda.gsfc.nasa.gov/products/90
+# How the app reads it: full resolution near the site, a coarse overview for the far skyline. The horizon walk
+# reaches 300 km, which at 30 m would be a 20,000 x 20,000 window.
+nearRadiusM: 6000
+farPixelM: 1000

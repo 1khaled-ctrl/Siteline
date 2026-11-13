@@ -1,5 +1,13 @@
 import type { StayQuery, StayResult } from '@siteline/contracts';
-import { type Dem, horizonFromDem, polarToUnit, polarXY, unitToLatLon } from './dem';
+import {
+  type Dem,
+  type HeightSource,
+  heightsFromDem,
+  horizonFromHeights,
+  polarToUnit,
+  polarXY,
+  unitToLatLon,
+} from './dem';
 import type { Ephemeris } from './ephemeris';
 import { siteFrame } from './frames';
 import { type StayInputs, stayTest } from './stay';
@@ -31,10 +39,13 @@ export function scoreOf(r: StayResult): number {
 export function bestSpots(
   search: BestSearch,
   query: Omit<StayQuery, 'site'>,
-  dem: Dem,
+  terrain: Dem | HeightSource,
   ephemeris: Ephemeris,
   inputs: Pick<StayInputs, 'sources' | 'stepMinutes'>,
 ): BestSpot[] {
+  // A plain grid or a windowed source: the walk reads both the same way, and a source knows its own finest cell size.
+  const heights = 'heightsM' in terrain ? heightsFromDem(terrain) : terrain;
+  const stepM = 'heightsM' in terrain ? terrain.pixM : undefined;
   const grid = search.grid ?? 9;
   const centre = polarXY(siteFrame(search.centreLatDeg, search.centreLonDeg).u);
   const halfM = (search.sizeKm * 1000) / 2;
@@ -44,7 +55,7 @@ export function bestSpots(
       const x = centre.x - halfM + (c / (grid - 1)) * 2 * halfM;
       const y = centre.y + halfM - (r / (grid - 1)) * 2 * halfM;
       const { latDeg, lonDeg } = unitToLatLon(polarToUnit(x, y));
-      const hz = horizonFromDem(dem, latDeg, lonDeg, { observerHeightM: query.observerHeightM });
+      const hz = horizonFromHeights(heights, latDeg, lonDeg, { observerHeightM: query.observerHeightM, stepM });
       if (!hz) continue;
       const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg, heightM: hz.groundHeightM };
       const result = stayTest(

@@ -402,8 +402,14 @@
     "point": "Point",
     "published": "Published",
     "ours": "SiteLine",
-    "ridgeNote": "△ Point A sits on a ridge narrower than one terrain pixel; finer terrain should close that gap.",
-    "recorded": "Recorded by the test suite on {{date}}."
+    "ridgeNote": "△ Point A sits on a ridge narrower than one terrain pixel.",
+    "recorded": "Recorded by the test suite on {{date}}.",
+    "fine": {
+      "heading": "Being checked: the same three points on NASA's 30 m terrain, which does not yet agree with the grid above.",
+      "coarse": "1.2 km",
+      "fine": "30 m",
+      "note": "The 30 m terrain resolves gentle rises within a few kilometres that the 1.2 km grid steps over, and at the pole the Sun sits so low that those rises shade a site. Which answer is right is open, so sites are judged on the 1.2 km grid, the one every published number here was checked against."
+    }
   },
   "report": {
     "heading": "Site report",
