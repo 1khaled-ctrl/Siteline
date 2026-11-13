@@ -1,0 +1,42 @@
+# NASA's MGS MOLA MEGDR global topography at 128 pixels per degree: the Mars height map's source.
+# Read by siteline_pipeline.mars_height. Plain `key: value` lines and a `files:` list, nothing deeper, so the
+# pipeline reads it without a YAML library (see config.py).
+datasetId: mola-megdr-128
+what: MGS MOLA Mission Experiment Gridded Data Record, 128 pixels per degree, 16-bit metres above the areoid
+dataSetId: MGS-M-MOLA-5-MEGDR-L3-V1.0
+productVersion: "2.0"
+bundle: urn:nasa:pds:mgs_mola_topography_derived
+collection: data_meg128
+# The project's R2 mirror of NASA's files, byte for byte. NASA's own copy is at
+# https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg128/
+baseUrl: https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/mola/megt128
+licence: >-
+  The PDS MEGDR pages state no licence of their own and the PDS4 labels carry none. NASA's media usage guidelines say
+  NASA content is generally not subject to copyright in the United States and ask that NASA be acknowledged as the
+  source.
+citation: >-
+  Smith, D. E. (producer, Goddard Space Flight Center, MOLA Team) and Hughes, M. N. (data curator, Washington
+  University in St. Louis), "MGS MOLA MEGDR", PDS Geosciences Node, NASA Planetary Data System.
+links:
+  - https://pds-geosciences.wustl.edu/missions/mgs/megdr.html
+  - https://www.nasa.gov/nasa-brand-center/images-and-media/
+# Every tile is 5632 x 11520 samples of two big-endian bytes. NASA publishes no checksums for these files, so the
+# size is what the fetch step verifies; each build's manifest records the sha256 it actually read.
+tileBytes: 129761280
+files:
+  - megt88n000hb
+  - megt88n090hb
+  - megt88n180hb
+  - megt88n270hb
+  - megt44n000hb
+  - megt44n090hb
+  - megt44n180hb
+  - megt44n270hb
+  - megt00n000hb
+  - megt00n090hb
+  - megt00n180hb
+  - megt00n270hb
+  - megt44s000hb
+  - megt44s090hb
+  - megt44s180hb
+  - megt44s270hb

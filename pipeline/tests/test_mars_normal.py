@@ -2,11 +2,11 @@ import numpy as np
 import pytest
 
 from siteline_pipeline.mars_normal import (
-    HEIGHT_PATH,
     MARS_RADIUS_M,
     decode_heights,
     decode_tilt,
     encode,
+    height_path,
     resample,
     tilt,
 )
@@ -62,9 +62,9 @@ def test_resampling_keeps_a_ramp_at_pixel_centres() -> None:
     assert np.allclose(out[0], (np.arange(4) + 0.5) / 4 * 8)
 
 
-@pytest.mark.skipif(not HEIGHT_PATH.exists(), reason="the Landfall height map is not on disk")
+@pytest.mark.skipif(not height_path().exists(), reason="no Mars height map is on disk")
 def test_olympus_mons_faces_outwards_on_every_side() -> None:
-    heights = decode_heights(read_png_rgb(HEIGHT_PATH.read_bytes()))
+    heights = decode_heights(read_png_rgb(height_path().read_bytes()))
     n_east, n_north, _ = tilt(heights)
     rows, cols = heights.shape
 
