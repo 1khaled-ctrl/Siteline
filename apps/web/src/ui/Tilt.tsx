@@ -24,6 +24,7 @@ export function TiltButton() {
   const [state, setState] = useState<State>('off');
   const [calm] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const stop = useRef<() => void>(() => {});
+  const sheetOpen = useStage((s) => s.sheetOpen);
 
   useEffect(() => () => stop.current(), []);
   // A note about why tilt is off says so for a few seconds, then gets out of the way.
@@ -84,7 +85,10 @@ export function TiltButton() {
   }
 
   return (
-    <div className="tilt-wrap pointer-events-none fixed inset-s-4 z-20 flex flex-col items-start gap-2">
+    <div
+      className={`tilt-wrap pointer-events-none fixed inset-s-4 z-20 flex flex-col items-start gap-2 transition-opacity duration-300 ${sheetOpen ? 'opacity-0' : ''}`}
+      inert={sheetOpen}
+    >
       {(state === 'denied' || state === 'none') && (
         <p role="status" className="glass pointer-events-auto max-w-56 px-3 py-2 text-xs text-quiet">
           {t(`tilt.${state}`)}

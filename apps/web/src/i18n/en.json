@@ -364,7 +364,12 @@
     "bestBadge": "Best",
     "bestValue": "(best in this row)",
     "winner": "Best of these for this date: {{site}}.",
-    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded."
+    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded.",
+    "introDeck": "Each site re-checked for the landing date and slip above, best first. Swipe a card away for the next; ★ marks the best value of a reading.",
+    "deck": "Deck of pinned sites",
+    "previous": "Previous site",
+    "next": "Next site",
+    "position": "Site {{n}} of {{of}}"
   },
   "best": {
     "button": "Best spot",
