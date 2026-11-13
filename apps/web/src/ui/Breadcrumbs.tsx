@@ -1,16 +1,33 @@
+import type { LanderBody } from '@siteline/engine';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { findLander } from '../landers';
 import { type MoonView, useApp } from '../store';
+import { SiteMenu } from './SiteMenu';
 
 interface Crumb {
   id: string;
   text: string;
   /** What clicking does; the last crumb is the current place and does not link. */
   go: () => void;
+  /** A planet crumb that also opens a menu of that planet's landing sites. */
+  menu?: LanderBody;
 }
 
 const to = (view: MoonView) => () => useApp.getState().set({ view });
+
+/** A whole planet with no lander picked: what the first item of its crumb's menu does. */
+const wholeBody = (body: LanderBody) => () => {
+  const s = useApp.getState();
+  s.selectMission(null);
+  if (body === 'Moon') {
+    s.set({ view: 'globe' });
+  } else {
+    s.set({ view: 'mars' });
+    s.setMarsPlace(null);
+    s.commandMars('home');
+  }
+};
 
 const SPRING = { type: 'spring', stiffness: 480, damping: 38 } as const;
 
@@ -46,10 +63,8 @@ export function Breadcrumbs() {
     trail.push({
       id: 'mars',
       text: t('crumbs.mars'),
-      go: () => {
-        useApp.getState().setMarsPlace(null);
-        useApp.getState().commandMars('home');
-      },
+      go: wholeBody('Mars'),
+      menu: 'Mars',
     });
     if (marsPlace?.feature) {
       trail.push({
@@ -59,13 +74,24 @@ export function Breadcrumbs() {
       });
     }
   } else if (view === 'globe' || view === 'pole') {
-    trail.push({ id: 'moon', text: t('crumbs.moon'), go: to('globe') });
+    trail.push({
+      id: 'moon',
+      text: t('crumbs.moon'),
+      go: wholeBody('Moon'),
+      menu: 'Moon',
+    });
     if (view === 'pole') trail.push({ id: 'pole', text: t('crumbs.pole'), go: to('pole') });
   }
 
   const site = view === 'site' && missionId ? findLander(missionId) : undefined;
   if (site) {
-    trail.push({ id: 'body', text: t(`crumbs.${site.body.toLowerCase()}`), go: () => useApp.getState().closeSite() });
+    trail.push({
+      // The same key as on the planet's own view, so its crumb stays put rather than sliding out and back in.
+      id: site.body.toLowerCase(),
+      text: t(`crumbs.${site.body.toLowerCase()}`),
+      go: wholeBody(site.body),
+      menu: site.body,
+    });
     trail.push({ id: 'site', text: t('siteView.crumb', { name: site.name }), go: () => {} });
   }
 
@@ -91,7 +117,9 @@ export function Breadcrumbs() {
                       ›
                     </span>
                   )}
-                  {last ? (
+                  {c.menu ? (
+                    <SiteMenu body={c.menu} text={c.text} here={last} goHome={c.go} />
+                  ) : last ? (
                     <span aria-current="page" className="relative flex min-h-8 items-center px-2">
                       <motion.span
                         layoutId="crumb-here"
