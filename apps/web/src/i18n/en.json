@@ -293,7 +293,12 @@
     "signal": "Signal from Earth",
     "au": "{{n}} AU",
     "none": "–",
-    "note": "Distances are for the date shown, from NASA JPL's DE440 ephemeris; AU is the Earth's average distance from the Sun. The signal time is how long light or radio takes to get there from Earth. Click Earth, the Moon or Mars to fly there."
+    "signalShort": "Signal",
+    "note": "The ring is a menu, not a map: the worlds are in order from the Sun but evenly spaced. Distances are for the date shown, from NASA JPL's DE440 ephemeris; AU is the Earth's average distance from the Sun. The signal time is how long light or radio takes to get there from Earth.",
+    "orbits": "Pick a world for its distance from the Sun and its signal time from Earth",
+    "pick": "Pick a world",
+    "pickToFly": "Click to fly there",
+    "fly": "Fly there"
   },
   "facts": {
     "heading": {
@@ -670,6 +675,32 @@
       "across": "across",
       "zoomFeature": "Zoom to {{name}}",
       "sources": "Heights: NASA MGS MOLA (<megdr>MEGDR</megdr>, made by the MOLA Science Team and archived by the PDS Geosciences Node at Washington University in St. Louis) through <jaanga>Jaanga’s height-map tiles</jaanga>, © 2015 Jaanga authors, <ccby>CC BY 4.0</ccby>, resampled to a coarser grid (about 21 km), so peaks and floors can read a few hundred metres off. Slope shading is computed from these heights, so it has no finer detail than they do. Colour: <sss>Solar System Scope</sss> Mars map, <ccby>CC BY 4.0</ccby>, based on NASA elevation and imagery data and recompressed; the site notes that unmapped gaps in its maps are filled with fictional terrain. Names and feature types: <gaz>IAU Gazetteer of Planetary Nomenclature</gaz> (USGS), public domain. Details in CREDITS.md."
+    }
+  },
+  "intro": {
+    "loading": "Loading SiteLine",
+    "progress": "What is loading",
+    "skip": "Skip intro",
+    "slow": "Still loading {{what}}…",
+    "task": {
+      "emblem": "the emblem",
+      "fonts": "the type",
+      "positions": "where the planets are",
+      "orbits": "the orbits",
+      "imagery": "the planets' colour maps"
+    },
+    "view": {
+      "solar": "where the planets are",
+      "earth": "NASA Blue Marble imagery",
+      "mars": "the Mars maps",
+      "globe": "the Moon map",
+      "pole": "NASA LOLA south-pole terrain",
+      "site": "the terrain around this site"
+    },
+    "state": {
+      "pending": "loading",
+      "done": "loaded",
+      "failed": "failed"
     }
   }
 }

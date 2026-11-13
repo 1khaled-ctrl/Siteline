@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useBoot } from '../boot';
 
 export type LoadState = 'loading' | 'ready' | 'failed';
 export type StatusView = 'solar' | 'earth' | 'mars' | 'globe' | 'pole' | 'site';
@@ -53,6 +54,12 @@ export function ViewStatus({ view, load }: { view: StatusView; load: Load }) {
   const { t } = useTranslation();
   const retry = useContext(RetryView);
   useRetryWhenOnline(load.state === 'failed', retry);
+  // The first view's load is one the opening waits for.
+  useEffect(() => {
+    const boot = useBoot.getState();
+    if (!boot.opened)
+      boot.setTask('view', load.state === 'loading' ? 'pending' : load.state === 'ready' ? 'done' : 'failed');
+  }, [load.state]);
   if (load.state === 'ready') return null;
   if (load.state === 'loading')
     return (

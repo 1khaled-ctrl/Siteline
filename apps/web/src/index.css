@@ -267,3 +267,157 @@ body {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
+
+/* The opening: the emblem as a coin with a milled gold edge, turning in a light that sweeps across its face. */
+.intro-field {
+  background: radial-gradient(circle at 50% 46%, #0d1a36 0%, #070c1c 42%, #03060e 100%);
+}
+.intro-coin {
+  --lit: 1;
+  transform-style: preserve-3d;
+}
+.intro-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  transform: translateZ(4px);
+  filter: brightness(var(--lit));
+  user-select: none;
+}
+.intro-back {
+  transform: rotateY(180deg) translateZ(4px);
+}
+.intro-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid #a86c06;
+}
+.intro-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.2) 50%, transparent 62%);
+  background-size: 300% 100%;
+  mix-blend-mode: screen;
+  transform: translateZ(4.5px);
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+.intro-part {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  opacity: 0;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform;
+}
+.intro-pulse {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 2px solid #feaf0a;
+  box-shadow:
+    0 0 18px #feaf0a,
+    inset 0 0 10px rgb(254 175 10 / 0.5);
+  opacity: 0;
+  pointer-events: none;
+}
+.intro-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(142 154 181 / 0.3);
+  transition:
+    background-color 0.4s,
+    box-shadow 0.4s;
+}
+.intro-dot.is-done {
+  background: #feaf0a;
+  box-shadow: 0 0 8px rgb(254 175 10 / 0.7);
+}
+.intro-dot.is-failed {
+  background: var(--color-fail);
+}
+.intro-skip {
+  background: rgb(12 19 34 / 0.6);
+  border: 1px solid var(--color-line);
+  animation: fade-in 0.6s 1.2s both;
+}
+
+/* The panel is a stack of floating glass cards: each direct child is one, with the 3D view showing through. */
+.hud {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-hover) transparent;
+}
+.hud > * {
+  border: 1px solid rgb(91 169 255 / 0.16);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(155deg, rgb(18 27 48 / 0.74), rgb(8 13 26 / 0.62));
+  backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow:
+    0 14px 40px rgb(0 0 0 / 0.45),
+    inset 0 1px 0 rgb(255 255 255 / 0.07);
+  padding: 16px;
+  animation: hud-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+.hud > *:hover {
+  border-color: rgb(91 169 255 / 0.4);
+  box-shadow:
+    0 14px 44px rgb(0 0 0 / 0.5),
+    0 0 24px rgb(91 169 255 / 0.12),
+    inset 0 1px 0 rgb(255 255 255 / 0.09);
+}
+.hud > *:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.hud > *:nth-child(3) {
+  animation-delay: 0.14s;
+}
+.hud > *:nth-child(n + 4) {
+  animation-delay: 0.21s;
+}
+@keyframes hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+/* The Worlds dial: the ring turns slowly and each world turns back, so its name stays upright. It holds still while
+   you point at it or have a world picked. */
+.orbit-spin {
+  animation: orbit-turn 120s linear infinite;
+}
+.orbit-unspin {
+  animation: orbit-turn 120s linear infinite reverse;
+}
+.orbit:hover :is(.orbit-spin, .orbit-unspin),
+.orbit:focus-within :is(.orbit-spin, .orbit-unspin),
+.orbit[data-paused] :is(.orbit-spin, .orbit-unspin) {
+  animation-play-state: paused;
+}
+@keyframes orbit-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud > *,
+  .orbit-spin,
+  .orbit-unspin {
+    animation: none;
+  }
+}

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
+import { useBoot } from './boot';
 import { findLander } from './landers';
 import { useApp, type MoonView as ViewName } from './store';
 import { BodyClock } from './ui/BodyClock';
@@ -11,6 +12,7 @@ import { Controls, LandingTime } from './ui/Controls';
 import { Copilot } from './ui/Copilot';
 import { DateStepper } from './ui/DateStepper';
 import { EarthPanel } from './ui/EarthPanel';
+import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
 import { SiteReport } from './ui/SiteReport';
@@ -58,44 +60,50 @@ function Tagline() {
 export function App() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
+  const opened = useBoot((s) => s.opened);
   return (
-    <div className="flex min-h-dvh flex-col lg:h-dvh">
-      <a
-        href="#panel"
-        className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
-      >
-        {t('app.skipToPanel')}
-      </a>
-      <header className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bar px-3.5 py-2">
-        <div className="flex flex-wrap items-baseline gap-x-2.5">
-          <h1 className="text-[21px]">SiteLine</h1>
-          <Tagline />
-        </div>
-        <Breadcrumbs />
-        {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
-        <div className="ms-auto">
-          <SourcesButton />
-        </div>
-        <div className="max-sm:w-full">
-          <DateStepper />
-        </div>
-      </header>
-      <SourcesDialog />
-      <JourneyDialog />
-      <OfflineBanner />
-      {/* On a wide screen the 3D view fills the window and the panel floats over its end; on a narrow one they stack. */}
-      <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
-        <MoonView />
-        <Copilot />
-        <aside
-          id="panel"
-          tabIndex={-1}
-          aria-label={t('app.panel')}
-          className="flex flex-col gap-5 border-t border-line bg-panel p-4 lg:absolute lg:inset-y-3 lg:inset-e-3 lg:z-10 lg:w-[410px] lg:overflow-y-auto lg:rounded-xl lg:border lg:bg-panel/95 lg:pb-6"
+    <>
+      <Intro />
+      {/* Out of reach of the keyboard and screen readers until the opening hands over. */}
+      <div className="flex min-h-dvh flex-col lg:h-dvh" inert={!opened}>
+        <a
+          href="#panel"
+          className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
         >
-          <PanelContent view={view} />
-        </aside>
-      </main>
-    </div>
+          {t('app.skipToPanel')}
+        </a>
+        <header className="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-bar px-3.5 py-2">
+          <div className="flex flex-wrap items-baseline gap-x-2.5">
+            <h1 className="text-[21px]">SiteLine</h1>
+            <Tagline />
+          </div>
+          <Breadcrumbs />
+          {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}
+          <div className="ms-auto">
+            <SourcesButton />
+          </div>
+          <div className="max-sm:w-full">
+            <DateStepper />
+          </div>
+        </header>
+        <SourcesDialog />
+        <JourneyDialog />
+        <OfflineBanner />
+        {/* On a wide screen the 3D view fills the window and the panel's cards float over its end as panes of
+          glass (`.hud` in index.css); on a narrow one they stack. */}
+        <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
+          <MoonView />
+          <Copilot />
+          <aside
+            id="panel"
+            tabIndex={-1}
+            aria-label={t('app.panel')}
+            className="hud flex flex-col gap-3 p-3 lg:absolute lg:inset-y-3 lg:inset-e-3 lg:z-10 lg:w-[410px] lg:overflow-y-auto lg:p-0 lg:pe-1"
+          >
+            <PanelContent view={view} />
+          </aside>
+        </main>
+      </div>
+    </>
   );
 }

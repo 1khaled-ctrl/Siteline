@@ -49,6 +49,7 @@ export { findFeature, MARS_RADIUS_KM, type MarsFeature, NEAR_FEATURE_KM } from '
 export { type MarsAssets, type MarsPlace, MarsView, type MarsViewOptions } from './marsView';
 export { type ModelSun, ModelView } from './modelView';
 export { type LayerColour, PoleView, type PoleViewOptions, type Region } from './poleView';
+export { fitCamera, type Insets, NO_INSETS, type ScreenPoint } from './screen';
 export {
   decodePatch,
   parseSites,
@@ -58,4 +59,10 @@ export {
   type SitesJson,
 } from './sitePatch';
 export { type PinHost, SITE_BODY_RADIUS_KM, type SiteBody, SiteView, type SiteViewOptions } from './siteView';
-export { type SolarLabelKey, type SolarSnapshot, SolarView, type SolarViewOptions } from './solarView';
+export {
+  LOOK as SOLAR_LOOK,
+  type SolarLabelKey,
+  type SolarSnapshot,
+  SolarView,
+  type SolarViewOptions,
+} from './solarView';

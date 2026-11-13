@@ -1,6 +1,7 @@
 import { KM_PER_AU, PLANET_NAMES, type PlanetName, type SolarBodyKey, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { fitCamera, type Insets, NO_INSETS, type ScreenPoint, toScreen } from './screen';
 
 /** Everything the overview draws; the Sun is fixed at the origin. */
 export type SolarLabelKey = SolarBodyKey | 'sun';
@@ -17,10 +18,15 @@ export interface SolarViewOptions {
   /** Colour maps for the bodies that have one; the rest stay a flat colour. */
   textures?: Partial<Record<SolarBodyKey, string>>;
   onSelect?: (body: SolarBodyKey) => void;
+  /**
+   * For the app's opening: hold the camera straight over the Sun, close enough that the Earth's orbit is this many
+   * pixels in radius, until `setIntroProgress` pulls it back. Without it the view opens with its own short dolly.
+   */
+  introRingPx?: number;
 }
 
 // Sizes are for looking at, not to scale: the real Sun is 109 Earths wide.
-const LOOK: Record<SolarLabelKey, { size: number; color: number }> = {
+export const LOOK: Record<SolarLabelKey, { size: number; color: number }> = {
   sun: { size: 2.4, color: 0xffd27a },
   mercury: { size: 0.42, color: 0xa8a39c },
   venus: { size: 0.62, color: 0xe6c98a },
@@ -164,6 +170,13 @@ export class SolarView {
   private readonly introFrom = new THREE.Vector3(0, 225, 322);
   private readonly introTo = new THREE.Vector3(0, 150, 215);
   private introStart = 0;
+  /** The opening's hold, as the Earth orbit's radius in pixels; null once the app has opened. */
+  private hold: number | null;
+  /** True while the opening moves the camera and draws each frame itself. */
+  private introDriven = false;
+  private insets: Insets = NO_INSETS;
+  private readonly loads: Promise<void>[] = [];
+  private readonly scratch = new THREE.Vector3();
 
   constructor(
     private readonly container: HTMLElement,
@@ -173,7 +186,9 @@ export class SolarView {
     container.appendChild(this.renderer.domElement);
 
     // Far enough back that Neptune's orbit (radius about 77) fits in the frame.
-    this.introK = this.motion.matches ? 1 : 0;
+    this.hold = opts.introRingPx ?? null;
+    this.introK = this.motion.matches || this.hold !== null ? 1 : 0;
+    if (this.hold !== null) this.driftWanted = false;
     this.camera.position.copy(this.introK ? this.introTo : this.introFrom);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.minDistance = 2;
@@ -181,6 +196,7 @@ export class SolarView {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.autoRotateSpeed = 0.12;
+    this.controls.enabled = this.hold === null;
     this.controls.addEventListener('change', () => this.requestRender());
     // Grabbing the view ends the entry dolly and the idle drift; the drift returns after a quiet while.
     this.controls.addEventListener('start', () => {
@@ -227,6 +243,8 @@ export class SolarView {
     });
     container.appendChild(this.labelLayer);
     for (const key of Object.keys(LOOK) as SolarLabelKey[]) this.addLabel(key);
+    // The names come in once the opening has handed over the camera.
+    if (this.hold !== null) this.labelLayer.style.opacity = '0';
 
     const canvas = this.renderer.domElement;
     if (!this.motion.matches) {
@@ -281,6 +299,84 @@ export class SolarView {
     const away = toScene(s.positionsKm.moon).normalize();
     this.mesh('moon').position.copy(earth).addScaledVector(away, MOON_ORBIT_SCENE);
     this.moonRing.position.copy(earth);
+    this.requestRender();
+  }
+
+  /** How much of the canvas the app's panels cover; the Sun moves to the middle of the rest. */
+  setInsets(insets: Insets): void {
+    this.insets = insets;
+    this.fit();
+  }
+
+  /** Resolves when every colour map has loaded or failed to. */
+  texturesReady(): Promise<void> {
+    return Promise.all(this.loads).then(() => undefined);
+  }
+
+  /** Where a body is on the page. */
+  projectBody(key: SolarLabelKey): ScreenPoint {
+    this.camera.updateMatrixWorld();
+    return toScreen(this.mesh(key).position, this.camera, this.renderer.domElement, this.scratch);
+  }
+
+  /**
+   * A planet's orbit as drawn, on the page: `n` points going round the Sun, the i-th the one closest to the direction
+   * −180° + 360° × i / n on screen (0° to the right, turning clockwise), so it lines up point by point with a circle.
+   */
+  projectOrbit(name: PlanetName, n: number): { x: number; y: number }[] {
+    const trail = this.trails.get(name);
+    if (!trail) return [];
+    const canvas = this.renderer.domElement;
+    const sun = this.projectBody('sun');
+    const points = trail.points.map((p) => toScreen(p, this.camera, canvas, this.scratch));
+    const angles = points.map((p) => Math.atan2(p.y - sun.y, p.x - sun.x));
+    return Array.from({ length: n }, (_, i) => {
+      const want = ((i / n) * 2 - 1) * Math.PI;
+      let best = 0;
+      let bestD = Infinity;
+      angles.forEach((a, j) => {
+        const d = Math.abs(Math.atan2(Math.sin(a - want), Math.cos(a - want)));
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+        }
+      });
+      return { x: points[best].x, y: points[best].y };
+    });
+  }
+
+  /**
+   * The opening's camera move, from straight over the Sun (`k` = 0) back and down to the usual view (`k` = 1); the
+   * caller eases `k` and calls this once a frame, and each call draws.
+   */
+  setIntroProgress(k: number): void {
+    if (this.hold === null) return;
+    this.introDriven = true;
+    const from = this.holdPose();
+    const r0 = from.length();
+    const r1 = this.introTo.length();
+    // Distance eases on a log scale, so the pull-back reads as a steady zoom; the tilt goes straight.
+    const r = r0 * (r1 / r0) ** k;
+    const phi0 = Math.acos(from.y / r0);
+    const phi = phi0 + (Math.acos(this.introTo.y / r1) - phi0) * k;
+    this.camera.position.set(0, r * Math.cos(phi), r * Math.sin(phi));
+    this.controls.target.set(0, 0, 0);
+    this.camera.lookAt(this.controls.target);
+    this.draw();
+  }
+
+  /** Ends the opening: the usual view, the names, the pointer and the idle drift. */
+  endIntro(): void {
+    if (this.hold === null) return;
+    this.hold = null;
+    this.introDriven = false;
+    this.camera.position.copy(this.introTo);
+    this.controls.target.set(0, 0, 0);
+    this.controls.enabled = true;
+    this.driftWanted = true;
+    this.labelLayer.style.transition = 'opacity 600ms ease';
+    this.labelLayer.style.opacity = '1';
+    this.controls.update();
     this.requestRender();
   }
 
@@ -359,14 +455,25 @@ export class SolarView {
     mesh.rotation.z = TILT[key] ?? 0;
     const url = key === 'sun' ? undefined : this.opts.textures?.[key];
     if (url) {
-      new THREE.TextureLoader().load(url, (map) => {
-        map.colorSpace = THREE.SRGBColorSpace;
-        this.textures.push(map);
-        material.map = map;
-        material.color.set(0xffffff);
-        material.needsUpdate = true;
-        this.requestRender();
-      });
+      this.loads.push(
+        new Promise((resolve) => {
+          new THREE.TextureLoader().load(
+            url,
+            (map) => {
+              map.colorSpace = THREE.SRGBColorSpace;
+              this.textures.push(map);
+              material.map = map;
+              material.color.set(0xffffff);
+              material.needsUpdate = true;
+              this.requestRender();
+              resolve();
+            },
+            undefined,
+            // A missing map leaves the body its flat colour, as before.
+            () => resolve(),
+          );
+        }),
+      );
     }
     // The Sun gets a breathing corona in layers; each planet a faint halo in its own colour.
     if (key === 'sun') {
@@ -636,6 +743,8 @@ export class SolarView {
       h.sprite.material.opacity = h.opacity * (0.92 + 0.1 * Math.sin(t * h.speed * 1.7 + h.phase));
     }
     if (this.starUniforms) this.starUniforms.uTime.value = t;
+    // While the opening moves the camera it also draws, once a frame.
+    if (this.introDriven) return;
     this.controls.autoRotate = this.driftWanted && this.introK >= 1;
     this.controls.update();
     this.draw();
@@ -676,12 +785,28 @@ export class SolarView {
     });
   }
 
+  /**
+   * Straight over the Sun (a hair towards the usual view, so north stays up), where the Earth's orbit is `hold` pixels
+   * in radius.
+   */
+  private holdPose(): THREE.Vector3 {
+    const earth = this.trails.get('earth');
+    const radius = earth ? earth.points.reduce((sum, p) => sum + p.length(), 0) / earth.points.length : radial(1);
+    const h = this.container.clientHeight || 1;
+    const d = (radius * h) / (2 * (this.hold ?? 1) * Math.tan((this.camera.fov * Math.PI) / 360));
+    const phi = 0.0005;
+    return new THREE.Vector3(0, d * Math.cos(phi), d * Math.sin(phi));
+  }
+
   private fit(): void {
     const { clientWidth: w, clientHeight: h } = this.container;
     if (!w || !h) return;
     this.renderer.setSize(w, h);
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    fitCamera(this.camera, w, h, this.insets);
+    if (this.hold !== null && !this.introDriven) {
+      this.camera.position.copy(this.holdPose());
+      this.camera.lookAt(this.controls.target);
+    }
     this.requestRender();
   }
 }

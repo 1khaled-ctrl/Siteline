@@ -1,3 +1,19 @@
+# Overnight log, 13 Nov 2026: the spatial redesign
+
+**Brief:** stop treating data as a panel next to the 3D view. A cinematic opening built on the SiteLine Lunar Emblem, glass cards that float in the scene and point at what they describe, and a phone layout of its own (bottom sheet, thumb dial, tilt to look, swipeable compare). Presentation only: no number, source or calculation changed.
+
+**Where it is:** branch `ui/spatial-hud`, one commit per step, not pushed. `corepack pnpm test`, `typecheck` and `lint` passed before each commit (lint's only complaints are the two workflow files' Windows line endings in this checkout, which are LF in git).
+
+## Calls I made (one line each)
+
+- The emblem source is now in the repo at `docs/brand/siteline-lunar-emblem.png` (1.4 MB, under the 5 MB rule); `apps/web/scripts/emblem.py` cuts it into the web pieces in `apps/web/src/assets` (badge 69 KB, lander, star, 64 px favicon).
+- Libraries: GSAP 3.15.0 for the opening's timeline and Motion 14.8.0 for the phone gestures, both pinned, both at least two weeks old. GSAP's licence is its own free "Standard no-charge" licence (from its package.json), not MIT; fine for a free web app. React Three Fiber is not used: the engine's plain three.js views already expose what the cards need, and a second WebGL stack would cost more than it saves.
+- The opening plays once per browser tab (sessionStorage); `?intro=1` replays it and `?intro=0` skips it. Esc or "Skip intro" also skips.
+- The opening waits on real loads (fonts, the emblem, planet positions, orbits, the planets' colour maps, the first view); at least 1.7 s so it never flashes, a "Still loading …" line after 4.5 s, and after 25 s it opens anyway so each view shows its own progress.
+- The lander flies to the Moon, not the Earth: SiteLine is about landing on the Moon.
+
+---
+
 # Overnight log, 12–13 Nov 2026
 
 **Status:** all 17 items done (Parts 1–4), each in its own commit. Tests went from 116 to 166. Time was left, so small polish items follow at the end, logged the same way.

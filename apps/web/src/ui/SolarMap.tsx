@@ -2,7 +2,9 @@ import { type SolarLabelKey, SolarView } from '@siteline/engine';
 import type { SolarBodyKey } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { INTRO_MODE, RING_PX, track, useBoot } from '../boot';
 import { physics, URLS, useLightingUtcMs } from '../physics';
+import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { ViewHint } from './ViewPills';
 import { useLoad, ViewStatus } from './ViewStatus';
@@ -61,10 +63,15 @@ export function SolarMap() {
       navigable: NAVIGABLE,
       textures: TEXTURES,
       onSelect: (body) => fly(created, body, setFlying),
+      // The opening holds the camera over the Sun and flies it out from there.
+      introRingPx: INTRO_MODE === 'cinematic' && !useBoot.getState().opened ? RING_PX : undefined,
     });
     setView(created);
-    physics.planetOrbits(URLS.data).then((orbits) => created.setOrbits(orbits), fail);
+    useStage.getState().setSolar(created);
+    track('imagery', created.texturesReady());
+    track('orbits', physics.planetOrbits(URLS.data)).then((orbits) => created.setOrbits(orbits), fail);
     return () => {
+      if (useStage.getState().solar === created) useStage.getState().setSolar(null);
       created.dispose();
       setView(null);
     };
@@ -79,7 +86,7 @@ export function SolarMap() {
   useEffect(() => {
     if (!view) return;
     let live = true;
-    physics.planetsAt(lightingUtcMs, URLS.data).then(
+    track('positions', physics.planetsAt(lightingUtcMs, URLS.data)).then(
       (positionsKm) => {
         if (!live) return;
         view.setSnapshot({ positionsKm });
