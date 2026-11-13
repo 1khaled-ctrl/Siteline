@@ -108,11 +108,11 @@ export function App() {
         </a>
         {/* The header assembles itself piece by piece as the opening hands over (`bar-in`, in order of `--i`). */}
         <MotionConfig reducedMotion="user">
-          <header className="bar relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2">
+          <header className="bar relative z-10 has-[[role=menu]]:z-40 flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2">
             <div className="bar-in" style={{ '--i': 0 } as CSSProperties}>
               <HeaderBrand />
             </div>
-            <div className="bar-in" style={{ '--i': 1 } as CSSProperties}>
+            <div className="bar-in relative has-[[role=menu]]:z-10" style={{ '--i': 1 } as CSSProperties}>
               <Breadcrumbs />
             </div>
             {/* On a phone the date gets a row of its own and the sources button stays up with the title. */}

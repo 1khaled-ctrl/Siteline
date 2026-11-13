@@ -469,7 +469,12 @@
     "moon": "Moon",
     "pole": "South pole",
     "earth": "Earth",
-    "mars": "Mars"
+    "mars": "Mars",
+    "sitesButton": "{{name}}: choose a landing site",
+    "sitesMenu": "Landing sites on the {{name}}",
+    "wholeBody": "Whole {{name}}",
+    "closeUps": "Open the close-up terrain",
+    "onGlobe": "Show on the globe (no close-up yet)"
   },
   "bodies": {
     "sun": "Sun",
