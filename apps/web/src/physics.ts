@@ -10,12 +10,11 @@ export const URLS: DataUrls = {
   data: import.meta.env.VITE_DATA_URL ?? '/data',
   terrain: `${ASSETS}/data/terrain.json`,
   maps: `${ASSETS}/data/maps.json`,
-  // LOLA's 10 m south pole terrain, for the slope. NASA's server lets no other site's page read it (no CORS), so the dev
-  // server passes the reads through (see vite.config.ts); a deployed build needs a copy that allows them, such as one
-  // in the R2 bucket, named in VITE_TERRAIN_10M_URL. Without either, the slope stays "needs finer terrain".
-  fine:
-    import.meta.env.VITE_TERRAIN_10M_URL ??
-    (import.meta.env.DEV ? '/pgda/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF' : undefined),
+  // LOLA's 10 m south pole terrain, for the slope. NASA's server lets no other site's page read it (no CORS), so the
+  // reads go through the site's own `/pgda`: the dev and preview servers' proxy (vite.config.ts), and on the deployed
+  // site a Pages Function (the repository's functions/pgda). A host without either names a copy that allows cross-site
+  // reads in VITE_TERRAIN_10M_URL; if the reads fail, the slope says it needs finer terrain.
+  fine: import.meta.env.VITE_TERRAIN_10M_URL ?? '/pgda/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF',
 };
 export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;

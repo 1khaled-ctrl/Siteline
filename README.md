@@ -14,6 +14,14 @@ corepack pnpm dev         # http://localhost:5173
 corepack pnpm test
 ```
 
+## Deploy
+
+The site is on Cloudflare Pages at https://siteline-a1a.pages.dev. Cloudflare builds `main` from GitHub on every merge (`pnpm --filter @siteline/web build`, published from `apps/web/dist`), and gives every other branch a preview of its own.
+
+- The data comes from the R2 bucket. The Pages project sets `VITE_DATA_URL` and `VITE_ASSETS_URL` to its public URL, and the bucket's CORS rule must list every address that loads it.
+- `functions/pgda` is a Pages Function that passes the slope's reads through to NASA's 10 m terrain file, as the dev server's proxy does. NASA's server allows no cross-site reads.
+- The slope reads that file's tiles from a byte-for-byte copy in R2 (`raw/lola/`, made once by the Terrain mirror workflow), named in the Pages project's `VITE_TERRAIN_10M_URL`, because NASA's server is slow from the Middle East. Without that variable it reads NASA's file through `functions/pgda`.
+
 ## What works so far
 
 - The stay test: Sun and Earth visibility from any site over the stay, a reason for every fail, the next sunset, sunrise, Earthset and Earthrise, and the launch-slip slider.

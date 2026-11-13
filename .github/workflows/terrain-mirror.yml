@@ -1,0 +1,72 @@
+name: Terrain mirror
+
+# Copies LOLA's 10 m south pole terrain (LDEM_83S_10MPP_ADJ.TIF, 5.1 GB, NASA PGDA product 90; see CREDITS.md) byte for
+# byte into the R2 bucket at raw/lola/, so the deployed site reads the slope's tiles from R2 (VITE_TERRAIN_10M_URL)
+# instead of NASA's server, which sends about 130 KB/s per connection to the Middle East. Run it once by hand; when the
+# bucket already holds a copy of the same size it does nothing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terrain-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      SOURCE: https://pgda.gsfc.nasa.gov/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF
+      KEY: raw/lola/LDEM_83S_10MPP_ADJ.TIF
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # R2 rejects the extra checksums that recent AWS CLI versions send by default.
+      AWS_REQUEST_CHECKSUM_CALCULATION: WHEN_REQUIRED
+      AWS_RESPONSE_CHECKSUM_VALIDATION: WHEN_REQUIRED
+    steps:
+      - name: R2 endpoint
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          # As in pipeline.yml: keep only the endpoint's scheme and host, and trim the pasted secrets.
+          endpoint="$(printf '%s' "${R2_ENDPOINT:-https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com}" | tr -d '[:space:]')"
+          echo "R2_URL=$(printf '%s' "$endpoint" | sed -E 's#^(https?://[^/]+).*#\1#')" >> "$GITHUB_ENV"
+          echo "BUCKET=$(printf '%s' "$R2_BUCKET" | tr -d '[:space:]')" >> "$GITHUB_ENV"
+
+      - name: Sizes at NASA and in the bucket
+        run: |
+          size="$(curl -sS -r 0-0 -D - -o /dev/null "$SOURCE" | tr -d '\r' | awk -F/ 'tolower($0) ~ /^content-range:/ {print $NF}')"
+          [ -n "$size" ] || { echo "::error::NASA's server gave no size for the file."; exit 1; }
+          echo "SIZE=$size" >> "$GITHUB_ENV"
+          have="$(aws s3api head-object --endpoint-url "$R2_URL" --bucket "$BUCKET" --key "$KEY" \
+            --query ContentLength --output text 2>/dev/null || true)"
+          echo "NASA: $size bytes. Bucket: ${have:-no copy}."
+          if [ "$have" = "$size" ]; then echo "COPIED=1" >> "$GITHUB_ENV"; fi
+
+      - name: Download from NASA
+        if: env.COPIED != '1'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq aria2
+          df -h "$RUNNER_TEMP"
+          aria2c -x 16 -s 16 -k 64M --file-allocation=none --summary-interval=60 --console-log-level=warn \
+            -d "$RUNNER_TEMP" -o terrain.tif "$SOURCE"
+          got="$(stat -c %s "$RUNNER_TEMP/terrain.tif")"
+          [ "$got" = "$SIZE" ] || { echo "::error::Downloaded $got bytes; NASA gave $SIZE."; exit 1; }
+
+      - name: Upload to R2
+        if: env.COPIED != '1'
+        run: |
+          aws configure set default.s3.multipart_chunksize 64MB
+          aws configure set default.s3.max_concurrent_requests 16
+          aws s3 cp --endpoint-url "$R2_URL" --no-progress --content-type image/tiff \
+            --cache-control "public, max-age=604800, immutable" "$RUNNER_TEMP/terrain.tif" "s3://$BUCKET/$KEY"
+          have="$(aws s3api head-object --endpoint-url "$R2_URL" --bucket "$BUCKET" --key "$KEY" \
+            --query ContentLength --output text)"
+          [ "$have" = "$SIZE" ] || { echo "::error::The bucket holds $have bytes; NASA gave $SIZE."; exit 1; }
+          echo "Copied $SIZE bytes to $KEY."

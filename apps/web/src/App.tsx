@@ -57,7 +57,8 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
 /**
  * Watches whether the floating panel has anything in it: when every card in it is empty (on a wide screen the solar
  * system's worlds carry their cards in the scene, so its panel is empty), the 3D view takes the whole width and centres
- * in it.
+ * in it. It also marks a panel taller than the window (`data-scrolls`): only then does the panel's empty space keep the
+ * pointer, for the scrollbar, instead of passing drags to the 3D view under it.
  */
 function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
   return useCallback((el: HTMLElement | null) => {
@@ -65,6 +66,7 @@ function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
     const check = () => {
       const shown = [...el.children].some((c) => (c as HTMLElement).offsetHeight > 0);
       document.documentElement.style.setProperty('--hud-end', shown ? '422px' : '0px');
+      el.toggleAttribute('data-scrolls', el.scrollHeight > el.clientHeight);
       useStage.getState().setPanelShown(shown);
     };
     const observer = new ResizeObserver(check);

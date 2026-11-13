@@ -33,7 +33,8 @@ function localData(): Plugin {
 
 /**
  * NASA's PGDA server, for LOLA's 10 m south pole terrain (the slope): it lets no other site's page read the file, so
- * the dev server passes the app's byte-range reads through to it.
+ * the dev server (and `vite preview`, which takes the same proxy) passes the app's byte-range reads through to it. On
+ * the deployed site the Pages Function in the repository's functions/pgda does the same.
  */
 const PGDA_PROXY = {
   '/pgda': {
