@@ -38,8 +38,9 @@ export function toScreen(
   camera: THREE.PerspectiveCamera,
   canvas: HTMLElement,
   scratch: THREE.Vector3,
+  // Pass the canvas's box when projecting many points in one go, so the page lays out once, not once a point.
+  rect: DOMRect = canvas.getBoundingClientRect(),
 ): ScreenPoint {
-  const rect = canvas.getBoundingClientRect();
   const depth = point.distanceTo(camera.position);
   scratch.copy(point).project(camera);
   return {

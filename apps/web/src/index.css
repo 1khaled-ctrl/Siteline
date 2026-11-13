@@ -287,7 +287,6 @@ body {
   background: radial-gradient(circle at 50% 46%, #0d1a36 0%, #070c1c 42%, #03060e 100%);
 }
 .intro-coin {
-  --lit: 1;
   transform-style: preserve-3d;
 }
 .intro-face {
@@ -298,7 +297,6 @@ body {
   border-radius: 50%;
   backface-visibility: hidden;
   transform: translateZ(4px);
-  filter: brightness(var(--lit));
   user-select: none;
 }
 .intro-back {
@@ -310,16 +308,28 @@ body {
   border-radius: 50%;
   border: 3px solid #a86c06;
 }
-.intro-sheen {
+.intro-light {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   border-radius: 50%;
-  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.2) 50%, transparent 62%);
-  background-size: 300% 100%;
-  mix-blend-mode: screen;
   transform: translateZ(4.5px);
   backface-visibility: hidden;
   pointer-events: none;
+}
+.intro-shade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+.intro-band {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 300%;
+  background: linear-gradient(105deg, transparent 40%, rgb(255 255 255 / 0.16) 50%, transparent 60%);
+  will-change: transform;
 }
 .intro-part {
   position: absolute;
@@ -572,6 +582,14 @@ body {
     rotate: 360deg;
   }
 }
+/* A slow device keeps every effect, lighter: no drift on the cards and a thinner frosting on the glass. */
+:root[data-low-power] .hud > * {
+  animation: hud-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+:root[data-low-power] :is(.glass, .hud > *) {
+  backdrop-filter: blur(8px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .callout-ping {
     animation: none;

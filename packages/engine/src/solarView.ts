@@ -178,6 +178,8 @@ export class SolarView {
   private hold: number | null;
   /** True while the opening moves the camera and draws each frame itself. */
   private introDriven = false;
+  /** During the opening's hold: whether the hidden view has drawn since it last changed (which readies the GPU). */
+  private warm = false;
   private insets: Insets = NO_INSETS;
   private readonly look = new LookOffset();
   private readonly loads: Promise<void>[] = [];
@@ -358,20 +360,22 @@ export class SolarView {
     if (!trail) return [];
     const canvas = this.renderer.domElement;
     const sun = this.projectBody('sun');
-    const points = trail.points.map((p) => toScreen(p, this.camera, canvas, this.scratch));
-    const angles = points.map((p) => Math.atan2(p.y - sun.y, p.x - sun.x));
+    const rect = canvas.getBoundingClientRect();
+    const points = trail.points.map((p) => toScreen(p, this.camera, canvas, this.scratch, rect));
+    // Sorted by their angle round the Sun, the samples can be matched to the n directions in one sweep.
+    const around = points
+      .map((p) => ({ x: p.x, y: p.y, a: Math.atan2(p.y - sun.y, p.x - sun.x) }))
+      .sort((p, q) => p.a - q.a);
+    const m = around.length;
+    const gap = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    let k = 0;
     return Array.from({ length: n }, (_, i) => {
       const want = ((i / n) * 2 - 1) * Math.PI;
-      let best = 0;
-      let bestD = Infinity;
-      angles.forEach((a, j) => {
-        const d = Math.abs(Math.atan2(Math.sin(a - want), Math.cos(a - want)));
-        if (d < bestD) {
-          bestD = d;
-          best = j;
-        }
-      });
-      return { x: points[best].x, y: points[best].y };
+      while (k + 1 < m && around[k + 1].a <= want) k++;
+      const below = around[k];
+      const above = around[(k + 1) % m];
+      const best = gap(below.a, want) <= gap(above.a, want) ? below : above;
+      return { x: best.x, y: best.y };
     });
   }
 
@@ -774,8 +778,17 @@ export class SolarView {
       h.sprite.material.opacity = h.opacity * (0.92 + 0.1 * Math.sin(t * h.speed * 1.7 + h.phase));
     }
     if (this.starUniforms) this.starUniforms.uTime.value = t;
-    // While the opening moves the camera it also draws, once a frame.
+    // While the opening moves the camera it also draws, once a frame. Before that its screen hides the view entirely,
+    // so the view draws only once after each change: enough to have shaders built and maps on the GPU before the
+    // flight, without taking time from the emblem.
     if (this.introDriven) return;
+    if (this.hold !== null) {
+      if (!this.warm) {
+        this.warm = true;
+        this.draw();
+      }
+      return;
+    }
     this.controls.autoRotate = this.driftWanted && this.introK >= 1;
     this.controls.update();
     this.draw();
@@ -811,6 +824,7 @@ export class SolarView {
   }
 
   private requestRender(): void {
+    this.warm = false;
     if (this.frame || this.flying || this.looping) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;

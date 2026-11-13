@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
 import { depthLook, edgePoint, type Placement, placeCallouts, type Rect, type Side } from '../callouts';
+import { perf } from '../perf';
 import { useWide } from '../stage';
 
 export type CalloutTone = 'accent' | 'sun' | 'pass' | 'fail' | 'warn';
@@ -87,6 +88,7 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
           .map((r) => ({ x: r.left - box.left - 6, y: r.top - box.top - 6, w: r.width + 12, h: r.height + 12 }));
       }
       const still = frozen.current || reduced();
+      const calmDrift = still || perf.low;
       const points = latest.current.map((item) => {
         const p = item.anchor();
         return p?.visible ? { item, x: p.x - box.left, y: p.y - box.top, depth: p.depth } : null;
@@ -135,7 +137,7 @@ function Layer({ source, items }: { source: FrameSource; items: readonly Callout
           l.side = spot.side;
         }
         l.shown = Math.min(1, Math.max(0, l.shown + (point ? 1 : -1) * (still ? 1 : dt * 4)));
-        const drift = still ? 0 : 1;
+        const drift = calmDrift ? 0 : 1;
         const dx = drift * 2.2 * Math.sin((t * 2 * Math.PI) / l.beat + l.phase);
         const dy = drift * 1.8 * Math.cos((t * 2 * Math.PI) / (l.beat * 1.3) + l.phase);
         const look = depthLook(point && far > near ? (point.depth - near) / (far - near) : 0);

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import emblem from './assets/emblem.json';
+import { measureFrames } from './perf';
 
 /** What the opening waits for, each named on its loading line. */
 export type BootTask = 'fonts' | 'emblem' | 'positions' | 'orbits' | 'imagery' | 'view';
@@ -68,6 +69,9 @@ export const useBoot = create<BootState>((set) => ({
   open: () => {
     markOpened();
     set({ opened: true });
+    // The first moments of the open app (the scene moving behind frosted glass) are the hardest work it does: a slow
+    // device turns its effects down from here on.
+    void measureFrames(2000);
   },
 }));
 

@@ -16,6 +16,7 @@ import {
   track,
   useBoot,
 } from '../boot';
+import { measureFrames, perf } from '../perf';
 import { useStage } from '../stage';
 import { useApp } from '../store';
 
@@ -36,6 +37,16 @@ const ORDER: BootTask[] = ['emblem', 'fonts', 'positions', 'orbits', 'imagery', 
 type Point = { x: number; y: number };
 const lerp = (a: Point, b: Point, k: number): Point => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
 const pathOf = (pts: Point[]) => `M${pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join('L')}Z`;
+
+/** Light on the turning coin: its face darkens toward edge-on, and a band of light slides across it. */
+function lightCoin(coin: HTMLElement | null, band: HTMLElement | null): void {
+  if (!coin || !band) return;
+  const a = ((Number(gsap.getProperty(coin, 'rotationY')) % 360) + 360) % 360;
+  const face = Math.abs(Math.cos((a * Math.PI) / 180));
+  const shade = coin.querySelector<HTMLElement>('.intro-shade');
+  if (shade) shade.style.opacity = (0.5 * (1 - face)).toFixed(3);
+  band.style.transform = `translateX(${(((a + 90) % 180) / 180) * -66.7}%)`;
+}
 
 /** Where the emblem's parts sit on the page while the coin faces front, its middle at `centre`. */
 function partsAt(centre: Point) {
@@ -77,7 +88,7 @@ export function Intro() {
   const field = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const coin = useRef<HTMLDivElement>(null);
-  const sheen = useRef<HTMLDivElement>(null);
+  const sheen = useRef<HTMLSpanElement>(null);
   const ring = useRef<SVGPathElement>(null);
   const lander = useRef<HTMLImageElement>(null);
   const star = useRef<HTMLImageElement>(null);
@@ -105,14 +116,9 @@ export function Intro() {
       { opacity: 0, scale: 0.86, rotationY: -70 },
       { opacity: 1, scale: 1, rotationY: 0, duration: 1.1, ease: 'power3.out' },
     );
-    // Light falls across the face as it turns, brightest face-on and dark edge-on.
-    const light = () => {
-      if (!coin.current || !sheen.current) return;
-      const a = ((Number(gsap.getProperty(coin.current, 'rotationY')) % 360) + 360) % 360;
-      const face = Math.abs(Math.cos((a * Math.PI) / 180));
-      coin.current.style.setProperty('--lit', (0.5 + 0.5 * face).toFixed(3));
-      sheen.current.style.backgroundPosition = `${(((a + 90) % 180) / 180) * 100}% 0`;
-    };
+    // The pace of this device, read while the coin turns: a slow one gets a lighter flight.
+    void measureFrames(1500);
+    const light = () => lightCoin(coin.current, sheen.current);
     spin.current = gsap.to(coin.current, {
       rotationY: '+=360',
       duration: TURN_S,
@@ -188,12 +194,7 @@ export function Intro() {
       rotationY: rest,
       duration: 0.4 + ((rest - now) / 360) * 0.9,
       ease: 'power3.out',
-      onUpdate: () => {
-        if (!coin.current || !sheen.current) return;
-        const a = ((Number(gsap.getProperty(coin.current, 'rotationY')) % 360) + 360) % 360;
-        coin.current.style.setProperty('--lit', (0.5 + 0.5 * Math.abs(Math.cos((a * Math.PI) / 180))).toFixed(3));
-        sheen.current.style.backgroundPosition = `${(((a + 90) % 180) / 180) * 100}% 0`;
-      },
+      onUpdate: () => lightCoin(coin.current, sheen.current),
       onComplete: () => (toSolar ? flyIn() : rushPast()),
     });
   }
@@ -255,7 +256,11 @@ export function Intro() {
     gsap.ticker.add(ticking.current);
     finale.current = gsap
       .timeline({ onComplete: finish })
-      .to(coin.current, { scale: 2.2, opacity: 0, filter: 'blur(12px)', duration: 0.8, ease: 'power1.in' }, 0.1)
+      .to(
+        coin.current,
+        { scale: 2.2, opacity: 0, filter: perf.low ? 'none' : 'blur(8px)', duration: 0.8, ease: 'power1.in' },
+        0.1,
+      )
       .to(field.current, { opacity: 0, duration: 1.5, ease: 'power1.inOut' }, 0.2)
       .to(status.current, { opacity: 0, duration: 0.4 }, 0)
       .to(k, { ring: 1, duration: 0.8, ease: 'power2.inOut' }, 0.15)
@@ -278,7 +283,11 @@ export function Intro() {
     const r = { v: RING_PX };
     finale.current = gsap
       .timeline({ onComplete: finish })
-      .to(coin.current, { scale: 2.6, opacity: 0, filter: 'blur(10px)', duration: 1, ease: 'power2.in' }, 0.05)
+      .to(
+        coin.current,
+        { scale: 2.6, opacity: 0, filter: perf.low ? 'none' : 'blur(8px)', duration: 1, ease: 'power2.in' },
+        0.05,
+      )
       .to(field.current, { opacity: 0, duration: 1.2, ease: 'power1.inOut' }, 0.2)
       .to(status.current, { opacity: 0, duration: 0.3 }, 0)
       .to(
@@ -329,14 +338,18 @@ export function Intro() {
           aria-hidden="true"
         >
           {cinematic &&
-            Array.from({ length: 9 }, (_, i) => (
+            Array.from({ length: 6 }, (_, i) => (
               // The coin's milled edge: stacked rims that show as a gold band when it turns side-on.
               // biome-ignore lint/suspicious/noArrayIndexKey: a fixed stack of identical rims.
-              <span key={i} className="intro-rim" style={{ transform: `translateZ(${(i - 4) * 0.9}px)` }} />
+              <span key={i} className="intro-rim" style={{ transform: `translateZ(${(i - 2.5) * 1.4}px)` }} />
             ))}
           <img src={emblemUrl} alt="" className="intro-face" draggable={false} />
           {cinematic && <img src={emblemUrl} alt="" className="intro-face intro-back" draggable={false} />}
-          <div ref={sheen} className="intro-sheen" />
+          {/* Shade and a band of light over the face, moved by opacity and transform alone. */}
+          <div className="intro-light">
+            <span className="intro-shade" />
+            <span ref={sheen} className="intro-band" />
+          </div>
         </div>
       </div>
       <svg className="pointer-events-none absolute inset-0 size-full" aria-hidden="true">
