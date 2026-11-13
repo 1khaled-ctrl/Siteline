@@ -187,7 +187,7 @@ export function SiteMap() {
           −
         </button>
       </ViewPills>
-      <button type="button" className={`${viewButton} absolute inset-e-3 top-3`} onClick={closeSite}>
+      <button type="button" className={`${viewButton} absolute inset-e-3 top-3`} data-avoid onClick={closeSite}>
         {t('siteView.back')}
       </button>
       <div className="pointer-events-none absolute inset-x-3 bottom-3.5 flex flex-col items-center gap-1.5">

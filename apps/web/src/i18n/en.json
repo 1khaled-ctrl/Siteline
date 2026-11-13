@@ -766,5 +766,12 @@
     "label": "Sound",
     "muteHint": "Sound is on. Press to mute everything (or press M).",
     "unmuteHint": "Sound is off. Press to turn it on (or press M)."
+  },
+  "orb": {
+    "open": "Open the SiteLine menu",
+    "close": "Close the menu",
+    "ask": "Ask SiteLine",
+    "hide": "Hide the interface",
+    "show": "Show the interface"
   }
 }

@@ -6,6 +6,7 @@ import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
 import { physics, queryFor, URLS } from '../physics';
 import { sound } from '../sound';
+import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
 import { Spinner } from './ViewStatus';
@@ -38,7 +39,8 @@ const callText = (intent: Intent) =>
  */
 export function Copilot() {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
+  const open = useStage((s) => s.copilotOpen);
+  const setOpen = useStage.getState().setCopilotOpen;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<Message[]>([]);
@@ -192,19 +194,8 @@ export function Copilot() {
     void send(text);
   };
 
-  if (!open)
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-avoid
-        className="copilot-open fixed inset-e-4 z-20 min-h-11 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent max-lg:min-w-11 max-lg:px-0 lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
-      >
-        <span aria-hidden="true">✦</span>
-        {/* On a phone the button is just the star, beside the dial. */}
-        <span className="max-lg:sr-only"> {t('copilot.open')}</span>
-      </button>
-    );
+  // The orb (Orb.tsx) opens it.
+  if (!open) return null;
 
   return (
     <section

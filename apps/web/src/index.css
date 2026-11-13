@@ -660,13 +660,13 @@ body {
   display: none;
 }
 
-/* The phone's dial, and the copilot's star beside it, just above the sheet. */
+/* The phone's dial, and the orb beside it, just above the sheet. */
 .dial-wrap {
   bottom: calc(var(--peek) + 10px);
 }
 @media (width < 64rem) {
-  .copilot-open {
-    bottom: calc(var(--peek) + 40px);
+  .orb-wrap {
+    bottom: calc(var(--peek) + 36px);
   }
 }
 .tilt-wrap {
@@ -674,11 +674,116 @@ body {
 }
 /* The phone's buttons arrive with the dial, once the opening has handed over. */
 .tilt-wrap,
-.copilot-open {
+.orb-wrap {
   transition: opacity 0.5s ease 0.15s;
 }
-:root:not([data-opened]) :is(.tilt-wrap, .copilot-open) {
+:root:not([data-opened]) :is(.tilt-wrap, .orb-wrap) {
   opacity: 0;
+}
+
+/* The orb: a gold-and-blue core with two rings that ripple out of it, and the buttons that fan out when it is tapped. */
+.orb {
+  background: radial-gradient(circle at 35% 30%, #ffe08a, #f4b63f 45%, #2f6fd6 100%);
+  box-shadow:
+    0 0 18px rgb(244 182 63 / 0.45),
+    0 0 40px rgb(91 169 255 / 0.25);
+  transition:
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s;
+}
+.orb:hover,
+.orb:focus-visible {
+  transform: scale(1.06);
+}
+.orb-wrap[data-open] .orb {
+  transform: scale(0.92);
+}
+.orb[data-hidden] {
+  opacity: 0.55;
+}
+.orb[data-hidden]:hover,
+.orb[data-hidden]:focus-visible {
+  opacity: 1;
+}
+.orb-core {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(8 13 26 / 0.55);
+  color: #ffe9b8;
+  backdrop-filter: blur(4px);
+}
+.orb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgb(244 182 63 / 0.55);
+  animation: orb-ripple 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.orb-ring-late {
+  border-color: rgb(91 169 255 / 0.45);
+  animation-delay: 1.2s;
+}
+@keyframes orb-ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+.orb-action {
+  --tx: 0px;
+  --ty: 0px;
+  translate: -50% -50%;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(0, 0) scale(0.4);
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.9, 0.2, 1.15) calc(var(--i) * 50ms),
+    opacity 0.25s calc(var(--i) * 50ms),
+    visibility 0s 0.45s;
+}
+.orb-wrap[data-open] .orb-action {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(var(--tx), var(--ty)) scale(1);
+  transition-delay: calc(var(--i) * 50ms), calc(var(--i) * 50ms), 0s;
+}
+.orb-action:hover,
+.orb-action:focus-visible {
+  border-color: var(--color-sun);
+  color: var(--color-sun-ink);
+}
+.orb-label {
+  translate: 0 -50%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-line);
+  background: rgb(12 19 34 / 0.92);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-ring {
+    animation: none;
+    opacity: 0.5;
+  }
+  .orb-action {
+    transition-duration: 0s, 0s, 0s;
+  }
+}
+
+/* The hidden interface: only the scene and the orb stay, for a clean look at it. */
+:root[data-ui-hidden]
+  :is(header.bar, .hud, .sheet, .dial-wrap, .tilt-wrap, .callout-layer, main search, [data-avoid]:not(.orb-wrap)) {
+  display: none;
 }
 .tilt {
   color: var(--color-quiet);

@@ -17,6 +17,13 @@ interface StageState {
   /** The 3D view on screen, for what turns its camera from outside (the phone's tilt-to-look). */
   active: Lookable | null;
   setActive: (view: Lookable | null) => void;
+  /** The orb at the corner of the view: whether its buttons are fanned out, and whether it has hidden the interface. */
+  orbOpen: boolean;
+  setOrbOpen: (open: boolean) => void;
+  uiHidden: boolean;
+  setUiHidden: (hidden: boolean) => void;
+  copilotOpen: boolean;
+  setCopilotOpen: (open: boolean) => void;
 }
 
 export interface Lookable {
@@ -34,6 +41,12 @@ export const useStage = create<StageState>((set) => ({
   setSheetOpen: (sheetOpen) => set({ sheetOpen }),
   active: null,
   setActive: (active) => set({ active }),
+  orbOpen: false,
+  setOrbOpen: (orbOpen) => set({ orbOpen }),
+  uiHidden: false,
+  setUiHidden: (uiHidden) => set({ uiHidden }),
+  copilotOpen: false,
+  setCopilotOpen: (copilotOpen) => set({ copilotOpen }),
 }));
 
 /** Puts a 3D view on the stage while it is mounted. */
