@@ -43,15 +43,53 @@ function NumberField({ label, value, onCommit }: { label: string; value: number;
   );
 }
 
+/**
+ * The time-lapse's readings: the share of the Sun's disc above the site's horizon at its moment, and how far into the
+ * stay it is. The clock moves on every frame, so each reading is picked from the store as it is shown (a whole percent,
+ * a tenth of a day) and this re-renders only when one of them changes.
+ */
+function LapseReadings() {
+  const { t } = useTranslation();
+  const lapse = useApp((s) => s.playing || s.playOffsetH > 0);
+  const track = useSunTrack(lapse);
+  const sunPercent = useApp((s) =>
+    track
+      ? Math.round(sunAt(track, Date.parse(s.landingUtc) + s.slipDays * DAY_MS + s.playOffsetH * HOUR_MS) * 100)
+      : Number.NaN,
+  );
+  // Tenths of a day into the time-lapse, or -1 at the landing time itself.
+  const dayTenths = useApp((s) => (s.playOffsetH > 0 ? Math.round(s.playOffsetH / 2.4) : -1));
+  return (
+    <>
+      {lapse && Number.isFinite(sunPercent) && (
+        <div className="flex flex-col gap-1.5">
+          <p className="flex flex-wrap justify-between gap-x-2 text-sm">
+            <span>{t('time.sunNow')}</span>
+            <span className="font-mono text-sun">{formatNumber(sunPercent, 0)}%</span>
+          </p>
+          <div className="h-1.5 overflow-hidden rounded-pill bg-panel-sunk" aria-hidden="true">
+            <div className="h-full rounded-pill bg-sun" style={{ width: `${sunPercent}%` }} />
+          </div>
+        </div>
+      )}
+      <p className="text-xs text-quiet">
+        {dayTenths >= 0 ? t('time.lightingAt', { days: formatNumber(dayTenths / 10, 1) }) : t('time.lightingLanding')}
+      </p>
+    </>
+  );
+}
+
 /** The landing date, the launch slip and the time-lapse, boxed together as in the demo's launch-delay box. */
 export function LandingTime() {
   const { t } = useTranslation();
-  const { landingUtc, slipDays, set, playing, speedHPerS, playOffsetH, setPlay } = useApp();
+  // Each value picked on its own: the time-lapse changes the store on every frame, and this need not follow it.
+  const landingUtc = useApp((s) => s.landingUtc);
+  const slipDays = useApp((s) => s.slipDays);
+  const playing = useApp((s) => s.playing);
+  const speedHPerS = useApp((s) => s.speedHPerS);
+  const moved = useApp((s) => s.playOffsetH > 0);
+  const { set, setPlay } = useApp.getState();
   const slipId = useId();
-  const lapse = playing || playOffsetH > 0;
-  const track = useSunTrack(lapse);
-  // The share of the Sun's disc above the site's horizon at the time-lapse's moment, shown beside Play.
-  const sunNow = track ? sunAt(track, Date.parse(landingUtc) + slipDays * DAY_MS + playOffsetH * HOUR_MS) : Number.NaN;
 
   return (
     <section className={`${box} flex flex-col gap-4`}>
@@ -102,28 +140,13 @@ export function LandingTime() {
             </option>
           ))}
         </select>
-        {playOffsetH > 0 && (
+        {moved && (
           <button type="button" className={smallButton} onClick={() => setPlay({ playing: false, playOffsetH: 0 })}>
             {t('time.reset')}
           </button>
         )}
       </div>
-      {lapse && Number.isFinite(sunNow) && (
-        <div className="flex flex-col gap-1.5">
-          <p className="flex flex-wrap justify-between gap-x-2 text-sm">
-            <span>{t('time.sunNow')}</span>
-            <span className="font-mono text-sun">{formatNumber(sunNow * 100, 0)}%</span>
-          </p>
-          <div className="h-1.5 overflow-hidden rounded-pill bg-panel-sunk" aria-hidden="true">
-            <div className="h-full rounded-pill bg-sun" style={{ width: `${Math.round(sunNow * 100)}%` }} />
-          </div>
-        </div>
-      )}
-      <p className="text-xs text-quiet">
-        {playOffsetH > 0
-          ? t('time.lightingAt', { days: formatNumber(playOffsetH / 24, 1) })
-          : t('time.lightingLanding')}
-      </p>
+      <LapseReadings />
     </section>
   );
 }
@@ -131,7 +154,9 @@ export function LandingTime() {
 /** The Moon's site picker: the latitude and longitude, the comparison and the named regions. */
 export function Controls() {
   const { t } = useTranslation();
-  const { latDeg, lonDeg, set, focusSite } = useApp();
+  const latDeg = useApp((s) => s.latDeg);
+  const lonDeg = useApp((s) => s.lonDeg);
+  const { set, focusSite } = useApp.getState();
 
   return (
     <div className="flex flex-col gap-5">

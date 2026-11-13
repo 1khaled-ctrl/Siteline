@@ -11,7 +11,7 @@ import {
 } from '@siteline/engine';
 import { useEffect, useRef, useState } from 'react';
 import { findLander, MISSIONS, SITES_URL, TRACKS_URL } from './landers';
-import { DAY_MS, physics, URLS, useLightingUtcMs } from './physics';
+import { DAY_MS, followLighting, physics, URLS } from './physics';
 import { useApp } from './store';
 
 interface LanderFiles {
@@ -64,26 +64,23 @@ export interface Subsolar {
  * it is refreshed at most every 200 ms, so the cards keep up without asking the physics worker on every frame.
  */
 export function useSubsolar(body: LanderBody): Subsolar | undefined {
-  const tUtcMs = useLightingUtcMs();
   const [point, setPoint] = useState<Subsolar>();
-  const last = useRef(0);
   useEffect(() => {
-    let live = true;
-    const wait = Math.max(0, last.current + 200 - performance.now());
-    const timer = setTimeout(() => {
-      last.current = performance.now();
-      const ask =
-        body === 'Moon' ? physics.sunKm(tUtcMs, URLS.data).then(directionToLatLon) : physics.marsSun(tUtcMs, URLS.data);
-      ask.then(
-        (p) => live && setPoint(p),
-        () => live && setPoint(undefined),
-      );
-    }, wait);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [body, tUtcMs]);
+    let lastMs = Number.NEGATIVE_INFINITY;
+    // Follows the store directly (`followLighting`), so only a new point re-renders the cards, not every frame.
+    return followLighting(
+      async (tUtcMs) => {
+        const wait = lastMs + 200 - performance.now();
+        if (wait > 0) await new Promise((done) => setTimeout(done, wait));
+        lastMs = performance.now();
+        return body === 'Moon'
+          ? physics.sunKm(tUtcMs, URLS.data).then(directionToLatLon)
+          : physics.marsSun(tUtcMs, URLS.data);
+      },
+      setPoint,
+      () => setPoint(undefined),
+    );
+  }, [body]);
   return point;
 }
 

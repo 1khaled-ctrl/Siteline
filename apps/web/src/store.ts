@@ -236,7 +236,10 @@ export const useApp = create<AppState>((set) => ({
 }));
 
 // The address bar keeps the site, pins, layer and lander, but not the view, date or slip, so opening the app again
-// starts in the solar system on the live clock; the Share button's link carries its own view, date and slip.
+// starts in the solar system on the live clock; the Share button's link carries its own view, date and slip. It is
+// written only when it changes: the store changes on every frame while the time-lapse plays or the camera flies, and
+// browsers throttle the address bar (Firefox throws after 100 writes in 10 seconds, which stopped the time-lapse).
+let shownQuery = '';
 useApp.subscribe((s) => {
   const p = new URLSearchParams({
     lat: String(s.latDeg),
@@ -245,7 +248,10 @@ useApp.subscribe((s) => {
   if (s.layer !== 'none') p.set('layer', s.layer);
   if (s.missionId) p.set('mission', s.missionId);
   if (s.pins.length) p.set('pins', s.pins.map((x) => `${x.latDeg},${x.lonDeg}`).join(';'));
-  window.history.replaceState(null, '', `?${p}`);
+  const query = `?${p}`;
+  if (query === shownQuery) return;
+  shownQuery = query;
+  window.history.replaceState(null, '', query);
 });
 
 // The view shown before the current one, and when that changed, so a view that opens can begin with the move back out

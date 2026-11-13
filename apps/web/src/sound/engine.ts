@@ -58,7 +58,19 @@ export const played = {
 
 /** Builds the output on the context the gesture started, and loads the two short sounds. */
 export async function init(context: AudioContext): Promise<void> {
-  setContext(context);
+  // Tone opens a context of its own as it loads; it is closed here, with its clock, so only the gesture's one runs.
+  setContext(context, true);
+  // Howler plays on the same context rather than opening the audio device a second time, which holds the page for a
+  // tenth of a second or more. It must then leave the context alone, since Tone's sounds use it too: no suspending it
+  // after 30 quiet seconds, and no unlocking of its own (`unlockSound` does that), which closes and replaces a context
+  // whose sample rate is not 44.1 kHz, as on most Windows machines.
+  Howler.autoSuspend = false;
+  Howler.autoUnlock = false;
+  if (!Howler.ctx) {
+    Howler.ctx = context;
+    Howler.masterGain = context.createGain();
+    Howler.masterGain.connect(context.destination);
+  }
   const limiter = new Limiter(-3).toDestination();
   master = new Volume(-4).connect(limiter);
   chimeSound = new Howl({ src: [chimeUrl], volume: LEVEL.chime });

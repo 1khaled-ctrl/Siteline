@@ -205,9 +205,53 @@ export function useLightingUtcMs(): number {
 }
 
 /**
+ * Follows the time the current view is lit for without re-rendering anything: `ask` turns a time into what the view
+ * needs (from the physics worker) and `apply` hands the answer to the view, now and after every change. The time-lapse
+ * changes the time on every frame, and a 3D view that re-rendered its React tree that often made the page stutter, so
+ * the views follow the store directly. At most one ask is in flight; when it returns, the next one takes the newest
+ * time. Returns the function that stops following.
+ */
+export function followLighting<T>(
+  ask: (tUtcMs: number) => Promise<T>,
+  apply: (value: T) => void,
+  onError?: (e: unknown) => void,
+): () => void {
+  let stopped = false;
+  let busy = false;
+  let askedMs = Number.NaN;
+  const next = () => {
+    if (stopped || busy) return;
+    const tUtcMs = lightingUtcMsOf(useApp.getState());
+    if (tUtcMs === askedMs) return;
+    busy = true;
+    askedMs = tUtcMs;
+    ask(tUtcMs).then(
+      (value) => {
+        busy = false;
+        if (stopped) return;
+        apply(value);
+        next();
+      },
+      (e: unknown) => {
+        busy = false;
+        if (stopped) return;
+        onError?.(e);
+        next();
+      },
+    );
+  };
+  const unsubscribe = useApp.subscribe(next);
+  next();
+  return () => {
+    stopped = true;
+    unsubscribe();
+  };
+}
+
+/**
  * Where every planet and the Moon are (km, from the planets table) at the whole hour the views are lit for; undefined
  * until they arrive or if the table cannot be read. Whole hours: in one the Moon moves about 270 km, 0.001 s of signal,
- * so the time-lapse need not ask the worker on every frame.
+ * so the time-lapse need not ask the worker on every frame; while it plays, whole days.
  */
 export function usePlanetsAtHour(): Readonly<Record<SolarBodyKey, Vec3>> | undefined {
   return usePlanetsAtHourState().positions;
@@ -222,7 +266,13 @@ export interface PlanetsState {
 
 /** `usePlanetsAtHour`, with the failure and a way to ask again. */
 export function usePlanetsAtHourState(): PlanetsState {
-  const hourMs = Math.floor(useLightingUtcMs() / HOUR_MS) * HOUR_MS;
+  // The whole hour itself is what the component follows, not the time, so the clock does not re-render it every frame.
+  // While the time-lapse plays, the whole day: the distances and delays shown barely move in a day, and asking 24 times
+  // a second (at a day a second) kept the panel re-rendering. Pausing lands back on the hour.
+  const hourMs = useApp((s) => {
+    const stepMs = s.playing ? DAY_MS : HOUR_MS;
+    return Math.floor(lightingUtcMsOf(s) / stepMs) * stepMs;
+  });
   const [state, setState] = useState<Omit<PlanetsState, 'retry'>>({});
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((a) => a + 1), []);

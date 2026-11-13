@@ -8,7 +8,7 @@ import {
 } from '@siteline/engine';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { physics, URLS, useLightingUtcMs } from '../physics';
+import { followLighting, physics, URLS } from '../physics';
 import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { CalloutLayer } from './Callouts';
@@ -65,7 +65,6 @@ export function EarthMap() {
   const [notFound, setNotFound] = useState(false);
   const place = useApp((s) => s.earthPlace);
   const command = useApp((s) => s.earthCommand);
-  const lightingUtcMs = useLightingUtcMs();
   const load = useLoad();
   const { ready, fail } = load;
   const names = useMemo(
@@ -107,16 +106,14 @@ export function EarthMap() {
     [globe, place],
   );
 
+  // The light follows the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {
     if (!globe || !realLight) return;
-    let live = true;
-    physics.earthSun(lightingUtcMs, URLS.data).then((p) => {
-      if (live) globe.setSubsolar(p.latDeg, p.lonDeg);
-    });
-    return () => {
-      live = false;
-    };
-  }, [globe, realLight, lightingUtcMs]);
+    return followLighting(
+      (tUtcMs) => physics.earthSun(tUtcMs, URLS.data),
+      (p) => globe.setSubsolar(p.latDeg, p.lonDeg),
+    );
+  }, [globe, realLight]);
 
   // The breadcrumbs ask the camera to move.
   useEffect(() => {

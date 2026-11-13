@@ -3,7 +3,7 @@ import { MOON_RADIUS_M } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PINNED } from '../landers';
-import { physics, URLS, useLightingUtcMs } from '../physics';
+import { followLighting, physics, URLS } from '../physics';
 import { useActiveView, useStageInsets } from '../stage';
 import { useApp } from '../store';
 import { useFlyToMission, useShownUtcMs } from '../useLanders';
@@ -35,7 +35,6 @@ export function GlobeMap() {
   const [flying, setFlying] = useState(false);
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
-  const lightingUtcMs = useLightingUtcMs();
   const shownMs = useShownUtcMs();
   const load = useLoad();
   const { ready, fail } = load;
@@ -78,16 +77,14 @@ export function GlobeMap() {
     globe?.setSite(latDeg, lonDeg);
   }, [globe, latDeg, lonDeg]);
 
+  // The Sun follows the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {
     if (!globe) return;
-    let live = true;
-    physics.sunKm(lightingUtcMs, URLS.data).then((sun) => {
-      if (live) globe.setSun(sun);
-    });
-    return () => {
-      live = false;
-    };
-  }, [globe, lightingUtcMs]);
+    return followLighting(
+      (tUtcMs) => physics.sunKm(tUtcMs, URLS.data),
+      (sun) => globe.setSun(sun),
+    );
+  }, [globe]);
 
   const insets = useStageInsets();
   useActiveView(globe);

@@ -116,10 +116,11 @@ export const sound = {
   },
 };
 
-// For checking in development: what has played, and what the sunlight tone is doing. Not in the built app.
+// For checking in development: what has played, and the running engine itself. Not in the built app.
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   (window as Window & { __sitelineSound?: unknown }).__sitelineSound = {
     context: () => context?.state ?? 'none',
+    engine: () => engine,
     state: () => useSound.getState(),
     report: async () => {
       const e = await engine;
@@ -135,8 +136,10 @@ function typing(target: EventTarget | null): boolean {
 }
 
 if (typeof window !== 'undefined') {
-  // A touch only counts as a gesture as the finger lifts, so try again then, and on clicks and key presses.
-  for (const type of ['pointerdown', 'pointerup', 'click'] as const) window.addEventListener(type, unlockSound, true);
+  // As the pointer lifts, on clicks and on key presses, not as it goes down: starting the audio device can hold the page
+  // for half a second (on Windows), and at the start of a drag that froze the 3D view. A touch only counts as a gesture
+  // as the finger lifts anyway.
+  for (const type of ['pointerup', 'click'] as const) window.addEventListener(type, unlockSound, true);
   window.addEventListener(
     'keydown',
     (e) => {

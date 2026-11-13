@@ -2,7 +2,7 @@ import { type LayerColour, PoleView } from '@siteline/engine';
 import { mapValue, type PolarMaps } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { physics, URLS, useLightingUtcMs, useStay } from '../physics';
+import { followLighting, physics, URLS, useStay } from '../physics';
 import { REGIONS } from '../regions';
 import { useActiveView, useStageInsets } from '../stage';
 import { LAYERS, type Layer, useApp } from '../store';
@@ -63,7 +63,6 @@ export function PoleMap() {
   const layer = useApp((s) => s.layer);
   const pins = useApp((s) => s.pins);
   const playing = useApp((s) => s.playing);
-  const lightingUtcMs = useLightingUtcMs();
 
   useEffect(() => {
     let live = true;
@@ -121,16 +120,14 @@ export function PoleMap() {
     view.setLayer(maps ? colourFor(layer, maps) : null);
   }, [view, maps, layer]);
 
+  // The Sun follows the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {
     if (!view) return;
-    let live = true;
-    physics.sunKm(lightingUtcMs, URLS.data).then((sun) => {
-      if (live) view.setSun(sun);
-    });
-    return () => {
-      live = false;
-    };
-  }, [view, lightingUtcMs]);
+    return followLighting(
+      (tUtcMs) => physics.sunKm(tUtcMs, URLS.data),
+      (sun) => view.setSun(sun),
+    );
+  }, [view]);
 
   const insets = useStageInsets();
   useActiveView(view);

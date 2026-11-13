@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { INTRO_MODE, RING_PX, track, useBoot } from '../boot';
 import { findLander } from '../landers';
-import { physics, URLS, useLightingUtcMs } from '../physics';
+import { followLighting, physics, URLS } from '../physics';
 import { useActiveView, useStage, useStageInsets, useWide } from '../stage';
 import { cameFrom, type MoonView, useApp } from '../store';
 import { type Callout, CalloutLayer } from './Callouts';
@@ -103,7 +103,6 @@ export function SolarMap() {
   const [arriveFrom] = useState(leftWorld);
   const [arriving, setArriving] = useState(arriveFrom !== undefined);
   const moving = flying || arriving;
-  const lightingUtcMs = useLightingUtcMs();
   const command = useApp((s) => s.solarCommand);
   // A flight asked for before this view opened is old news: only later asks from the Worlds list count.
   const handled = useRef(command?.id ?? 0);
@@ -158,23 +157,18 @@ export function SolarMap() {
     fly(view, command.body, setFlying);
   }, [view, command]);
 
+  // The planets follow the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {
     if (!view) return;
-    let live = true;
-    track('positions', physics.planetsAt(lightingUtcMs, URLS.data)).then(
+    return followLighting(
+      (tUtcMs) => track('positions', physics.planetsAt(tUtcMs, URLS.data)),
       (positionsKm) => {
-        if (!live) return;
         view.setSnapshot({ positionsKm });
         ready();
       },
-      (e: unknown) => {
-        if (live) fail(e);
-      },
+      fail,
     );
-    return () => {
-      live = false;
-    };
-  }, [view, lightingUtcMs, ready, fail]);
+  }, [view, ready, fail]);
 
   const insets = useStageInsets();
   useActiveView(view);
