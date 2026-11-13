@@ -24,6 +24,9 @@ interface StageState {
   setUiHidden: (hidden: boolean) => void;
   copilotOpen: boolean;
   setCopilotOpen: (open: boolean) => void;
+  /** Cards folded away by their arrow: the scene's callouts by id, and the panel's facts card. Kept for the visit. */
+  folded: ReadonlySet<string>;
+  toggleFolded: (id: string) => void;
 }
 
 export interface Lookable {
@@ -47,6 +50,13 @@ export const useStage = create<StageState>((set) => ({
   setUiHidden: (uiHidden) => set({ uiHidden }),
   copilotOpen: false,
   setCopilotOpen: (copilotOpen) => set({ copilotOpen }),
+  folded: new Set(),
+  toggleFolded: (id) =>
+    set((s) => {
+      const folded = new Set(s.folded);
+      if (!folded.delete(id)) folded.add(id);
+      return { folded };
+    }),
 }));
 
 /** Puts a 3D view on the stage while it is mounted. */

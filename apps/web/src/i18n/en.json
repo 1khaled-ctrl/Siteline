@@ -735,7 +735,9 @@
       "zone": "Near the pole"
     },
     "flyTo": "Fly to {{name}}",
-    "place": "The place you picked"
+    "place": "The place you picked",
+    "fold": "Fold this card away",
+    "unfold": "Open this card"
   },
   "sheet": {
     "open": "Show the panel",

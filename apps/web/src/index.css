@@ -386,7 +386,31 @@ body {
     inset 0 1px 0 rgb(255 255 255 / 0.1);
 }
 
-/* Callouts: glass cards in the scene, each with a leader line to the exact point it describes. */
+/* Callouts: glass cards in the scene, each with a leader line to the exact point it describes. Each has an arrow that
+   folds it down to its title. */
+.callout-fold {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  color: var(--color-quiet);
+}
+.callout-fold:hover,
+.callout-fold:focus-visible {
+  border-color: var(--color-line-hover);
+  color: var(--color-ink);
+}
+.callout[data-folded] {
+  padding: 6px 8px 6px 12px;
+}
+.callout[data-folded] .callout-fold {
+  position: static;
+}
 .callout {
   width: max-content;
   max-width: 264px;
