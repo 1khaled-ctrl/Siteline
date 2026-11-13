@@ -47,7 +47,7 @@ export function MoonView() {
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((a) => a + 1), []);
   return (
-    <div className="space-backdrop relative h-[60vh] lg:absolute lg:inset-y-0 lg:inset-s-0 lg:inset-e-(--hud-end) lg:h-auto">
+    <div className="space-backdrop absolute inset-y-0 inset-s-0 inset-e-(--hud-end)">
       <RetryView value={retry}>
         <CurrentView key={attempt} />
       </RetryView>

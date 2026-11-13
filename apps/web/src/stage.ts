@@ -1,4 +1,4 @@
-import { type Insets, NO_INSETS, type SolarView } from '@siteline/engine';
+import { type Insets, NO_INSETS, type SolarLabelKey, type SolarView } from '@siteline/engine';
 import { useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 
@@ -9,6 +9,11 @@ interface StageState {
   /** False while the floating panel has nothing to show, so the 3D view takes the whole width. */
   panelShown: boolean;
   setPanelShown: (shown: boolean) => void;
+  /** On a phone: the world the dial has picked in the solar system, and whether the sheet is up. */
+  dialWorld: SolarLabelKey;
+  setDialWorld: (world: SolarLabelKey) => void;
+  sheetOpen: boolean;
+  setSheetOpen: (open: boolean) => void;
 }
 
 export const useStage = create<StageState>((set) => ({
@@ -16,6 +21,10 @@ export const useStage = create<StageState>((set) => ({
   setSolar: (solar) => set({ solar }),
   panelShown: true,
   setPanelShown: (panelShown) => set({ panelShown }),
+  dialWorld: 'moon',
+  setDialWorld: (dialWorld) => set({ dialWorld }),
+  sheetOpen: false,
+  setSheetOpen: (sheetOpen) => set({ sheetOpen }),
 }));
 
 /** True on a screen wide enough for the floating panel and the callouts in the scene (Tailwind's `lg`). */

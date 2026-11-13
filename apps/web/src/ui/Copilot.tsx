@@ -194,10 +194,11 @@ export function Copilot() {
         type="button"
         onClick={() => setOpen(true)}
         data-avoid
-        className="fixed inset-e-4 bottom-4 z-20 min-h-10 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
+        className="copilot-open fixed inset-e-4 z-20 min-h-11 rounded-pill border border-accent/60 bg-panel/95 px-4 text-sm text-ink shadow-lg hover:border-accent max-lg:min-w-11 max-lg:px-0 lg:absolute lg:inset-e-auto lg:inset-s-3 lg:bottom-14"
       >
-        <span aria-hidden="true">✦ </span>
-        {t('copilot.open')}
+        <span aria-hidden="true">✦</span>
+        {/* On a phone the button is just the star, beside the dial. */}
+        <span className="max-lg:sr-only"> {t('copilot.open')}</span>
       </button>
     );
 

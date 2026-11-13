@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
 import { useBoot } from './boot';
 import { findLander } from './landers';
-import { useStage } from './stage';
+import { useStage, useWide } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
 import { BodyClock } from './ui/BodyClock';
 import { BodyFacts } from './ui/BodyFacts';
@@ -17,6 +17,9 @@ import { useGlassLight } from './ui/glass';
 import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
 import { MoonView } from './ui/MoonView';
+import { OrbitDial } from './ui/OrbitDial';
+import { Peek } from './ui/Peek';
+import { Sheet } from './ui/Sheet';
 import { SiteReport } from './ui/SiteReport';
 import { SourcesButton, SourcesDialog } from './ui/SourcesDialog';
 import { OfflineBanner } from './ui/ViewStatus';
@@ -63,7 +66,7 @@ function Tagline() {
  * Watches whether the floating panel has anything in it: when every card in it is empty (the solar system's clock card
  * hides while no slip or time-lapse is set), the 3D view takes the whole width and centres in it.
  */
-function usePanelShown(): (el: HTMLElement | null) => void {
+function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
   return useCallback((el: HTMLElement | null) => {
     if (!el) return;
     const check = () => {
@@ -80,6 +83,12 @@ function usePanelShown(): (el: HTMLElement | null) => void {
     watch.observe(el, { childList: true });
     for (const c of el.children) observer.observe(c);
     check();
+    return () => {
+      observer.disconnect();
+      watch.disconnect();
+      document.documentElement.style.removeProperty('--hud-end');
+      useStage.getState().setPanelShown(true);
+    };
   }, []);
 }
 
@@ -89,11 +98,12 @@ export function App() {
   const opened = useBoot((s) => s.opened);
   useGlassLight();
   const panelRef = usePanelShown();
+  const wide = useWide();
   return (
     <>
       <Intro />
       {/* Out of reach of the keyboard and screen readers until the opening hands over. */}
-      <div className="flex min-h-dvh flex-col lg:h-dvh" inert={!opened}>
+      <div className="flex h-dvh flex-col" inert={!opened}>
         <a
           href="#panel"
           className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
@@ -117,20 +127,29 @@ export function App() {
         <SourcesDialog />
         <JourneyDialog />
         <OfflineBanner />
-        {/* On a wide screen the 3D view fills the window and the panel's cards float over its end as panes of
-          glass (`.hud` in index.css); on a narrow one they stack. */}
-        <main className="relative flex flex-1 flex-col lg:block lg:min-h-0 lg:overflow-hidden">
+        {/* The 3D view fills the window. On a wide screen the panel's cards float over its end as panes of glass
+          (`.hud` in index.css); on a phone they live in a sheet that peeks up from the bottom, under a thumb dial. */}
+        <main className="relative min-h-0 flex-1 overflow-hidden">
           <MoonView />
           <Copilot />
-          <aside
-            ref={panelRef}
-            id="panel"
-            tabIndex={-1}
-            aria-label={t('app.panel')}
-            className="hud flex flex-col gap-3 p-3 lg:absolute lg:inset-y-3 lg:inset-e-3 lg:z-10 lg:w-[410px] lg:overflow-y-auto lg:p-0 lg:pe-1"
-          >
-            <PanelContent view={view} />
-          </aside>
+          {wide ? (
+            <aside
+              ref={panelRef}
+              id="panel"
+              tabIndex={-1}
+              aria-label={t('app.panel')}
+              className="hud absolute inset-y-3 inset-e-3 z-10 flex w-[410px] flex-col gap-3 overflow-y-auto pe-1"
+            >
+              <PanelContent view={view} />
+            </aside>
+          ) : (
+            <>
+              <Sheet peek={<Peek view={view} />} label={t('app.panel')}>
+                <PanelContent view={view} />
+              </Sheet>
+              <OrbitDial />
+            </>
+          )}
         </main>
       </div>
     </>

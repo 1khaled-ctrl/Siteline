@@ -595,3 +595,84 @@ body {
 .hud > .flash {
   outline-color: rgb(91 169 255 / 0.85);
 }
+
+/* How far the floating panel reaches over the 3D view: set by App on a wide screen, none on a phone. */
+:root {
+  --hud-end: 0px;
+  --peek: 104px;
+}
+
+/* The phone's sheet: glass, rounded on top, its cards a shade raised inside it. */
+.sheet {
+  border-radius: 20px 20px 0 0;
+  border-bottom-width: 0;
+  box-shadow:
+    0 -14px 40px rgb(0 0 0 / 0.45),
+    inset 0 1px 0 rgb(255 255 255 / 0.09);
+}
+.hud-sheet > * {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: rgb(14 22 40 / 0.6);
+  padding: 14px;
+}
+.hud-sheet > :empty {
+  display: none;
+}
+
+/* The phone's dial, and the copilot's star beside it, just above the sheet. */
+.dial-wrap {
+  bottom: calc(var(--peek) + 10px);
+}
+@media (width < 64rem) {
+  .copilot-open {
+    bottom: calc(var(--peek) + 40px);
+  }
+}
+.dial {
+  border-radius: 50%;
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 0 0 6px rgb(255 255 255 / 0.025);
+}
+.dial:focus-visible {
+  outline-offset: 4px;
+}
+.dial-tick {
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 5px;
+  width: 2px;
+  height: 7px;
+  margin-inline-start: -1px;
+  border-radius: 1px;
+  background: rgb(146 186 255 / 0.45);
+  transform-origin: 1px 47px;
+}
+.dial-tick:nth-child(3n + 1) {
+  height: 11px;
+  background: var(--color-accent);
+}
+.dial-notch {
+  position: absolute;
+  top: -7px;
+  inset-inline-start: 50%;
+  margin-inline-start: -6px;
+  border: 6px solid transparent;
+  border-top-color: var(--color-sun);
+  filter: drop-shadow(0 0 4px rgb(244 182 63 / 0.7));
+}
+.dial-chip {
+  min-height: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line-hover);
+  background: rgb(12 19 34 / 0.85);
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--color-ink);
+}
+.dial-chip[aria-pressed="true"] {
+  border-color: var(--color-sun);
+  color: var(--color-sun-ink);
+}

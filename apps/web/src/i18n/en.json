@@ -712,5 +712,24 @@
       "zone": "Near the pole"
     },
     "flyTo": "Fly to {{name}}"
+  },
+  "sheet": {
+    "open": "Show the panel",
+    "close": "Hide the panel"
+  },
+  "dial": {
+    "label": {
+      "worlds": "Pick a world: turn the dial",
+      "time": "Move the time: turn the dial",
+      "sites": "Pick a pinned site: turn the dial"
+    },
+    "landing": "Landing",
+    "hours": "+{{n}} h",
+    "site": "Site {{n}} of {{of}}",
+    "turn": "Turn",
+    "tapFly": "Tap to fly",
+    "tapReset": "Tap: landing",
+    "modeTime": "Time",
+    "modeSites": "Pinned sites"
   }
 }

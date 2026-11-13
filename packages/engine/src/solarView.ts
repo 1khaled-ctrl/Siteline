@@ -315,6 +315,11 @@ export class SolarView {
     return () => this.frameListeners.delete(listener);
   }
 
+  /** Lights a body and its name as if the pointer were on it (the phone's dial picks bodies this way); null for none. */
+  highlight(body: SolarBodyKey | null): void {
+    this.setHover(body);
+  }
+
   /** Hides the name chips of these bodies, for the ones the app labels with a card of its own. */
   setHiddenLabels(keys: ReadonlySet<SolarLabelKey>): void {
     this.hiddenLabels = keys;

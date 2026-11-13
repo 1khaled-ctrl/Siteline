@@ -19,6 +19,9 @@
 - A globe's facts card shows only while the globe leaves room for it (radius under 36 % of the window's height): Mars and the Earth open filling the view, so their cards arrive as you zoom out, instead of covering the surface.
 - The cards' "Fly there" buttons are named "Fly to Earth" etc. for screen readers, and the smoke test clicks those (or the phone list's rows); it reads the verdict from the panel's report, since the site's card repeats it.
 - The site card and the full report share one stay check through a small cache in `physics.ts` (`stayOnce`); the compare table uses it too. Retry still forces a fresh run.
+- Phones (under 1024 px) get their own layout: the 3D view fills the screen, the panel is a glass bottom sheet (drag the handle or tap it; only the handle drags, so the cards inside scroll normally), and the thumb dial sits just above it. The sheet's peek line is the view's key number: the dial's world and its two readings with Fly there, the site's verdict with its two percentages, a globe's signal time (Earth: its sunlight).
+- What the dial turns: the worlds in the solar view (default the Moon; a tap flies there); time everywhere else, an hour a click or a day a click when spun fast, through the same time-lapse offset the Play button uses (a tap goes back to the landing time); and, at the south pole with two or more pinned sites, a "Time / Pinned sites" chip switches it to stepping through the pins. On Mars and the Moon globe it could have stepped through landers instead; I chose time so the dial means the same thing on every body view.
+- On a phone the copilot button shrinks to its star and sits beside the dial.
 
 ---
 
