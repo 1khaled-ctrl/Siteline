@@ -2,13 +2,16 @@ import { KM_PER_AU, type SolarBodyKey, type Vec3 } from '@siteline/physics';
 import { describe, expect, it } from 'vitest';
 import { BODY_CONSTANTS } from './bodyFacts';
 import {
+  circularPeriodS,
   DAY_S,
   MOON_COAST_DAYS,
   MOON_ORBIT_DAYS,
   marsJourney,
   marsReference,
   moonJourney,
+  PLAYBACK_SHARE,
   type Positions,
+  playbackTime,
 } from './journey';
 
 const DAY_MS = DAY_S * 1000;
@@ -87,5 +90,42 @@ describe('marsJourney', () => {
     const earliest = LAND - 200 * DAY_MS;
     const j = await marsJourney(LAND, sky, {}, earliest);
     expect(j.departUtcMs).toBeGreaterThanOrEqual(earliest);
+  });
+});
+
+describe('lunar orbit and playback', () => {
+  it('gives a low lunar orbit a period of about two hours, as Apollo flew', () => {
+    const { radiusKm, gmKm3PerS2 } = BODY_CONSTANTS.Moon;
+    const hours = circularPeriodS(radiusKm + 110, gmKm3PerS2) / 3600;
+    expect(hours).toBeGreaterThan(1.9);
+    expect(hours).toBeLessThan(2.1);
+  });
+
+  it('starts the descent half an orbit and the powered descent before touchdown', async () => {
+    const j = await moonJourney(LAND, fakeSky(0));
+    expect(j.lunarOrbitS).toBeDefined();
+    expect(j.descentUtcMs).toBe(LAND - ((j.lunarOrbitS ?? 0) / 2) * 1000 - 12 * 60_000);
+    expect(j.descentUtcMs).toBeGreaterThan(j.arriveUtcMs);
+  });
+
+  it('plays the coast, the lunar orbit and the descent in their shares of the timeline, in order', async () => {
+    const j = await moonJourney(LAND, fakeSky(0));
+    expect(playbackTime(j, 0)).toBe(j.departUtcMs);
+    expect(playbackTime(j, PLAYBACK_SHARE.coast)).toBe(j.arriveUtcMs);
+    expect(playbackTime(j, PLAYBACK_SHARE.coast + PLAYBACK_SHARE.orbit)).toBeCloseTo(j.descentUtcMs ?? 0, -1);
+    expect(playbackTime(j, 1)).toBe(j.landUtcMs);
+    // Never runs backwards, and stays inside the trip past either end.
+    let last = -Infinity;
+    for (let k = -0.1; k <= 1.1; k += 0.01) {
+      const t = playbackTime(j, k);
+      expect(t).toBeGreaterThanOrEqual(last);
+      last = t;
+    }
+    expect(playbackTime(j, 1.1)).toBe(j.landUtcMs);
+  });
+
+  it('plays a journey with no descent time straight through', () => {
+    const j = { departUtcMs: 0, arriveUtcMs: 100, landUtcMs: 100 };
+    expect(playbackTime(j, 0.25)).toBe(25);
   });
 });
