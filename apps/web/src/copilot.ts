@@ -132,6 +132,6 @@ export function summarize(r: StayResponse, site: { latDeg: number; lonDeg: numbe
       earthset: r.result.nextEarthsetUtc,
       earthrise: r.result.nextEarthriseUtc,
     },
-    sources: [...r.result.sources, ...(r.longTerm ? [r.longTerm.id] : [])],
+    sources: [...new Set([...r.result.sources, ...(r.longTerm ? [r.longTerm.id] : [])])],
   };
 }

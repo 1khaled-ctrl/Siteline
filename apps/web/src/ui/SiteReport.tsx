@@ -262,7 +262,8 @@ export function SiteReport() {
 
       <p className="text-xs text-quiet">
         {t('report.sources')}:{' '}
-        {[...result.sources, ...(longTerm ? [longTerm.id] : [])].map((id, i) => (
+        {/* Each dataset once: the long-term maps can be among the check's own sources (the cold trap) too. */}
+        {[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : [])])].map((id, i) => (
           <Fragment key={id}>
             {i > 0 && ', '}
             <button

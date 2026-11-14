@@ -27,6 +27,12 @@ export interface BestSearch {
   /** Points per side of the sampling grid. */
   grid?: number;
   top?: number;
+  /**
+   * How far each point's skyline is looked for, metres; the full 300 km by default. A shorter reach can only miss
+   * ridges, never invent one, so it makes a quick screen more hopeful, not less: right for picking candidates that
+   * a full check then confirms, wrong for a verdict.
+   */
+  reachM?: number;
 }
 
 export function scoreOf(r: StayResult): number {
@@ -55,7 +61,11 @@ export function bestSpots(
       const x = centre.x - halfM + (c / (grid - 1)) * 2 * halfM;
       const y = centre.y + halfM - (r / (grid - 1)) * 2 * halfM;
       const { latDeg, lonDeg } = unitToLatLon(polarToUnit(x, y));
-      const hz = horizonFromHeights(heights, latDeg, lonDeg, { observerHeightM: query.observerHeightM, stepM });
+      const hz = horizonFromHeights(heights, latDeg, lonDeg, {
+        observerHeightM: query.observerHeightM,
+        stepM,
+        ...(search.reachM ? { maxDistM: search.reachM } : {}),
+      });
       if (!hz) continue;
       const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg, heightM: hz.groundHeightM };
       const result = stayTest(
