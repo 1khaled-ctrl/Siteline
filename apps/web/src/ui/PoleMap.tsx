@@ -1,7 +1,8 @@
 import { type LayerColour, PoleView } from '@siteline/engine';
-import { mapValue, type PolarMaps } from '@siteline/physics';
+import { mapValue, maxSunPct, type PolarMaps } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatNumber } from '../format';
 import { followLighting, physics, URLS, useStay } from '../physics';
 import { REGIONS } from '../regions';
 import { useActiveView, useStageInsets } from '../stage';
@@ -42,8 +43,8 @@ function colourFor(layer: Layer, maps: PolarMaps): LayerColour | null {
     };
   }
   const plane = layer === 'sun' ? maps.sunPct : maps.earthPct;
-  // Long-term sunlight tops out near 92 % at the best ridges, so stretch the ramp to that.
-  const scale = layer === 'sun' ? 92 : 100;
+  // Long-term sunlight never reaches 100 % even on the best ridges, so the ramp tops out at the maps' own highest.
+  const scale = layer === 'sun' ? maxSunPct(maps) : 100;
   return (x, y) => {
     const v = mapValue(maps, plane, x, y);
     return Number.isNaN(v) ? null : ramp(v / scale);
@@ -82,7 +83,7 @@ export function PoleMap() {
         if (live) fail(e);
       },
     );
-    physics.maps(URLS.maps).then(
+    physics.maps(URLS).then(
       (m) => {
         if (live) setMaps(m);
       },
@@ -162,7 +163,7 @@ export function PoleMap() {
         below={
           layer !== 'none' && (
             <p className="w-60 rounded-lg border border-line bg-panel/92 px-2.5 py-2 text-xs text-quiet">
-              {t(`layers.${layer}Legend`)}
+              {t(`layers.${layer}Legend`, { top: maps ? formatNumber(maxSunPct(maps), 0) : '' })}
             </p>
           )
         }

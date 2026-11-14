@@ -11,19 +11,38 @@ export interface PolarMaps {
   earthPct: Float32Array;
   /** 1 where the ground is never sunlit. */
   shadowed: Uint8Array;
+  /** Distance to the nearest never-sunlit cell, km, where the maps carry it; `shadowDistanceCapKm` is its reach. */
+  shadowDistanceKm?: Float32Array;
+  shadowDistanceCapKm?: number;
 }
 
-/** Decode the concept demo's maps file: three n×n uint8 planes, sunlight ×2, Earth-view ×2, never-sunlit flag. */
-export function mapsFromBytes(bytes: Uint8Array, n: number, pixM: number): PolarMaps {
+/**
+ * Decode a maps file: n×n uint8 planes, sunlight ×2, Earth-view ×2, never-sunlit flag, and, when `distanceUnitKm`
+ * is given, a fourth: the distance to the nearest never-sunlit cell in that unit (255 is as far as it reaches).
+ */
+export function mapsFromBytes(bytes: Uint8Array, n: number, pixM: number, distanceUnitKm?: number): PolarMaps {
   const size = n * n;
-  if (bytes.length !== 3 * size) throw new Error(`maps need ${3 * size} bytes, got ${bytes.length}`);
-  return {
+  const planes = distanceUnitKm === undefined ? 3 : 4;
+  if (bytes.length !== planes * size) throw new Error(`maps need ${planes * size} bytes, got ${bytes.length}`);
+  const maps: PolarMaps = {
     n,
     pixM,
     sunPct: Float32Array.from(bytes.subarray(0, size), (v) => v / 2),
     earthPct: Float32Array.from(bytes.subarray(size, 2 * size), (v) => v / 2),
     shadowed: Uint8Array.from(bytes.subarray(2 * size, 3 * size)),
   };
+  if (distanceUnitKm !== undefined) {
+    maps.shadowDistanceKm = Float32Array.from(bytes.subarray(3 * size, 4 * size), (v) => v * distanceUnitKm);
+    maps.shadowDistanceCapKm = 255 * distanceUnitKm;
+  }
+  return maps;
+}
+
+/** The highest long-term sunlight anywhere on the maps, percent: where a colour ramp should top out. */
+export function maxSunPct(maps: PolarMaps): number {
+  let top = 0;
+  for (const v of maps.sunPct) if (v > top) top = v;
+  return top;
 }
 
 /** Bilinear value at plane coordinates in metres (row 0 at +y), NaN outside the grid. */
@@ -53,5 +72,13 @@ export function mapsAtSite(maps: PolarMaps, latDeg: number, lonDeg: number) {
     sunPct: mapValue(maps, maps.sunPct, p.x, p.y),
     earthPct: mapValue(maps, maps.earthPct, p.x, p.y),
     shadowed: inside ? maps.shadowed[r * maps.n + c] === 1 : undefined,
+    // Undefined where the maps carry no distance, or the nearest shadow is past what they reach.
+    shadowDistanceKm: distanceAt(maps, p.x, p.y),
   };
+}
+
+function distanceAt(maps: PolarMaps, x: number, y: number): number | undefined {
+  if (!maps.shadowDistanceKm || maps.shadowDistanceCapKm === undefined) return undefined;
+  const km = mapValue(maps, maps.shadowDistanceKm, x, y);
+  return Number.isFinite(km) && km < maps.shadowDistanceCapKm ? km : undefined;
 }
