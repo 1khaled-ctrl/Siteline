@@ -52,9 +52,13 @@ The site is on Cloudflare Pages. Cloudflare builds `main` from GitHub on every m
 - **A relief globe of Mars** shaded from NASA's MOLA MEGDR at 463 m, with 2,054 IAU names, search, and the height of any point you click.
 - **A lander tracker** on the Moon and Mars: 46 landings, crashes and planned landings, with a card, a 3D NASA model and the sources for each, and the rover routes on Mars.
 - **Close-up terrain** for each landing site. Nine south-pole sites, VIPER among them, are cut from NASA's 5 m Artemis III models or the 10 m LOLA terrain; the rest from the concept demo's patches. The camera stops zooming where the terrain runs out of detail.
-- **The 3D south pole** from LOLA terrain with NASA's Artemis regions: click anywhere to check that spot, pin up to four sites to compare, rank the best spots in a region, switch on the long-term layers, or play a lunar day over the terrain.
+- **The 3D south pole** from LOLA terrain with NASA's Artemis regions: click anywhere to check that spot, pin up to four sites to compare, switch on the long-term layers, or play a lunar day over the terrain. Picking a Moon lander from the Moon menu checks its spot too.
+- **Find a site that passes.** Search an Artemis region for spots that pass all four checks on the chosen date, judged by the same stay check as the report.
+- **Land Here.** Descend to any south-pole point and stand on it at real scale: eyes 1.7 m up, walk with the keys, a compass with the Sun, the Earth and the way back to touchdown, and the hour steps the light. The ground is NASA's 10 m terrain, or the 5 m Artemis III models where they exist; shadows are the terrain's own. An About panel lists the terrain rings and what the view cannot show.
+- **Fit for a robot.** Read a site against one lander's published needs (NASA's RLLDP concepts, IM-2 Athena's site criteria, the Artemis IV crew): landing circles at NASA's 50 m and 100 m precision-landing radii, lit at landing, longest darkness, Earth in view, the nearest other lander. A need no source gives answers "not enough data", never a pass. See `docs/robot-fit.md`.
+- **The journey.** A simplified Earth-to-Moon flight to the landing site, solved as Lambert's problem from the real positions, labelled as illustrative.
 - **"How we checked it"**, whose numbers are written by the test suite (`tests/reference/validation.json`), never typed by hand.
-- **The orb** at the corner of the view opens Ask SiteLine, a small copilot, and can hide the interface for a clean look at the scene.
+- **The orb** at the corner of the view opens Ask SiteLine and can hide the interface for a clean look at the scene. Ask SiteLine answers through a relay on Cloudflare Workers AI (`functions/api/copilot.ts`, no API key) that only calls the app's own tools and shows them under each reply; without the `AI` binding it falls back to a keyword matcher.
 - English only for now; the strings are in `apps/web/src/i18n/en.json`.
 
 ## Data and credits
