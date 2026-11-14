@@ -131,6 +131,11 @@ export interface HorizonOptions {
   maxDistM?: number;
   /** Skip terrain closer than this, in metres; `HORIZON_MIN_DIST_M` by default. */
   minDistM?: number;
+  /**
+   * Only these azimuth bins are walked, the rest left at −90°: for a check that only ever looks at a few directions
+   * (see `stayBins`). Every bin by default.
+   */
+  bins?: ArrayLike<number>;
 }
 
 /** Skyline from the terrain, walking each azimuth along its great circle so lunar curvature is built in. */
@@ -161,6 +166,7 @@ export function horizonFromHeights(
     maxDistM = 300_000,
     stepM = 30,
     minDistM = HORIZON_MIN_DIST_M,
+    bins,
   }: HorizonOptions & { stepM?: number } = {},
 ): DemHorizon | undefined {
   const { u, e, n } = siteFrame(latDeg, lonDeg);
@@ -168,8 +174,10 @@ export function horizonFromHeights(
   const groundHeightM = heights.heightAt(p.x, p.y);
   if (Number.isNaN(groundHeightM)) return undefined;
   const r0 = MOON_RADIUS_M + groundHeightM + observerHeightM;
-  const mask = new Float32Array(HORIZON_BINS);
-  for (let j = 0; j < HORIZON_BINS; j++) {
+  const mask = new Float32Array(HORIZON_BINS).fill(-90);
+  const count = bins ? bins.length : HORIZON_BINS;
+  for (let k = 0; k < count; k++) {
+    const j = bins ? bins[k] : k;
     const a = j * HORIZON_STEP_DEG * DEG;
     const ca = Math.cos(a);
     const sa = Math.sin(a);

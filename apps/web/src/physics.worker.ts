@@ -18,7 +18,9 @@ import {
   gridTriangles,
   type HeightPatch,
   type HeightSource,
+  HORIZON_BINS,
   HORIZON_MIN_DIST_M,
+  heightsFromDem,
   heightsFromPatches,
   horizonFromDem,
   horizonFromHeights,
@@ -47,10 +49,12 @@ import {
   polarXY,
   resampleGrid,
   resampleToLocal,
+  type SkylineCache,
   type SolarBodyKey,
   SUN_RADIUS_KM,
   siteFrame,
   siteSlopes,
+  stayBins,
   stayTest,
   subsolarPoint,
   sweepDiscVisibility,
@@ -59,7 +63,7 @@ import {
   WALK_RADIUS_M,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
-import type { GeoTIFFImage } from 'geotiff';
+import type { GeoTIFFImage, RemoteSourceOptions } from 'geotiff';
 import fineRegions from './a3clrRegions.json';
 import { type DayStrip, dayStrip } from './dayStrip';
 import { checksOf, verdictOf } from './verdict';
@@ -217,6 +221,17 @@ const loadDrawnDem = (url: string): Promise<Dem> =>
     return demFromInt16(new Int16Array(bytes.buffer), DRAWN.n, DRAWN.pixM, DRAWN.metresPerUnit);
   });
 
+/**
+ * How a terrain GeoTIFF is opened: through a cache of the bytes it has read, in 64 kB blocks, up to 64 MB a file.
+ * geotiff.js otherwise downloads a tile again for every read that touches it, and the reads around nearby sites touch
+ * the same few tiles: one region's search fetched 18 distinct 10 m tiles 130 times (64 MB for 3.2 MB). The bytes are
+ * the file's own, so no height changes. (`fromUrl` hands these to its block cache; its typings leave them out.)
+ */
+const TIFF_BYTE_CACHE: RemoteSourceOptions & { blockSize: number; cacheSize: number } = {
+  blockSize: 65_536,
+  cacheSize: 1_024,
+};
+
 /** One level of a terrain GeoTIFF: its image, where its grid starts, and how big its cells are. */
 interface TerrainLevel {
   image: GeoTIFFImage;
@@ -252,7 +267,7 @@ const levelOf = (image: GeoTIFFImage, base: GeoTIFFImage): TerrainLevel => {
 const loadPyramid = (url: string): Promise<TerrainLevel[]> =>
   memo(`pyramid:${url}`, async () => {
     const { fromUrl } = await import('geotiff');
-    const tiff = await fromUrl(url);
+    const tiff = await fromUrl(url, TIFF_BYTE_CACHE);
     const base = await tiff.getImage();
     const levels = [levelOf(base, base)];
     for (let i = 1; i < (await tiff.getImageCount()); i++) levels.push(levelOf(await tiff.getImage(i), base));
@@ -434,6 +449,102 @@ const slopeAt = (latDeg: number, lonDeg: number, url: string): Promise<SlopeInfo
 /** `p`, or undefined if it has not settled within `ms`. */
 const within = <T>(p: Promise<T | undefined>, ms: number): Promise<T | undefined> =>
   Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
+
+/** A skyline walked in some of its bins, the rest still −90°. */
+interface CachedSkyline {
+  mask: Float32Array;
+  walked: Uint8Array;
+  groundHeightM: number;
+}
+
+/**
+ * Skylines the searches have walked, bin by bin. A skyline does not depend on the date, so searching again, or on
+ * another date, walks only the directions not walked before. The site report never reads these: its skyline is the
+ * whole circle (`fineHorizon`).
+ */
+const skylines = new Map<string, CachedSkyline>();
+/** About 4 kB a skyline. */
+const MAX_SKYLINES = 20_000;
+
+/** A site's skyline for the search, keyed by where it is, how high the observer stands, the terrain and the reach. */
+const skylineCache =
+  (terrainId: string, observerHeightM: number, reachM: number): SkylineCache =>
+  (latDeg, lonDeg, bins, walk) => {
+    const key = `${terrainId}:${round4(latDeg)},${round4(lonDeg)}:${observerHeightM}:${reachM}`;
+    let entry = skylines.get(key);
+    const missing = entry ? bins.filter((b) => !entry?.walked[b]) : bins;
+    if (!entry || missing.length) {
+      const hz = walk(missing);
+      if (!hz) return undefined;
+      if (!entry) {
+        if (skylines.size >= MAX_SKYLINES) skylines.delete(skylines.keys().next().value as string);
+        entry = { mask: hz.mask, walked: new Uint8Array(HORIZON_BINS), groundHeightM: hz.groundHeightM };
+        skylines.set(key, entry);
+      } else for (const b of missing) entry.mask[b] = hz.mask[b];
+      for (const b of missing) entry.walked[b] = 1;
+    }
+    return { mask: entry.mask, groundHeightM: entry.groundHeightM };
+  };
+
+/**
+ * The site report's stay check (`api.stay`) as far as its verdict goes, for the search: the same terrain, the same
+ * fallback to the 1.2 km grid when the 30 m one does not arrive in time, the same slope; but the skyline is walked only
+ * in the directions the stay's Sun and Earth pass through (`stayBins`), and cached, and no 30-day timeline is drawn.
+ * Its pass or fail, least sunlight, Earth share and slope are the report's.
+ */
+async function searchStay(query: StayQuery, urls: DataUrls, patienceMs: number): Promise<StayResult> {
+  const { latDeg, lonDeg } = query.site;
+  const { observerHeightM } = query;
+  const slopeRun = urls.fine
+    ? quiet(slopeAt(latDeg, lonDeg, urls.fine), (m) => console.warn(`slope: ${m}`))
+    : Promise.resolve(undefined);
+  const fineRun = urls.horizonTerrain
+    ? (async () => {
+        const grids = await loadTerrain(urls.horizonTerrain as string);
+        const heights = await heightsAround(grids, latDeg, lonDeg, HORIZON_REACH_M);
+        return heights && { heights, stepM: grids.near.pixM };
+      })().catch(() => undefined)
+    : Promise.resolve(undefined);
+  const ephemeris = await loadEphemeris(urls.data);
+  const [fine, slope] = await Promise.all([within(fineRun, patienceMs), within(slopeRun, patienceMs)]);
+  const binsAt = (heightM: number) => stayBins({ ...query, site: { ...query.site, heightM } }, ephemeris);
+  const at = polarXY(siteFrame(latDeg, lonDeg).u);
+  let hz: (DemHorizon & { id: string }) | undefined;
+  const fineGroundM = fine?.heights.heightAt(at.x, at.y);
+  if (fine && fineGroundM !== undefined && !Number.isNaN(fineGroundM)) {
+    const found = skylineCache(TERRAIN.id, observerHeightM, HORIZON_REACH_M)(
+      latDeg,
+      lonDeg,
+      binsAt(fineGroundM),
+      (bins) =>
+        horizonFromHeights(fine.heights, latDeg, lonDeg, {
+          observerHeightM,
+          stepM: fine.stepM,
+          maxDistM: HORIZON_REACH_M,
+          bins,
+        }),
+    );
+    hz = found && { ...found, id: TERRAIN.id };
+  }
+  if (!hz) {
+    const dem = await quiet(loadDrawnDem(urls.terrain), () => {});
+    const coarseGroundM = dem && heightsFromDem(dem).heightAt(at.x, at.y);
+    if (dem && coarseGroundM !== undefined && !Number.isNaN(coarseGroundM)) {
+      const found = skylineCache(DRAWN.id, observerHeightM, 0)(latDeg, lonDeg, binsAt(coarseGroundM), (bins) =>
+        horizonFromDem(dem, latDeg, lonDeg, { observerHeightM, bins }),
+      );
+      hz = found && { ...found, id: DRAWN.id };
+    }
+  }
+  return stayTest(hz ? { ...query, site: { ...query.site, heightM: hz.groundHeightM } } : query, {
+    ephemeris,
+    horizon: hz?.mask ?? flatHorizon(),
+    slope100mDeg: slope?.slope100mDeg ?? Number.NaN,
+    slope2kmPctUnder20: slope?.slope2kmPctUnder20 ?? Number.NaN,
+    timelineDays: 0,
+    sources: [...EPHEMERIS_SOURCES, ...(hz ? [hz.id] : []), ...(slope ? [slope.id] : [])],
+  });
+}
 
 /** A landing site that passes all four checks, as the site report itself judges them. */
 export interface PassingSite {
@@ -1280,9 +1391,17 @@ const api = {
   },
 
   /** Rank spots inside a region; the timelines are left out to keep the reply small. */
-  /** Sites in a region that pass all four checks for this landing date, by the site report's own verdict. */
-  passing(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<PassingSearch> {
-    return passingSites(search, query, urls);
+  /**
+   * Sites in a region that pass all four checks for this landing date, by the site report's own verdict. `onSite`, if
+   * given, hears of each one the moment it is confirmed; the reply lists them all.
+   */
+  passing(
+    search: BestSearch,
+    query: Omit<StayQuery, 'site'>,
+    urls: DataUrls,
+    onSite?: (site: PassingSite) => void,
+  ): Promise<PassingSearch> {
+    return passingSites(search, query, urls, onSite);
   },
 
   /**
@@ -1440,15 +1559,20 @@ async function passingSites(
   search: BestSearch,
   query: Omit<StayQuery, 'site'>,
   urls: DataUrls,
+  onSite?: (site: PassingSite) => void,
 ): Promise<PassingSearch> {
   const ephemeris = await loadEphemeris(urls.data);
   const dem = await loadDrawnDem(urls.terrain);
   const grid = search.grid ?? 9;
   // The screen walks each skyline 120 km, not 300: quicker, and only ever more hopeful (see BestSearch.reachM).
-  const screen = bestSpots({ ...search, grid, top: grid * grid, reachM: SCREEN_REACH_M }, query, dem, ephemeris, {
-    sources: [...EPHEMERIS_SOURCES, DRAWN.id],
-    stepMinutes: 60,
-  });
+  const screen = bestSpots(
+    { ...search, grid, top: grid * grid, reachM: SCREEN_REACH_M },
+    query,
+    dem,
+    ephemeris,
+    { sources: [...EPHEMERIS_SOURCES, DRAWN.id], stepMinutes: 60 },
+    skylineCache(DRAWN.id, query.observerHeightM, SCREEN_REACH_M),
+  );
   // Candidates: points inside the zone with the Sun and the Earth up for the whole stay on the coarse terrain, best
   // first. The coarse terrain is the optimistic one (it misses the rises near a site that shade it), so a point it
   // fails would not pass at 30 m either; a region with none answers at once.
@@ -1459,8 +1583,8 @@ async function passingSites(
 
   const check = async (latDeg: number, lonDeg: number) => {
     const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg };
-    const r = await api.stay({ ...query, site } as StayQuery, urls, PASSING_PATIENCE_MS);
-    return { r, checks: checksOf(r.result), passes: verdictOf(checksOf(r.result)) === 'pass' };
+    const result = await searchStay({ ...query, site } as StayQuery, urls, PASSING_PATIENCE_MS);
+    return { result, checks: checksOf(result), passes: verdictOf(checksOf(result)) === 'pass' };
   };
   const found: PassingSite[] = [];
   const top = search.top ?? 3;
@@ -1493,7 +1617,7 @@ async function passingSites(
       }
     }
     if (!verdict.passes) return undefined;
-    const { result } = verdict.r;
+    const { result } = verdict;
     return {
       ...at,
       sunFractionMin: result.sunFractionMin,
@@ -1502,7 +1626,14 @@ async function passingSites(
     };
   };
   for (let i = 0; i < candidates.length && found.length < top; i += CHECKS_AT_ONCE) {
-    const batch = await Promise.all(candidates.slice(i, i + CHECKS_AT_ONCE).map(confirm));
+    const batch = await Promise.all(
+      candidates.slice(i, i + CHECKS_AT_ONCE).map((c) =>
+        confirm(c).then((site) => {
+          if (site) void onSite?.(site);
+          return site;
+        }),
+      ),
+    );
     for (const site of batch) if (site) found.push(site);
   }
   found.sort(
