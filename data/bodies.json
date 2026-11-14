@@ -1,17 +1,41 @@
 {
-  "note": "Physical facts about the Moon, Earth and Mars for the body card (apps/web/src/bodyFacts.ts). Each value names the page or kernel it was read from (`sources`), read on 2026-11-11. Radii are NASA's volumetric mean radii; pck00011.tpc agrees (the Moon's 1737.4 km sphere; Earth and Mars as ellipsoids whose mean radii are 6371.01 km and 3389.53 km). The Moon's solarDayH is NASA's synodic period, 29.53 days, as hours. Gravity, escape speed, sunlight strength and signal delay are not stored: the app works them out from these numbers and the planets table. `text.ar` is the Landfall concept demo's Arabic text, not used yet, and it still carries the demo's older temperatures (the Moon at the equator, −173 to 127 °C, and Mars at −63 °C on average, against NASA's current 95 to 390 K and 214 K); redo it from the numbers here before the Arabic version.",
+  "note": "Physical facts about the Moon and the eight planets for the body cards (apps/web/src/bodyFacts.ts). Each value names the page or kernel it was read from (`sources`): the Moon, Earth and Mars on 2026-11-11; Mercury, Venus, Jupiter, Saturn, Uranus, Neptune and every obliquityDeg on 2026-11-15, when the Moon, Earth and Mars sheets still carried the update dates below. Radii are NASA's volumetric mean radii; pck00011.tpc agrees (the Moon's 1737.4 km sphere; Earth and Mars as ellipsoids whose mean radii are 6371.01 km and 3389.53 km). Each GM is the body's own value in gm_de440.tpc (BODY199_GM to BODY899_GM, and BODY301_GM for the Moon), never a system barycentre's. rotationH is the sidereal rotation period as NASA prints it, negative for a retrograde spin (Venus, Uranus); the four giants' sheets mark theirs as System III (Jupiter, Saturn) or magnetic coordinates from Voyager 2 (Uranus, Neptune). solarDayH is the sheet's length of day; the Moon's is its synodic period, 29.53 days, as hours. obliquityDeg is the obliquity to orbit. Jupiter, Saturn, Uranus and Neptune have no solid surface (`surface`: none): their sheets give the temperature at the 1 bar level (`levelBar`, `temperatureK.atLevelK`) and the surface pressure only as '>>1000 bars', so surfacePressureMbar is null, and equatorialRadiusKm is the equatorial radius at 1 bar, the radius NASA's printed escape velocity uses. The Moon's and Mercury's sheets give only trace exosphere pressures (the Moon 3 x 10^-15 bar at night, Mercury under about 5 x 10^-15 bar), so their surfacePressureMbar is null too; Venus's 92 bar is stored as 92000 mbar. Mercury's meanK is the sheet's average temperature; its sunward-side range, 590 to 725 K, is not a day-to-night range and is not stored. Gravity, escape speed, sunlight strength and signal delay are not stored: the app works them out from these numbers and the planets table.",
   "sources": {
-    "nasaMoon": [
-      "NASA NSSDCA Moon Fact Sheet, updated 11 Jan 2024",
-      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+    "nasaMercury": [
+      "NASA NSSDCA Mercury Fact Sheet, updated 11 Jan 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/mercuryfact.html"
+    ],
+    "nasaVenus": [
+      "NASA NSSDCA Venus Fact Sheet, updated 11 Jan 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/venusfact.html"
     ],
     "nasaEarth": [
       "NASA NSSDCA Earth Fact Sheet, updated 15 Nov 2024",
       "https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html"
     ],
+    "nasaMoon": [
+      "NASA NSSDCA Moon Fact Sheet, updated 11 Jan 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html"
+    ],
     "nasaMars": [
       "NASA NSSDCA Mars Fact Sheet, updated 19 May 2025",
       "https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html"
+    ],
+    "nasaJupiter": [
+      "NASA NSSDCA Jupiter Fact Sheet, updated 2 Oct 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/jupiterfact.html"
+    ],
+    "nasaSaturn": [
+      "NASA NSSDCA Saturn Fact Sheet, updated 18 Mar 2025",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/saturnfact.html"
+    ],
+    "nasaUranus": [
+      "NASA NSSDCA Uranus Fact Sheet, updated 2 Oct 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/uranusfact.html"
+    ],
+    "nasaNeptune": [
+      "NASA NSSDCA Neptune Fact Sheet, updated 3 Oct 2024",
+      "https://nssdc.gsfc.nasa.gov/planetary/factsheet/neptunefact.html"
     ],
     "spiceGm": [
       "NAIF gm_de440.tpc, gravitational parameters",
@@ -24,20 +48,41 @@
   },
   "solarConstant": { "wM2": 1361, "source": "nasaEarth" },
   "bodies": {
-    "Moon": {
-      "factSheet": "nasaMoon",
-      "radiusKm": 1737.4,
-      "gmKm3PerS2": 4902.800118,
-      "rotationH": 655.72,
-      "solarDayH": 708.72,
+    "Mercury": {
+      "factSheet": "nasaMercury",
+      "radiusKm": 2439.7,
+      "gmKm3PerS2": 22031.868551,
+      "rotationH": 1407.6,
+      "solarDayH": 4222.6,
+      "obliquityDeg": 0.034,
       "surfacePressureMbar": null,
-      "temperatureK": { "rangeK": [95, 390], "coldestK": 38 },
+      "temperatureK": { "meanK": 440 },
       "sources": {
-        "radiusKm": ["nasaMoon"],
+        "radiusKm": ["nasaMercury"],
         "gmKm3PerS2": ["spiceGm"],
-        "rotationH": ["nasaMoon"],
-        "solarDayH": ["nasaMoon"],
-        "temperatureK": ["nasaMoon", "paige2010"]
+        "rotationH": ["nasaMercury"],
+        "solarDayH": ["nasaMercury"],
+        "obliquityDeg": ["nasaMercury"],
+        "temperatureK": ["nasaMercury"]
+      }
+    },
+    "Venus": {
+      "factSheet": "nasaVenus",
+      "radiusKm": 6051.8,
+      "gmKm3PerS2": 324858.592,
+      "rotationH": -5832.6,
+      "solarDayH": 2802,
+      "obliquityDeg": 177.36,
+      "surfacePressureMbar": 92000,
+      "temperatureK": { "meanK": 737 },
+      "sources": {
+        "radiusKm": ["nasaVenus"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaVenus"],
+        "solarDayH": ["nasaVenus"],
+        "obliquityDeg": ["nasaVenus"],
+        "surfacePressureMbar": ["nasaVenus"],
+        "temperatureK": ["nasaVenus"]
       }
     },
     "Earth": {
@@ -46,6 +91,7 @@
       "gmKm3PerS2": 398600.435507,
       "rotationH": 23.9345,
       "solarDayH": 24,
+      "obliquityDeg": 23.44,
       "surfacePressureMbar": 1014,
       "temperatureK": { "meanK": 288 },
       "sources": {
@@ -53,8 +99,27 @@
         "gmKm3PerS2": ["spiceGm"],
         "rotationH": ["nasaEarth"],
         "solarDayH": ["nasaEarth"],
+        "obliquityDeg": ["nasaEarth"],
         "surfacePressureMbar": ["nasaEarth"],
         "temperatureK": ["nasaEarth"]
+      }
+    },
+    "Moon": {
+      "factSheet": "nasaMoon",
+      "radiusKm": 1737.4,
+      "gmKm3PerS2": 4902.800118,
+      "rotationH": 655.72,
+      "solarDayH": 708.72,
+      "obliquityDeg": 6.68,
+      "surfacePressureMbar": null,
+      "temperatureK": { "rangeK": [95, 390], "coldestK": 38 },
+      "sources": {
+        "radiusKm": ["nasaMoon"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaMoon"],
+        "solarDayH": ["nasaMoon"],
+        "obliquityDeg": ["nasaMoon"],
+        "temperatureK": ["nasaMoon", "paige2010"]
       }
     },
     "Mars": {
@@ -63,6 +128,7 @@
       "gmKm3PerS2": 42828.373621,
       "rotationH": 24.6229,
       "solarDayH": 24.6597,
+      "obliquityDeg": 25.19,
       "surfacePressureMbar": 6.36,
       "temperatureK": { "meanK": 214, "rangeK": [184, 242] },
       "sources": {
@@ -70,23 +136,102 @@
         "gmKm3PerS2": ["spiceGm"],
         "rotationH": ["nasaMars"],
         "solarDayH": ["nasaMars"],
+        "obliquityDeg": ["nasaMars"],
         "surfacePressureMbar": ["nasaMars"],
         "temperatureK": ["nasaMars"]
       }
-    }
-  },
-  "text": {
-    "ar": {
-      "Sun": ["نحو 5,500 °م عند السطح المرئي", "لا يوجد (بلازما)"],
-      "Mercury": ["−173 إلى 427 °م", "صلب، بلا هواء"],
-      "Venus": ["464 °م، وضغط 92 بار من ثاني أكسيد الكربون", "صلب، غلاف جوي ساحق"],
-      "Earth": ["نحو 15 °م في المتوسط", "يابسة ومحيطات، ضغط 1 بار"],
-      "Moon": ["−173 إلى 127 °م عند خط الاستواء؛ أقل من −230 °م في ظلال القطبين", "صلب، بلا هواء"],
-      "Mars": ["نحو −63 °م في المتوسط، ضغط 0.006 بار", "صلب، هواء رقيق"],
-      "Jupiter": ["نحو −110 °م عند قمم السحب", "لا سطح صلب"],
-      "Saturn": ["نحو −140 °م عند قمم السحب", "لا سطح صلب"],
-      "Uranus": ["نحو −195 °م عند قمم السحب", "لا سطح صلب"],
-      "Neptune": ["نحو −200 °م عند قمم السحب", "لا سطح صلب"]
+    },
+    "Jupiter": {
+      "factSheet": "nasaJupiter",
+      "radiusKm": 69911,
+      "equatorialRadiusKm": 71492,
+      "gmKm3PerS2": 126686531.90037,
+      "rotationH": 9.925,
+      "solarDayH": 9.9259,
+      "obliquityDeg": 3.13,
+      "surface": "none",
+      "levelBar": 1,
+      "surfacePressureMbar": null,
+      "temperatureK": { "atLevelK": 165 },
+      "sources": {
+        "radiusKm": ["nasaJupiter"],
+        "equatorialRadiusKm": ["nasaJupiter"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaJupiter"],
+        "solarDayH": ["nasaJupiter"],
+        "obliquityDeg": ["nasaJupiter"],
+        "levelBar": ["nasaJupiter"],
+        "temperatureK": ["nasaJupiter"]
+      }
+    },
+    "Saturn": {
+      "factSheet": "nasaSaturn",
+      "radiusKm": 58232,
+      "equatorialRadiusKm": 60268,
+      "gmKm3PerS2": 37931206.234362,
+      "rotationH": 10.656,
+      "solarDayH": 10.656,
+      "obliquityDeg": 26.73,
+      "surface": "none",
+      "levelBar": 1,
+      "surfacePressureMbar": null,
+      "temperatureK": { "atLevelK": 134 },
+      "sources": {
+        "radiusKm": ["nasaSaturn"],
+        "equatorialRadiusKm": ["nasaSaturn"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaSaturn"],
+        "solarDayH": ["nasaSaturn"],
+        "obliquityDeg": ["nasaSaturn"],
+        "levelBar": ["nasaSaturn"],
+        "temperatureK": ["nasaSaturn"]
+      }
+    },
+    "Uranus": {
+      "factSheet": "nasaUranus",
+      "radiusKm": 25362,
+      "equatorialRadiusKm": 25559,
+      "gmKm3PerS2": 5793951.256527,
+      "rotationH": -17.24,
+      "solarDayH": 17.24,
+      "obliquityDeg": 97.77,
+      "surface": "none",
+      "levelBar": 1,
+      "surfacePressureMbar": null,
+      "temperatureK": { "atLevelK": 76 },
+      "sources": {
+        "radiusKm": ["nasaUranus"],
+        "equatorialRadiusKm": ["nasaUranus"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaUranus"],
+        "solarDayH": ["nasaUranus"],
+        "obliquityDeg": ["nasaUranus"],
+        "levelBar": ["nasaUranus"],
+        "temperatureK": ["nasaUranus"]
+      }
+    },
+    "Neptune": {
+      "factSheet": "nasaNeptune",
+      "radiusKm": 24622,
+      "equatorialRadiusKm": 24764,
+      "gmKm3PerS2": 6835103.145462,
+      "rotationH": 16.11,
+      "solarDayH": 16.11,
+      "obliquityDeg": 28.32,
+      "surface": "none",
+      "levelBar": 1,
+      "surfacePressureMbar": null,
+      "temperatureK": { "atLevelK": 72 },
+      "sources": {
+        "radiusKm": ["nasaNeptune"],
+        "equatorialRadiusKm": ["nasaNeptune"],
+        "gmKm3PerS2": ["spiceGm"],
+        "rotationH": ["nasaNeptune"],
+        "solarDayH": ["nasaNeptune"],
+        "obliquityDeg": ["nasaNeptune"],
+        "levelBar": ["nasaNeptune"],
+        "temperatureK": ["nasaNeptune"]
+      }
     }
   }
 }
