@@ -188,8 +188,14 @@ def missions() -> list[dict]:
 
 
 def demo_sites() -> dict:
-    """The demo's entries, each told its resolution so the camera's zoom limit applies to them too."""
-    sites = json.loads(DEMO_SITES_PATH.read_text(encoding="utf-8")) if DEMO_SITES_PATH.exists() else {}
+    """The demo's entries, each told its resolution so the camera's zoom limit applies to them too.
+
+    Required, not optional: the app reads this step's sites.json in place of the demo's, so one written without the
+    demo's entries would take every demo close-up (Apollo, Surveyor, the Mars landers) out of the app.
+    """
+    if not DEMO_SITES_PATH.exists():
+        raise FileNotFoundError(f"{DEMO_SITES_PATH} is needed: the close-ups' file must keep the demo's entries")
+    sites = json.loads(DEMO_SITES_PATH.read_text(encoding="utf-8"))
     for key, entry in sites.items():
         entry.setdefault("pixM", DEMO_PIX_M.get(key.split("_", 1)[0]))
     return sites
