@@ -153,7 +153,11 @@
   "copilot": {
     "open": "Ask SiteLine",
     "title": "Ask SiteLine",
-    "badge": "Simple matcher, no AI yet",
+    "badge": {
+      "unknown": "Free AI, with a fallback",
+      "ai": "Free AI: Cloudflare Workers AI",
+      "basic": "Basic mode: simple matcher"
+    },
     "close": "Close",
     "inputLabel": "Message",
     "placeholder": "Ask about this site, or say where to go",
@@ -180,7 +184,7 @@
       "flatHorizon": "Horizon taken as flat, as this spot is off the loaded terrain: {{list}}.",
       "notMeasured": "Not measured yet: {{list}}."
     },
-    "note": "Runs in your browser and understands a few kinds of request. It only reads data and moves the view: it changes nothing and calls no outside service. A Claude-powered copilot is planned.",
+    "note": "Answers come from a free AI model (Qwen3 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead.",
     "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight in the long term?\", \"How sure is that?\").",
     "flying": "Flying to {{place}}.",
     "places": {
@@ -222,7 +226,10 @@
     "shadowed": " It never sees the Sun.",
     "longTermNone": "This spot is outside the long-term maps.",
     "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}.",
-    "slopePending": "The slope can't be judged yet: it is measured on LOLA's 10 m terrain, which has not arrived for this spot or does not reach it (it stops at 83° S)."
+    "slopePending": "The slope can't be judged yet: it is measured on LOLA's 10 m terrain, which has not arrived for this spot or does not reach it (it stops at 83° S).",
+    "noteBasic": "Basic mode: the free AI isn't reachable right now (or its daily allowance is used up), so a simple matcher in your browser is answering. It understands a few kinds of request and only reads data or moves the view.",
+    "unverified": "Check: SiteLine didn't give these numbers: {{list}}",
+    "example7": "Would the NASA tripod lander fit here?"
   },
   "share": {
     "button": "Share",

@@ -51,6 +51,13 @@ const PGDA_PROXY = {
   },
 };
 
+/**
+ * Ask SiteLine's relay (functions/api/copilot.ts). On the deployed site it is the Pages Function itself; while
+ * developing, `corepack pnpm copilot` runs it under Wrangler on port 8788 with the Workers AI binding, and the dev
+ * server passes /api there. With nothing on 8788 the copilot falls back to its matcher.
+ */
+const COPILOT_PROXY = { '/api': { target: 'http://localhost:8788' } };
+
 export default defineConfig(({ command, mode }) => {
   // Read from the shell or from apps/web/.env.local (git ignores it), with no prefix filter.
   const env = loadEnv(mode, process.cwd(), '');
@@ -68,7 +75,7 @@ export default defineConfig(({ command, mode }) => {
     // The sound libraries load on the first tap and the GeoTIFF reader with the first slope, not with the app; named
     // here, the dev server bundles them up front instead of finding them mid-session and reloading the page.
     optimizeDeps: { include: ['tone', 'howler', 'geotiff'] },
-    server: { proxy: { ...PGDA_PROXY, ...r2Proxy } },
+    server: { proxy: { ...PGDA_PROXY, ...COPILOT_PROXY, ...r2Proxy } },
     // The physics worker is a module worker; built as one too, it can leave the GeoTIFF reader in a chunk of its own
     // that loads with the first slope, rather than with the app.
     worker: { format: 'es' },

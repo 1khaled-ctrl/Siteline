@@ -1,4 +1,7 @@
-import type { RobotNeeds } from '@siteline/physics';
+import type { StayQuery } from '@siteline/contracts';
+import { moonDistanceKm, type RobotFit, type RobotNeeds, robotFit } from '@siteline/physics';
+import { MISSIONS } from './landers';
+import type { StayResponse } from './physics.worker';
 
 /**
  * The robots a site can be read against. Each need is set only as far as a source says it: a field the source does
@@ -89,3 +92,35 @@ export const LANDING_RADII_M = [50, 100] as const;
 export type LandingRadius = (typeof LANDING_RADII_M)[number];
 
 export const isRobotId = (v: unknown): v is RobotId => typeof v === 'string' && (ROBOT_IDS as string[]).includes(v);
+
+const DAY_MS = 86_400_000;
+
+/**
+ * One robot read against a site check: the card and the copilot both call this, on the same check, so they cannot
+ * disagree.
+ */
+export function fitAt(robot: Robot, query: StayQuery, r: StayResponse, radiusM: number): RobotFit {
+  const stayStartMs = Date.parse(query.landingUtc);
+  return robotFit(robot.needs, {
+    stayStartMs,
+    stayEndMs: stayStartMs + query.stayDays * DAY_MS,
+    series: r.result.series,
+    earthVisiblePct: r.result.earthVisiblePct,
+    circle: r.slope?.circles.find((c) => c.radiusM === radiusM),
+    walkablePct: r.slope?.slope2kmPctUnder20 ?? Number.NaN,
+    shadowDistanceKm: r.longTerm?.shadowDistanceKm ?? r.result.iceDistanceKm,
+  });
+}
+
+/** The nearest other landed or planned Moon mission, for the plume note; undefined if none has a place. */
+export function nearestLander(latDeg: number, lonDeg: number) {
+  let best: { id: string; name: string; km: number; approximate: boolean } | undefined;
+  for (const m of MISSIONS) {
+    if (m.body !== 'Moon' || m.latDeg === undefined || m.lonDeg === undefined) continue;
+    const km = moonDistanceKm(latDeg, lonDeg, m.latDeg, m.lonDeg);
+    // The site may be the mission's own spot, opened from its card.
+    if (km < 0.01) continue;
+    if (!best || km < best.km) best = { id: m.id, name: m.name, km, approximate: m.approximate };
+  }
+  return best;
+}

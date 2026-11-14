@@ -2,9 +2,11 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type Confidence, confidenceOf, type Reading, SLOPE_NEEDS_M } from '../confidence';
 import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, type Target } from '../copilot';
+import { askAi, type ChatMessage, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
 import { physics, queryFor, URLS } from '../physics';
+import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS } from '../robots';
 import { sound } from '../sound';
 import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
@@ -18,11 +20,20 @@ interface Message {
   /** The tool call behind a reply, shown so it is clear what was looked up. */
   call?: string;
   sources?: string[];
+  /** Numbers in an AI reply that no tool of that turn gave: shown while developing, logged on the live site. */
+  unverified?: string[];
 }
+
+/** Who answered last: the free AI model, or the matcher in the browser when the AI is not reachable. */
+type Mode = 'ai' | 'basic' | 'unknown';
+
+/** Rounded to a tenth, the precision the report shows, so the model repeats what the screen says. */
+const tenth = (v: number | undefined) => (v === undefined || !Number.isFinite(v) ? null : Math.round(v * 10) / 10);
+const TARGETS: Target[] = ['solar', 'earth', 'mars', 'moon', 'pole'];
 
 const NAMES = MISSIONS.map((m) => ({ id: m.id, name: m.name }));
 const VIEW_OF: Record<Target, MoonView> = { solar: 'solar', earth: 'earth', mars: 'mars', moon: 'globe', pole: 'pole' };
-const EXAMPLES = ['example1', 'example2', 'example3', 'example6', 'example4', 'example5'];
+const EXAMPLES = ['example1', 'example2', 'example7', 'example3', 'example4', 'example5'];
 const READINGS: Reading[] = ['zone', 'sun', 'earth', 'height', 'longTerm', 'slope'];
 const CONFIDENCE_LEVELS: Confidence[] = ['high', 'firstPass', 'flatHorizon', 'notMeasured'];
 
@@ -44,6 +55,8 @@ export function Copilot() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<Message[]>([]);
+  const [mode, setMode] = useState<Mode>('unknown');
+  const history = useRef<ChatMessage[]>([]);
   const next = useRef(1);
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -153,7 +166,144 @@ export function Copilot() {
     return lines[aspect].join(' ');
   };
 
+  /** The site check for the current site and date, waiting a few seconds for the 10 m slope as the report does. */
+  const check = () => {
+    const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
+    const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
+    return physics.stay(query, URLS, 6000).then((r) => ({ query, r, site: { latDeg, lonDeg } }));
+  };
+
+  /** The tools the AI may call: the matcher's three, and the robot card's check. They read data or move the view. */
+  const runTool = async (call: ToolCall): Promise<ToolResult> => {
+    const a = call.arguments;
+    const shown = `${call.name}(${Object.entries(a)
+      .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+      .join(', ')})`;
+    if (call.name === 'fly_to') {
+      const target = a.target as Target;
+      if (!TARGETS.includes(target)) throw new Error(`no place called ${String(a.target)}`);
+      useApp.getState().set({ view: VIEW_OF[target] });
+      return { call: shown, data: { flyingTo: target } };
+    }
+    if (call.name === 'show_mission') {
+      const named = parseIntent(String(a.name ?? ''), NAMES);
+      if (named.tool !== 'show_mission') throw new Error(`no mission called ${String(a.name)}`);
+      useApp.getState().selectMission(named.input.id);
+      const m = findLander(named.input.id);
+      return {
+        call: shown,
+        data: { opened: m?.name, status: m?.status, date: m?.date, site: m?.site[0], note: m?.note[0] },
+      };
+    }
+    if (call.name === 'analyze_site') {
+      const { query, r, site } = await check();
+      const s = summarize(r, site, query.landingUtc);
+      return {
+        call: shown,
+        sources: s.sources,
+        data: {
+          site,
+          landingUtc: s.landingUtc,
+          stayDays: query.stayDays,
+          verdict: s.verdict,
+          checks: s.checks,
+          sunMinVisiblePct: tenth(s.sunMinPct),
+          earthInViewPct: tenth(s.earthPct),
+          landingSlope100mDeg: tenth(r.slope?.slope100mDeg),
+          walkableWithin1kmPct: tenth(r.slope?.slope2kmPctUnder20),
+          groundHeightM: s.groundHeightM === undefined ? null : Math.round(s.groundHeightM),
+          horizonTerrainResolutionM: r.terrain?.resolutionM ?? null,
+          longTerm: s.longTerm && {
+            sunPct: tenth(s.longTerm.sunPct),
+            earthPct: tenth(s.longTerm.earthPct),
+            neverSunlit: s.longTerm.shadowed,
+          },
+          firstProblem: s.problem ?? null,
+          next: s.next,
+          caveat: 'Screening aid, not certification. Earth in view is not a radio link.',
+        },
+      };
+    }
+    if (call.name === 'robot_fit') {
+      if (!isRobotId(a.robot)) throw new Error(`no robot called ${String(a.robot)}`);
+      const robot = ROBOTS[a.robot];
+      const radiusM = (LANDING_RADII_M as readonly number[]).includes(Number(a.landingRadiusM))
+        ? (Number(a.landingRadiusM) as LandingRadius)
+        : useApp.getState().landingRadiusM;
+      // The card shows the same robot, so what the copilot says can be checked on screen.
+      useApp.getState().set({ robot: robot.id, landingRadiusM: radiusM });
+      const { query, r } = await check();
+      const fit = fitAt(robot, query, r, radiusM);
+      const near = nearestLander(query.site.latDeg, query.site.lonDeg);
+      return {
+        call: shown,
+        sources: robot.sources,
+        data: {
+          robot: t(`robot.name.${robot.id}`),
+          about: t(`robot.blurb.${robot.id}`),
+          overall: fit.overall,
+          landingRadiusM: radiusM,
+          checks: fit.checks
+            .filter((c) => c.status !== 'not_evaluated' || c.id === 'darkness')
+            .map((c) => ({
+              check: c.id,
+              status: c.status,
+              says: t(`robot.check.${c.id}.${c.reason}`, {
+                radius: c.values.radiusM,
+                limit: c.values.limitDeg,
+                worst: tenth(c.values.worstDeg),
+                steep: tenth(c.values.steepPct),
+                sun: tenth(c.values.sunPct),
+                dark: tenth(c.values.darkH),
+                days: query.stayDays,
+                pct: tenth(c.values.pct),
+                walk: tenth(c.values.walkablePct),
+                km: tenth(c.values.shadowKm),
+              }),
+            })),
+          slopeLimitNote: t('robot.limitNote'),
+          nearestLander: near && { name: near.name, km: tenth(near.km), approximate: near.approximate },
+          caveat: t('robot.con3'),
+        },
+      };
+    }
+    throw new Error(`no tool called ${call.name}`);
+  };
+
+  const appState = () => {
+    const s = useApp.getState();
+    const query = queryFor({ latDeg: s.latDeg, lonDeg: s.lonDeg }, s.landingUtc, s.slipDays);
+    return {
+      view: s.view,
+      selectedSite: { latDeg: s.latDeg, lonDeg: s.lonDeg },
+      landingUtc: query.landingUtc,
+      slipDays: s.slipDays,
+      stayDays: query.stayDays,
+      robot: s.robot,
+      openMission: s.missionId,
+    };
+  };
+
   const run = async (message: string) => {
+    const out = await askAi(message, appState(), history.current, runTool);
+    if (out.ok) {
+      history.current = out.history;
+      setMode('ai');
+      if (out.unverified.length) console.warn(`copilot: numbers no tool gave: ${out.unverified.join(', ')}`);
+      return say({
+        from: 'siteline',
+        text: out.text,
+        call: out.calls.map((c) => `↳ ${c}`).join('\n') || undefined,
+        sources: out.sources,
+        unverified: import.meta.env.DEV && out.unverified.length ? out.unverified : undefined,
+      });
+    }
+    setMode('basic');
+    return runBasic(message);
+  };
+
+  /** The matcher: one tool picked from the message's words, answered from the report's own sentences. */
+  const runBasic = async (message: string) => {
     const intent = parseIntent(message, NAMES);
     const call = callText(intent) || undefined;
     if (intent.tool === 'help') return say({ from: 'siteline', text: t('copilot.help') });
@@ -214,7 +364,7 @@ export function Copilot() {
         <h2 className="text-lg">
           {t('copilot.title')}{' '}
           <span className="ms-1 rounded-pill border border-line px-2 py-0.5 align-middle font-sans text-[11px] font-normal text-quiet">
-            {t('copilot.badge')}
+            {t(`copilot.badge.${mode}`)}
           </span>
         </h2>
         <button
@@ -255,11 +405,14 @@ export function Copilot() {
               className="max-w-[92%] self-start rounded-lg border border-line bg-panel-raised px-3 py-2 text-sm"
             >
               {m.call && (
-                <p className="mb-1 font-mono text-[11.5px] text-quiet" dir="ltr">
-                  ↳ {m.call}
+                <p className="mb-1 whitespace-pre-line font-mono text-[11.5px] text-quiet" dir="ltr">
+                  {m.call.startsWith('↳') ? m.call : `↳ ${m.call}`}
                 </p>
               )}
               <p>{m.text}</p>
+              {m.unverified && (
+                <p className="mt-1 text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
+              )}
               {m.sources && m.sources.length > 0 && (
                 <p className="mt-1.5 text-xs text-quiet">
                   {t('report.sources')}:{' '}
@@ -309,7 +462,7 @@ export function Copilot() {
           {t('copilot.send')}
         </button>
       </form>
-      <p className="text-[11.5px] text-quiet">{t('copilot.note')}</p>
+      <p className="text-[11.5px] text-quiet">{t(mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}</p>
     </section>
   );
 }

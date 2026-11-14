@@ -1,12 +1,10 @@
 import type { StayQuery } from '@siteline/contracts';
-import { type FitCheck, type FitStatus, moonDistanceKm, robotFit } from '@siteline/physics';
+import type { FitCheck, FitStatus } from '@siteline/physics';
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
-import { MISSIONS } from '../landers';
-import { DAY_MS } from '../physics';
 import type { StayResponse } from '../physics.worker';
-import { LANDING_RADII_M, ROBOT_IDS, ROBOTS, type RobotId } from '../robots';
+import { fitAt, LANDING_RADII_M, nearestLander, ROBOT_IDS, ROBOTS, type RobotId } from '../robots';
 import { useApp } from '../store';
 import { box, chipButton } from './Controls';
 
@@ -26,19 +24,6 @@ const OVERALL_BOX = {
 /** Checks that do not apply and say nothing useful are left off the list; the lander with no surface power is kept. */
 const shown = (c: FitCheck) => c.status !== 'not_evaluated' || c.id === 'darkness';
 
-/** The nearest other landed or planned Moon mission, for the plume note. */
-function nearestLander(latDeg: number, lonDeg: number) {
-  let best: { name: string; km: number; approximate: boolean } | undefined;
-  for (const m of MISSIONS) {
-    if (m.body !== 'Moon' || m.latDeg === undefined || m.lonDeg === undefined) continue;
-    const km = moonDistanceKm(latDeg, lonDeg, m.latDeg, m.lonDeg);
-    // The site may be the mission's own spot, opened from its card.
-    if (km < 0.01) continue;
-    if (!best || km < best.km) best = { name: m.name, km, approximate: m.approximate };
-  }
-  return best;
-}
-
 interface Props extends StayResponse {
   query: StayQuery;
 }
@@ -53,19 +38,10 @@ export function RobotFit({ query, result, slope, longTerm, slopePending }: Props
   const radiusM = useApp((s) => s.landingRadiusM);
   const robot = robotId ? ROBOTS[robotId] : undefined;
 
-  const fit = useMemo(() => {
-    if (!robot) return undefined;
-    const stayStartMs = Date.parse(query.landingUtc);
-    return robotFit(robot.needs, {
-      stayStartMs,
-      stayEndMs: stayStartMs + query.stayDays * DAY_MS,
-      series: result.series,
-      earthVisiblePct: result.earthVisiblePct,
-      circle: slope?.circles.find((c) => c.radiusM === radiusM),
-      walkablePct: slope?.slope2kmPctUnder20 ?? Number.NaN,
-      shadowDistanceKm: longTerm?.shadowDistanceKm ?? result.iceDistanceKm,
-    });
-  }, [robot, query, result, slope, longTerm, radiusM]);
+  const fit = useMemo(
+    () => robot && fitAt(robot, query, { result, slope, longTerm }, radiusM),
+    [robot, query, result, slope, longTerm, radiusM],
+  );
   const near = useMemo(() => nearestLander(query.site.latDeg, query.site.lonDeg), [query.site]);
 
   const n = (v: number | undefined, digits = 1) => (v === undefined ? '—' : formatNumber(v, digits));
