@@ -3,9 +3,11 @@ import type { BestSearch } from '@siteline/physics';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
-import { DAY_MS, physics, URLS } from '../physics';
+import { touchdownUtcMsOf } from '../land';
+import { physics, URLS } from '../physics';
 import type { PassingSearch, PassingSite } from '../physics.worker';
 import { useApp } from '../store';
+import { LandHereButton } from './LandHere';
 import { PanelError } from './ViewStatus';
 
 /** A region to search: where it is and how wide. */
@@ -19,7 +21,7 @@ export interface SearchArea {
 /** The landing date the site report checks, with the slip: the search checks the same stay. */
 function stayQuery() {
   const { landingUtc, slipDays } = useApp.getState();
-  return { ...DEFAULT_STAY, landingUtc: new Date(Date.parse(landingUtc) + slipDays * DAY_MS).toISOString() };
+  return { ...DEFAULT_STAY, landingUtc: new Date(touchdownUtcMsOf(landingUtc, slipDays)).toISOString() };
 }
 
 /** Sites in one area that pass all four checks, by the site report's own verdict. */
@@ -28,30 +30,62 @@ export function searchArea(area: SearchArea, top = 3): Promise<PassingSearch> {
   return physics.passing(search, stayQuery(), URLS);
 }
 
-/** One passing site, as a row that flies to it and opens its report. */
-export function PassingRow({ site, label, onPick }: { site: PassingSite; label: string; onPick: () => void }) {
+/**
+ * One passing site, as a row that flies to it and opens its report, with Land Here beside it: the search's exact point,
+ * at the moment the search checked.
+ */
+export function PassingRow({
+  site,
+  label,
+  onPick,
+  name,
+}: {
+  site: PassingSite;
+  label: string;
+  onPick: () => void;
+  /** The search region's name, for the surface view's title. */
+  name?: string;
+}) {
   const { t } = useTranslation();
+  const { landingUtc, slipDays } = useApp.getState();
+  const pick = () => {
+    useApp.getState().focusSite(site.latDeg, site.lonDeg);
+    onPick();
+  };
   return (
-    <button
-      type="button"
-      className="flex min-h-11 w-full flex-col items-start gap-0.5 rounded px-2 py-1 text-start hover:bg-panel-raised"
-      onClick={() => {
-        useApp.getState().focusSite(site.latDeg, site.lonDeg);
-        onPick();
-      }}
-    >
-      <span>
-        <span className="text-pass">✓ </span>
-        {label} {formatNumber(Math.abs(site.latDeg), 2)}° S, {formatNumber(site.lonDeg, 2)}°
-      </span>
-      <span className="font-mono text-xs text-quiet">
-        {t('best.readings', {
-          sun: formatNumber(site.sunFractionMin * 100, 0),
-          earth: formatNumber(site.earthVisiblePct, 0),
-          slope: formatNumber(site.slope100mDeg, 1),
-        })}
-      </span>
-    </button>
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        className="flex min-h-11 min-w-0 flex-1 flex-col items-start gap-0.5 rounded px-2 py-1 text-start hover:bg-panel-raised"
+        onClick={pick}
+      >
+        <span>
+          <span className="text-pass">✓ </span>
+          {label} {formatNumber(Math.abs(site.latDeg), 2)}° S, {formatNumber(site.lonDeg, 2)}°
+        </span>
+        <span className="font-mono text-xs text-quiet">
+          {t('best.readings', {
+            sun: formatNumber(site.sunFractionMin * 100, 0),
+            earth: formatNumber(site.earthVisiblePct, 0),
+            slope: formatNumber(site.slope100mDeg, 1),
+          })}
+        </span>
+      </button>
+      <LandHereButton
+        compact
+        latDeg={site.latDeg}
+        lonDeg={site.lonDeg}
+        touchdownUtcMs={touchdownUtcMsOf(landingUtc, slipDays)}
+        name={name}
+        source={{
+          kind: 'passing',
+          sunFractionMin: site.sunFractionMin,
+          earthVisiblePct: site.earthVisiblePct,
+          slope100mDeg: site.slope100mDeg,
+        }}
+        onLand={pick}
+      />
+    </div>
   );
 }
 
@@ -107,7 +141,7 @@ export function BestSpots({ region }: { region: SearchArea }) {
           )}
           {found?.sites.map((s, i) => (
             <li key={`${s.latDeg},${s.lonDeg}`}>
-              <PassingRow site={s} label={`${i + 1}.`} onPick={() => setFound(undefined)} />
+              <PassingRow site={s} label={`${i + 1}.`} name={region.name} onPick={() => setFound(undefined)} />
             </li>
           ))}
           {found && found.sites.length === 0 && (
@@ -158,7 +192,7 @@ export function SearchAll({ regions }: { regions: readonly SearchArea[] }) {
         <ol className="rounded-lg border border-line bg-panel-sunk p-1.5 text-sm" aria-live="polite">
           {state.sites.map((s) => (
             <li key={`${s.latDeg},${s.lonDeg}`}>
-              <PassingRow site={s} label={`${s.region},`} onPick={() => {}} />
+              <PassingRow site={s} label={`${s.region},`} name={s.region} onPick={() => {}} />
             </li>
           ))}
           {!busy && state.sites.length === 0 && (

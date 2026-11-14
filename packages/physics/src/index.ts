@@ -12,4 +12,5 @@ export * from './mission';
 export * from './planets';
 export * from './slope';
 export * from './stay';
+export * from './surface';
 export * from './vec';
