@@ -582,7 +582,9 @@
     "resolution": "One pixel of terrain is {{m}} m across.",
     "credit": {
       "Moon": "Terrain: LRO WAC GLD100 elevation model, German Aerospace Center (DLR) and Arizona State University (<gld>Scholten et al. 2012</gld>).",
-      "Mars": "Terrain: NASA MGS MOLA elevation (<megdr>MEGDR</megdr>). Colour: <sss>Solar System Scope</sss> Mars map, <ccby>CC BY 4.0</ccby>."
+      "Mars": "Terrain: NASA MGS MOLA elevation (<megdr>MEGDR</megdr>). Colour: <sss>Solar System Scope</sss> Mars map, <ccby>CC BY 4.0</ccby>.",
+      "a3clr-sfs-5m": "Terrain: NASA Goddard's 5 m shape-from-shading model of this Artemis III candidate region (<paper>Bertone et al.</paper>; data: <zenodo>Zenodo 17954508</zenodo>), <ccby>CC BY 4.0</ccby>.",
+      "lola-spole-10m": "Terrain: NASA LRO LOLA south pole elevation at 10 m (<pgda>Barker et al. 2023</pgda>)."
     }
   },
   "map": {

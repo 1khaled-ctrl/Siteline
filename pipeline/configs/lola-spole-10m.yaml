@@ -1,0 +1,18 @@
+# LOLA's 10 m south pole terrain inside 83 degrees south (PGDA product 90): the close-up source for sites the
+# Artemis regions do not cover, and the slope's source in the app. Read by byte range; never downloaded whole.
+datasetId: lola-spole-10m
+what: >-
+  LRO LOLA south pole terrain LDEM_83S_10MPP_ADJ.TIF, 10 m a pixel inside 83 degrees south, 32-bit metres on the
+  1737.4 km sphere in LOLA's south polar stereographic grid: 43,280 x 43,280 cells, tiled 512 x 512, deflate with the
+  floating-point predictor.
+url: https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/lola/LDEM_83S_10MPP_ADJ.TIF
+bytes: 5116709568
+licence: >-
+  NASA Goddard data (PGDA). NASA content is generally not subject to copyright in the United States. The product
+  page has a "Data Usage Policy" heading with no text under it, and asks that the paper below be cited.
+citation: >-
+  Barker, M. K., Mazarico, E., Neumann, G. A., Smith, D. E., Zuber, M. T., and Head, J. W. (2023), Improved LOLA
+  elevation maps for south pole landing sites, Planetary Science Journal 4, 183, doi:10.3847/PSJ/acf3e1;
+  data doi:10.60903/gsfcpgda-lola-spole.
+links:
+  - https://pgda.gsfc.nasa.gov/products/90
