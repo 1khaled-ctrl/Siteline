@@ -47,6 +47,26 @@ describe('propagate', () => {
     expect(end.vKmS[0]).toBeCloseTo(-v, 9);
   });
 
+  it('stays on a long, thin trans-lunar ellipse at every moment of a three-day coast', () => {
+    // From a 185 km parking orbit at close to escape speed: the orbit swings out past the Moon. Plain Newton steps from
+    // a rough first guess used to overshoot at a few moments of such a coast and return points 10^16 km away.
+    const energy = (s: { rKm: Vec3; vKmS: Vec3 }) => norm(s.vKmS) ** 2 / 2 - MU_EARTH / norm(s.rKm);
+    for (const speed of [10.8, 10.9, 10.95, 10.97, 10.99]) {
+      for (const radial of [-0.3, 0, 0.2]) {
+        const r0: Vec3 = [6556, 0, 0];
+        const v0: Vec3 = [radial, speed, 0];
+        const e0 = energy({ rKm: r0, vKmS: v0 });
+        const apogee = -MU_EARTH / e0; // 2a, an upper bound on the distance for an ellipse
+        for (let k = 1; k <= 240; k++) {
+          const out = propagate(r0, v0, (3 * 86_400 * k) / 240, MU_EARTH);
+          expect(Number.isFinite(norm(out.rKm))).toBe(true);
+          expect(norm(out.rKm)).toBeLessThan(apogee);
+          expect(energy(out)).toBeCloseTo(e0, 6);
+        }
+      }
+    }
+  });
+
   it('keeps energy and angular momentum on a hyperbolic escape, and comes back when run backwards', () => {
     const r0: Vec3 = [6563, 0, 0];
     const v0: Vec3 = [0, 11.5, 0.4];

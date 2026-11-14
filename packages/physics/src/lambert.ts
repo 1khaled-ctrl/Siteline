@@ -86,16 +86,37 @@ export function propagate(rKm: Vec3, vKmS: Vec3, dtS: number, muKm3S2: number): 
   const alpha = 2 / r0 - v0 ** 2 / muKm3S2;
   const sqrtMu = Math.sqrt(muKm3S2);
 
-  let chi = sqrtMu * Math.abs(alpha) * dtS;
-  for (let i = 0; i < 100; i++) {
+  // Kepler's equation in the universal variable, F(chi) = 0. Its slope is the distance r, never negative, so F only
+  // rises with chi and a root can be kept in a bracket. Newton steps that would leave the bracket are replaced by
+  // halving it, so a thin ellipse (a trans-lunar coast from a low parking orbit) can't send the search off to infinity.
+  const kepler = (chi: number): [F: number, dF: number] => {
     const z = alpha * chi ** 2;
     const C = stumpffC(z);
     const S = stumpffS(z);
     const F = ((r0 * vr0) / sqrtMu) * chi ** 2 * C + (1 - alpha * r0) * chi ** 3 * S + r0 * chi - sqrtMu * dtS;
     const dF = ((r0 * vr0) / sqrtMu) * chi * (1 - z * S) + (1 - alpha * r0) * chi ** 2 * C + r0;
-    const step = F / dF;
-    chi -= step;
-    if (Math.abs(step) < 1e-10) break;
+    return [F, dF];
+  };
+  // F(0) = −√μ·dt, so the root is on the side of zero that dt is on; widen the far end until F changes sign.
+  let lo = 0;
+  let hi = 0;
+  if (dtS !== 0) {
+    const dir = Math.sign(dtS);
+    let far = dir * Math.max(sqrtMu * Math.abs(alpha) * Math.abs(dtS), (sqrtMu * Math.abs(dtS)) / r0, 1e-6);
+    while (dir * kepler(far)[0] < 0) far *= 2;
+    [lo, hi] = dir > 0 ? [0, far] : [far, 0];
+  }
+  let chi = dtS === 0 ? 0 : Math.min(hi, Math.max(lo, sqrtMu * Math.abs(alpha) * dtS));
+  for (let i = 0; i < 200 && dtS !== 0; i++) {
+    const [F, dF] = kepler(chi);
+    if (F === 0) break;
+    if (F < 0) lo = chi;
+    else hi = chi;
+    const newton = chi - F / dF;
+    const next = newton > lo && newton < hi && Number.isFinite(newton) ? newton : (lo + hi) / 2;
+    const step = next - chi;
+    chi = next;
+    if (Math.abs(step) <= 1e-12 * Math.max(1, Math.abs(chi)) || hi - lo <= 1e-12 * Math.max(1, Math.abs(chi))) break;
   }
 
   const z = alpha * chi ** 2;
