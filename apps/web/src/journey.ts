@@ -29,6 +29,15 @@ export const MOON_COAST_DAYS = 3;
 export const MOON_ORBIT_DAYS = 1;
 /** Apollo's parking orbit before trans-lunar injection was about 185 km up. */
 export const PARKING_ALTITUDE_KM = 185;
+/** Apollo 11's lunar orbit before descent was about 100 by 120 km, so about 110 km up (NASA's mission timeline). */
+export const LUNAR_ORBIT_ALTITUDE_KM = 110;
+/** Apollo's powered descent, from the last burn to touchdown, took about 12 minutes. */
+export const POWERED_DESCENT_MIN = 12;
+/**
+ * How the playback splits its time: half on the three-day coast, then the day in lunar orbit, then the descent. The
+ * readouts always show the real mission time, so slowing the arrival down hides nothing.
+ */
+export const PLAYBACK_SHARE = { coast: 0.5, orbit: 0.3 } as const;
 /** Trans-lunar injection starts a little short of opposite the Moon's arrival point, where a transfer is cheapest. */
 const TLI_LEAD_DEG = 170;
 /** The Sun's GM, BODY10_GM in gm_de440.tpc (dataset spice-gm-de440). */
@@ -67,6 +76,10 @@ export interface Journey {
   /** Speed relative to Earth just after leaving its orbit (Moon), or relative to Mars on arrival (Mars), km/s. */
   speedKmS: number;
   tofDays: number;
+  /** Moon only: when the descent starts, half a lunar orbit plus the powered descent before touchdown. */
+  descentUtcMs?: number;
+  /** Moon only: the period of the lunar orbit the craft waits in, seconds. */
+  lunarOrbitS?: number;
   /** Mars only: yardsticks from the two orbits themselves, to judge the launch energy by. */
   reference?: MarsReference;
 }
@@ -87,6 +100,23 @@ export function marsReference(r1Km: number, r2Km: number, mu = SUN_GM_KM3_S2): M
     hohmannC3Km2S2: (vTransfer - vCircle) ** 2,
     synodicDays: 1 / Math.abs(1 / period(r1Km) - 1 / period(r2Km)),
   };
+}
+
+/** The period of a circular orbit of radius `rKm` around a body of gravity `mu` (km³/s²), in seconds. */
+export const circularPeriodS = (rKm: number, mu: number): number => 2 * Math.PI * Math.sqrt(rKm ** 3 / mu);
+
+/** The mission time shown at playback position `k` (0 to 1); the Moon journey spends longer on its arrival. */
+export function playbackTime(
+  j: Pick<Journey, 'departUtcMs' | 'arriveUtcMs' | 'landUtcMs' | 'descentUtcMs'>,
+  k: number,
+): number {
+  const kk = Math.min(1, Math.max(0, k));
+  if (j.descentUtcMs === undefined) return j.departUtcMs + kk * (j.landUtcMs - j.departUtcMs);
+  const { coast, orbit } = PLAYBACK_SHARE;
+  const seg = (k0: number, k1: number, t0: number, t1: number) => t0 + ((kk - k0) / (k1 - k0)) * (t1 - t0);
+  if (kk <= coast) return seg(0, coast, j.departUtcMs, j.arriveUtcMs);
+  if (kk <= coast + orbit) return seg(coast, coast + orbit, j.arriveUtcMs, j.descentUtcMs);
+  return seg(coast + orbit, 1, j.descentUtcMs, j.landUtcMs);
 }
 
 /** A launch counts as in a window when it needs no more than this many times the Hohmann energy. */
@@ -175,6 +205,11 @@ export async function moonJourney(landUtcMs: number, at: PositionsAt): Promise<J
   const moon = await Promise.all(
     moonTimes.map(async (t) => ({ tUtcMs: t, xy: xy(toPlane(plane, (await at(t)).moon)) })),
   );
+  const lunarOrbitS = circularPeriodS(
+    BODY_CONSTANTS.Moon.radiusKm + LUNAR_ORBIT_ALTITUDE_KM,
+    BODY_CONSTANTS.Moon.gmKm3PerS2,
+  );
+  const descentUtcMs = landUtcMs - (lunarOrbitS / 2) * 1000 - POWERED_DESCENT_MIN * 60_000;
   const sun = toPlane(plane, [-land.earth[0], -land.earth[1], -land.earth[2]]);
   const sunLen = Math.hypot(sun[0], sun[1]) || 1;
   return {
@@ -189,6 +224,8 @@ export async function moonJourney(landUtcMs: number, at: PositionsAt): Promise<J
     c3Km2S2: norm(sol.v1KmS) ** 2 - (2 * mu) / rp,
     speedKmS: norm(sol.v1KmS),
     tofDays: MOON_COAST_DAYS + MOON_ORBIT_DAYS,
+    descentUtcMs,
+    lunarOrbitS,
   };
 }
 

@@ -1,15 +1,18 @@
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BODY_CONSTANTS } from '../bodyFacts';
 import { formatNumber, formatUtc } from '../format';
 import {
   type CraftSample,
   type Journey,
+  LUNAR_ORBIT_ALTITUDE_KM,
   MARS_TOF_DAYS,
   MOON_COAST_DAYS,
   MOON_ORBIT_DAYS,
   marsJourney,
   moonJourney,
   type Positions,
+  playbackTime,
   trackAt,
   WINDOW_C3_FACTOR,
   type XY,
@@ -21,7 +24,8 @@ import { Spinner } from './ViewStatus';
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** How long a full play-through takes on screen. */
-const PLAY_SECONDS = 14;
+const PLAY_SECONDS = 16;
+const HOUR_MS = 3_600_000;
 const COLOURS = {
   bg: '#070b16',
   ink: '#e8edf7',
@@ -54,6 +58,22 @@ function craftAt(samples: readonly CraftSample[], tUtcMs: number): { s: CraftSam
   };
 }
 
+/** When the transfer first comes within `rKm` of the Moon's centre; the arrival time if it never does. */
+function orbitEntryUtcMs(j: Journey, rKm: number): number {
+  const moon = j.tracks.moon ?? [];
+  if (!moon.length) return j.arriveUtcMs;
+  const dist = (c: CraftSample) => {
+    const m = trackAt(moon, c.tUtcMs);
+    return Math.hypot(c.xy[0] - m[0], c.xy[1] - m[1]);
+  };
+  for (let i = 1; i < j.craft.length; i++) {
+    const [a, b] = [j.craft[i - 1], j.craft[i]];
+    const [da, db] = [dist(a), dist(b)];
+    if (da > rKm && db <= rKm) return a.tUtcMs + ((da - rKm) / (da - db)) * (b.tUtcMs - a.tUtcMs);
+  }
+  return j.arriveUtcMs;
+}
+
 interface Labels {
   earth: string;
   moon: string;
@@ -61,28 +81,66 @@ interface Labels {
   sun: string;
   depart: string;
   arrive: string;
+  descent: string;
   touchdown: string;
   site: string;
+  siteInset: string;
   scale: string;
+  closeScale: string;
 }
 
+export interface Site {
+  latDeg: number;
+  lonDeg: number;
+}
+
+const smoothstep = (a: number, b: number, x: number) => {
+  const k = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return k * k * (3 - 2 * k);
+};
+
+/** Size of the "where it lands" globe in the corner, px. */
+const INSET_R = 40;
+
 /** One frame of the journey at `tUtcMs`, top-down onto the plane of motion. */
-function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUtcMs: number, labels: Labels) {
+function draw(
+  g: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  j: Journey,
+  tUtcMs: number,
+  labels: Labels,
+  site: Site,
+) {
   g.clearRect(0, 0, w, h);
   g.fillStyle = COLOURS.bg;
   g.fillRect(0, 0, w, h);
 
+  const moonTrip = j.body === 'Moon';
+  const target = moonTrip ? 'moon' : 'mars';
+  const targetXY = trackAt(j.tracks[target] ?? [], tUtcMs);
+
+  // The whole trip, framed on everything drawn, so the picture fills the canvas whichever way the orbit lies.
   const pts: XY[] = [...j.craft.map((c) => c.xy), ...Object.values(j.tracks).flatMap((tr) => tr.map((p) => p.xy))];
-  if (j.body === 'Mars') pts.push(...(j.rings.mars ?? []), ...(j.rings.earth ?? []));
-  // Framed on everything drawn, so the picture fills the canvas whichever way the orbit lies.
+  if (!moonTrip) pts.push(...(j.rings.mars ?? []), ...(j.rings.earth ?? []));
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const s = Math.min((w * 0.84) / (x1 - x0 || 1), (h * 0.74) / (y1 - y0 || 1));
-  const mx = (x0 + x1) / 2;
-  const my = (y0 + y1) / 2;
+  const wholeS = Math.min((w * 0.84) / (x1 - x0 || 1), (h * 0.74) / (y1 - y0 || 1));
+  const whole: XY = [(x0 + x1) / 2, (y0 + y1) / 2];
+
+  // Near the Moon the camera closes in on it, so the lunar orbit and the descent are big enough to follow. It zooms
+  // geometrically and keeps the Moon still on screen while it does, rather than sliding it across.
+  const moonR = BODY_CONSTANTS.Moon.radiusKm;
+  const orbitR = moonR + LUNAR_ORBIT_ALTITUDE_KM;
+  const closeMoonPx = Math.max(48, Math.min(Math.min(w, h) * 0.3, w / 2 - 2 * INSET_R - 28));
+  const closeS = closeMoonPx / moonR;
+  const zoom = moonTrip ? smoothstep(j.arriveUtcMs - 14 * HOUR_MS, j.arriveUtcMs + HOUR_MS, tUtcMs) : 0;
+  const s = wholeS * (closeS / wholeS) ** zoom;
+  const pull = zoom === 0 ? 0 : (1 - wholeS / s) / (1 - wholeS / closeS);
+  const mx = whole[0] + (targetXY[0] - whole[0]) * pull;
+  const my = whole[1] + (targetXY[1] - whole[1]) * pull;
   const toScreen = ([x, y]: XY): XY => [w / 2 + (x - mx) * s, h / 2 + 12 - (y - my) * s];
-  const fromScreen = ([x, y]: XY): XY => [(x - w / 2) / s + mx, (h / 2 + 12 - y) / s + my];
 
   const disc = (at: XY, r: number, fill: string, glow: number) => {
     const [x, y] = toScreen(at);
@@ -95,8 +153,33 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
     g.fill();
     g.restore();
   };
+  // Seen from above the orbit, the half facing the Sun is lit: the terminator is a straight line through the centre.
+  const litDisc = (at: XY, r: number, fill: string, glow: number) => {
+    if (!j.sunDir) {
+      disc(at, r, fill, glow);
+      return;
+    }
+    const [x, y] = toScreen(at);
+    const sunA = Math.atan2(-j.sunDir[1], j.sunDir[0]);
+    g.save();
+    g.shadowColor = fill;
+    g.shadowBlur = glow / 2;
+    g.fillStyle = '#1b202b';
+    g.beginPath();
+    g.arc(x, y, r, 0, Math.PI * 2);
+    g.fill();
+    g.shadowBlur = glow;
+    g.fillStyle = fill;
+    g.beginPath();
+    g.arc(x, y, r, sunA - Math.PI / 2, sunA + Math.PI / 2);
+    g.closePath();
+    g.fill();
+    g.restore();
+  };
   const label = (at: XY, text: string, dy: number, colour = COLOURS.quiet) => {
     const [x, y] = toScreen(at);
+    // Off the canvas once the camera has closed in: leave it out rather than pin it to an edge.
+    if (x < -40 || x > w + 40 || y + dy < 0 || y + dy > h) return;
     g.fillStyle = colour;
     g.font = '500 12px "IBM Plex Sans", system-ui, sans-serif';
     g.textAlign = 'center';
@@ -121,18 +204,18 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
   };
 
   // Orbits and tracks first, then the path, then the bodies and the craft on top.
-  if (j.body === 'Mars') {
-    line(j.rings.earth ?? [], 'rgba(91, 169, 255, 0.28)', 1);
-    line(j.rings.mars ?? [], 'rgba(224, 115, 74, 0.3)', 1);
-    disc([0, 0], 9, COLOURS.sun, 24);
-    label([0, 0], labels.sun, 24);
-  } else {
+  if (moonTrip) {
     line(
       (j.tracks.moon ?? []).map((p) => p.xy),
       'rgba(201, 206, 216, 0.35)',
       1.2,
       [2, 5],
     );
+  } else {
+    line(j.rings.earth ?? [], 'rgba(91, 169, 255, 0.28)', 1);
+    line(j.rings.mars ?? [], 'rgba(224, 115, 74, 0.3)', 1);
+    disc([0, 0], 9, COLOURS.sun, 24);
+    label([0, 0], labels.sun, 24);
   }
   line(
     j.craft.map((c) => c.xy),
@@ -140,8 +223,11 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
     1.5,
     [5, 6],
   );
-  const done = j.craft.filter((c) => c.tUtcMs <= tUtcMs).map((c) => c.xy);
-  const here = craftAt(j.craft, Math.min(tUtcMs, j.arriveUtcMs));
+  // The simplified transfer aims at the Moon's centre, so the craft leaves it for the lunar orbit where it first comes
+  // within the orbit's radius, rather than flying on into the Moon.
+  const entryUtcMs = moonTrip ? orbitEntryUtcMs(j, orbitR) : j.arriveUtcMs;
+  const done = j.craft.filter((c) => c.tUtcMs <= Math.min(tUtcMs, entryUtcMs)).map((c) => c.xy);
+  const here = craftAt(j.craft, Math.min(tUtcMs, entryUtcMs));
   if (tUtcMs > j.craft[0].tUtcMs) done.push(here.s.xy);
   g.save();
   g.shadowColor = COLOURS.craft;
@@ -149,58 +235,77 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
   line(done, COLOURS.craft, 2.2);
   g.restore();
 
-  const earthXY = j.body === 'Mars' ? trackAt(j.tracks.earth ?? [], tUtcMs) : ([0, 0] as XY);
-  disc(earthXY, j.body === 'Mars' ? 6 : 11, COLOURS.earth, 14);
-  label(earthXY, labels.earth, j.body === 'Mars' ? 20 : 27);
-  const target = j.body === 'Mars' ? 'mars' : 'moon';
-  const targetXY = trackAt(j.tracks[target] ?? [], tUtcMs);
-  const targetR = j.body === 'Mars' ? 5.5 : 6.5;
-  disc(targetXY, targetR, j.body === 'Mars' ? COLOURS.mars : COLOURS.moon, 10);
-  label(targetXY, j.body === 'Mars' ? labels.mars : labels.moon, -14);
+  // Bodies are enlarged while the whole trip is in view, and drawn at their true size once that is bigger.
+  const earthXY = moonTrip ? ([0, 0] as XY) : trackAt(j.tracks.earth ?? [], tUtcMs);
+  const earthPx = moonTrip ? Math.max(11, BODY_CONSTANTS.Earth.radiusKm * s) : 6;
+  (moonTrip ? litDisc : disc)(earthXY, earthPx, COLOURS.earth, 14);
+  label(earthXY, labels.earth, earthPx + 16);
+  const targetPx = moonTrip ? Math.max(6.5, moonR * s) : 5.5;
+  (moonTrip ? litDisc : disc)(targetXY, targetPx, moonTrip ? COLOURS.moon : COLOURS.mars, 10);
+  label(targetXY, moonTrip ? labels.moon : labels.mars, -targetPx - 8);
   // At the Moon the start is on top of the Earth, whose name is below it.
-  label(j.craft[0].xy, labels.depart, j.body === 'Moon' ? -20 : 22, COLOURS.craft);
+  if (zoom < 0.5) label(j.craft[0].xy, labels.depart, moonTrip ? -earthPx - 9 : 22, COLOURS.craft);
 
-  // The craft: on its transfer orbit, then (Moon) circling in lunar orbit, then down at the site.
+  // The craft: on its transfer orbit, then (Moon) circling in lunar orbit, then down to the surface.
   let craftXY = here.s.xy;
   let heading = here.heading;
   const landed = tUtcMs >= j.landUtcMs;
-  if (tUtcMs > j.arriveUtcMs && j.body === 'Moon') {
-    const k = (tUtcMs - j.arriveUtcMs) / (j.landUtcMs - j.arriveUtcMs);
-    const turns = 6 * k;
+  const descending = j.descentUtcMs !== undefined && tUtcMs >= j.descentUtcMs && !landed;
+  if (moonTrip && tUtcMs > entryUtcMs && j.lunarOrbitS) {
+    // The lunar orbit to scale, with the craft going round it at its real period, starting where it came in from.
     const [tx, ty] = toScreen(targetXY);
-    const r = landed ? 0 : targetR + 7;
-    const a = turns * Math.PI * 2;
     g.strokeStyle = 'rgba(244, 182, 63, 0.4)';
     g.lineWidth = 1;
     g.beginPath();
-    g.arc(tx, ty, targetR + 7, 0, Math.PI * 2);
+    g.arc(tx, ty, Math.max(targetPx + 7, orbitR * s), 0, Math.PI * 2);
     g.stroke();
-    craftXY = fromScreen([tx + r * Math.cos(a), ty - r * Math.sin(a)]);
+    const entry = craftAt(j.craft, entryUtcMs).s.xy;
+    const entryMoon = trackAt(j.tracks.moon ?? [], entryUtcMs);
+    const a0 = Math.atan2(entry[1] - entryMoon[1], entry[0] - entryMoon[0]);
+    const a = a0 + (2 * Math.PI * (Math.min(tUtcMs, j.landUtcMs) - entryUtcMs)) / (j.lunarOrbitS * 1000);
+    // The descent brings it from the orbit's height to the ground over the last stretch.
+    const down =
+      j.descentUtcMs === undefined ? 0 : smoothstep(j.descentUtcMs, j.landUtcMs, Math.min(tUtcMs, j.landUtcMs));
+    const rKm = orbitR + (moonR - orbitR) * down;
+    const rPx = Math.max(targetPx + 7 - 7 * down, rKm * s);
+    craftXY = [targetXY[0] + (rPx / s) * Math.cos(a), targetXY[1] + (rPx / s) * Math.sin(a)];
     heading = a + Math.PI / 2;
   } else if (landed) {
     craftXY = targetXY;
   }
-  const [x, y] = toScreen(craftXY);
+  const [cx, cy] = toScreen(craftXY);
+  if (!landed) {
+    // A soft ring so the craft is easy to find while it is small against the whole trip.
+    g.strokeStyle = 'rgba(244, 182, 63, 0.35)';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.arc(cx, cy, 13, 0, Math.PI * 2);
+    g.stroke();
+  }
   g.save();
-  g.translate(x, y);
+  g.translate(cx, cy);
   g.rotate(-heading);
   g.shadowColor = COLOURS.craft;
   g.shadowBlur = 14;
   g.fillStyle = COLOURS.craft;
   g.beginPath();
-  g.moveTo(7, 0);
-  g.lineTo(-5, 4.5);
-  g.lineTo(-2.5, 0);
-  g.lineTo(-5, -4.5);
+  g.moveTo(10, 0);
+  g.lineTo(-7, 6.5);
+  g.lineTo(-3.5, 0);
+  g.lineTo(-7, -6.5);
   g.closePath();
   g.fill();
   g.restore();
-  if (tUtcMs >= j.arriveUtcMs) label(targetXY, landed ? labels.touchdown : labels.arrive, 24, COLOURS.craft);
+  if (tUtcMs >= j.arriveUtcMs) {
+    const text = landed ? labels.touchdown : descending ? labels.descent : labels.arrive;
+    label(targetXY, text, targetPx + 22, COLOURS.craft);
+  }
 
   if (j.sunDir) {
+    // Which way the Sun is: an arrow from the corner, with its name past the tip so the two never cross.
     const [dx, dy] = j.sunDir;
-    const ax = 30;
-    const ay = h - 30;
+    const ax = 44;
+    const ay = h - 44;
     g.strokeStyle = COLOURS.sun;
     g.fillStyle = COLOURS.sun;
     g.lineWidth = 1.5;
@@ -212,46 +317,65 @@ function draw(g: CanvasRenderingContext2D, w: number, h: number, j: Journey, tUt
     g.arc(ax + dx * 22, ay - dy * 22, 3, 0, Math.PI * 2);
     g.fill();
     g.font = '500 11px "IBM Plex Sans", system-ui, sans-serif';
-    g.textAlign = 'left';
-    g.fillText(labels.sun, ax + 8, ay + 16);
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(labels.sun, ax + dx * 38, ay - dy * 38);
+    g.textBaseline = 'alphabetic';
   }
 
-  // The landing site, once the craft has arrived: a small globe seen from straight above the site.
+  // Where it lands, once the craft has arrived: a small globe seen from its equator above the site's longitude, so
+  // the site sits at its real latitude, with the south pole at the bottom.
   if (tUtcMs >= j.arriveUtcMs) {
-    const R = 46;
-    const ix = w - R - 18;
-    const iy = R + 18;
+    const R = INSET_R;
+    const ix = w - R - 16;
+    const iy = R + 50;
     g.save();
-    g.globalAlpha = Math.min(1, (tUtcMs - j.arriveUtcMs) / (0.15 * (j.landUtcMs - j.arriveUtcMs + DAY_MS)));
+    g.globalAlpha = Math.min(1, (tUtcMs - j.arriveUtcMs) / (3 * HOUR_MS));
+    g.fillStyle = COLOURS.quiet;
+    g.font = '500 11px "IBM Plex Sans", system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.fillText(labels.siteInset, ix, iy - R - 8);
     const grad = g.createRadialGradient(ix - R * 0.3, iy - R * 0.3, R * 0.1, ix, iy, R);
-    grad.addColorStop(0, j.body === 'Mars' ? '#e79a6e' : '#d8dce4');
-    grad.addColorStop(1, j.body === 'Mars' ? '#7a3a22' : '#5a606c');
+    grad.addColorStop(0, moonTrip ? '#d8dce4' : '#e79a6e');
+    grad.addColorStop(1, moonTrip ? '#5a606c' : '#7a3a22');
     g.fillStyle = grad;
     g.beginPath();
     g.arc(ix, iy, R, 0, Math.PI * 2);
     g.fill();
-    g.strokeStyle = 'rgba(255,255,255,0.25)';
-    g.lineWidth = 1;
-    for (const rr of [R * 0.4, R * 0.75]) {
+    // Parallels every 30° and meridians 30° and 60° either side of the site's.
+    g.strokeStyle = 'rgba(255,255,255,0.22)';
+    g.lineWidth = 0.8;
+    for (const lat of [-60, -30, 0, 30, 60]) {
+      const y = iy - R * Math.sin((lat * Math.PI) / 180);
+      const half = R * Math.cos((lat * Math.PI) / 180);
       g.beginPath();
-      g.arc(ix, iy, rr, 0, Math.PI * 2);
+      g.moveTo(ix - half, y);
+      g.lineTo(ix + half, y);
       g.stroke();
     }
-    g.fillStyle = landed ? COLOURS.craft : 'rgba(244, 182, 63, 0.5)';
+    for (const dLon of [-60, -30, 0, 30, 60]) {
+      g.beginPath();
+      g.ellipse(ix, iy, Math.abs(R * Math.sin((dLon * Math.PI) / 180)) || 0.01, R, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+    const sy = iy - R * Math.sin((site.latDeg * Math.PI) / 180);
+    g.fillStyle = landed ? COLOURS.craft : 'rgba(244, 182, 63, 0.6)';
+    g.shadowColor = COLOURS.craft;
+    g.shadowBlur = landed ? 10 : 0;
     g.beginPath();
-    g.arc(ix, iy, landed ? 5 : 3.5, 0, Math.PI * 2);
+    g.arc(ix, sy, landed ? 5 : 4, 0, Math.PI * 2);
     g.fill();
+    g.shadowBlur = 0;
     g.fillStyle = COLOURS.ink;
     g.font = '500 11.5px "IBM Plex Sans", system-ui, sans-serif';
-    g.textAlign = 'center';
-    g.fillText(labels.site, ix, iy + R + 16);
+    g.fillText(labels.site, Math.min(ix, w - g.measureText(labels.site).width / 2 - 6), iy + R + 16);
     g.restore();
   }
 
   g.fillStyle = COLOURS.quiet;
   g.font = '400 11px "IBM Plex Sans", system-ui, sans-serif';
   g.textAlign = 'right';
-  g.fillText(labels.scale, w - 12, h - 12);
+  g.fillText(zoom > 0.5 ? labels.closeScale : labels.scale, w - 12, h - 12);
 }
 
 /** The button that opens the simulation for a landing. */
@@ -355,7 +479,7 @@ function JourneyBody({ target }: { target: JourneyTarget }) {
     return () => cancelAnimationFrame(frame);
   }, [playing]);
 
-  const tUtcMs = journey ? journey.departUtcMs + k * (journey.landUtcMs - journey.departUtcMs) : 0;
+  const tUtcMs = journey ? playbackTime(journey, k) : 0;
   const ns = target.latDeg < 0 ? t('landers.south') : t('landers.north');
   const ew = target.lonDeg < 0 ? t('landers.west') : t('landers.east');
   const place = `${formatNumber(Math.abs(target.latDeg), 2)}° ${ns}, ${formatNumber(Math.abs(target.lonDeg), 2)}° ${ew}`;
@@ -367,9 +491,12 @@ function JourneyBody({ target }: { target: JourneyTarget }) {
       sun: t('bodies.sun'),
       depart: t(`journey.depart.${target.body}`),
       arrive: t(`journey.arrive.${target.body}`),
+      descent: t('journey.descent'),
       touchdown: t('journey.touchdown'),
       site: place,
+      siteInset: t('journey.siteInset'),
       scale: t('journey.notToScale'),
+      closeScale: t('journey.closeScale'),
     }),
     [t, target.body, place],
   );
@@ -385,18 +512,20 @@ function JourneyBody({ target }: { target: JourneyTarget }) {
     const g = c.getContext('2d');
     if (!g) return;
     g.setTransform(ratio, 0, 0, ratio, 0, 0);
-    draw(g, w, h, journey, tUtcMs, labels);
-  }, [journey, tUtcMs, labels]);
+    draw(g, w, h, journey, tUtcMs, labels, target);
+  }, [journey, tUtcMs, labels, target]);
 
   const phase = !journey
     ? ''
     : tUtcMs >= journey.landUtcMs
       ? t('journey.phase.landed')
-      : tUtcMs >= journey.arriveUtcMs
-        ? t(`journey.phase.arrived.${journey.body}`)
-        : tUtcMs <= journey.departUtcMs
-          ? t(`journey.phase.start.${journey.body}`)
-          : t(`journey.phase.cruise.${journey.body}`);
+      : journey.descentUtcMs !== undefined && tUtcMs >= journey.descentUtcMs
+        ? t('journey.phase.descent')
+        : tUtcMs >= journey.arriveUtcMs
+          ? t(`journey.phase.arrived.${journey.body}`)
+          : tUtcMs <= journey.departUtcMs
+            ? t(`journey.phase.start.${journey.body}`)
+            : t(`journey.phase.cruise.${journey.body}`);
   let now = journey && craftAt(journey.craft, Math.min(tUtcMs, journey.arriveUtcMs)).s;
   // In lunar orbit the craft goes where the Moon goes: its distance and speed are the Moon's, from the ephemeris.
   if (journey && now && journey.body === 'Moon' && tUtcMs > journey.arriveUtcMs && journey.tracks.moon) {
@@ -432,30 +561,61 @@ function JourneyBody({ target }: { target: JourneyTarget }) {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-[1fr_15rem]">
-        <div className="relative">
-          <canvas
-            ref={canvas}
-            className="block h-[min(56dvh,520px)] w-full rounded-lg border border-line"
-            role="img"
-            aria-label={t('journey.canvasLabel', { phase })}
-          />
-          {!journey && !error && (
-            <p role="status" className="absolute inset-0 grid place-items-center text-sm text-quiet">
-              <span className="flex items-center gap-2">
-                <Spinner />
-                {t('journey.working')}
-              </span>
+        {/* Play and the timeline sit right under the picture, so they stay in view on a narrow screen too. */}
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="relative">
+            <canvas
+              ref={canvas}
+              className="block h-[min(56dvh,520px)] w-full rounded-lg border border-line"
+              role="img"
+              aria-label={t('journey.canvasLabel', { phase })}
+            />
+            {!journey && !error && (
+              <p role="status" className="absolute inset-0 grid place-items-center text-sm text-quiet">
+                <span className="flex items-center gap-2">
+                  <Spinner />
+                  {t('journey.working')}
+                </span>
+              </p>
+            )}
+            {error && (
+              <p role="alert" className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-fail">
+                {t('journey.failed', { message: error })}
+              </p>
+            )}
+            {/* The caption sits on the animation itself, so no still or recording of it loses it. */}
+            <p className="pointer-events-none absolute inset-x-2 top-2 mx-auto w-fit max-w-[90%] rounded-md bg-bar/85 px-2.5 py-1 text-center text-xs text-sun-ink">
+              {t('journey.caption')}
             </p>
-          )}
-          {error && (
-            <p role="alert" className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-fail">
-              {t('journey.failed', { message: error })}
-            </p>
-          )}
-          {/* The caption sits on the animation itself, so no still or recording of it loses it. */}
-          <p className="pointer-events-none absolute inset-x-2 top-2 mx-auto w-fit max-w-[90%] rounded-md bg-bar/85 px-2.5 py-1 text-center text-xs text-sun-ink">
-            {t('journey.caption')}
-          </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={!journey}
+              className={smallButton}
+              onClick={() => {
+                if (k >= 1) setK(0);
+                setPlaying((p) => !p);
+              }}
+            >
+              {playing ? t('journey.pause') : k >= 1 ? t('journey.replay') : t('journey.play')}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1000}
+              step={1}
+              value={Math.round(k * 1000)}
+              disabled={!journey}
+              aria-label={t('journey.scrub')}
+              aria-valuetext={journey ? formatUtc(new Date(tUtcMs).toISOString()) : undefined}
+              className="min-w-0 flex-1 accent-sun"
+              onChange={(e) => {
+                setPlaying(false);
+                setK(Number(e.currentTarget.value) / 1000);
+              }}
+            />
+          </div>
         </div>
 
         {journey && now && (
@@ -490,35 +650,6 @@ function JourneyBody({ target }: { target: JourneyTarget }) {
             )}
           </dl>
         )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled={!journey}
-          className={smallButton}
-          onClick={() => {
-            if (k >= 1) setK(0);
-            setPlaying((p) => !p);
-          }}
-        >
-          {playing ? t('journey.pause') : k >= 1 ? t('journey.replay') : t('journey.play')}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1000}
-          step={1}
-          value={Math.round(k * 1000)}
-          disabled={!journey}
-          aria-label={t('journey.scrub')}
-          aria-valuetext={journey ? formatUtc(new Date(tUtcMs).toISOString()) : undefined}
-          className="min-w-0 flex-1 accent-sun"
-          onChange={(e) => {
-            setPlaying(false);
-            setK(Number(e.currentTarget.value) / 1000);
-          }}
-        />
       </div>
 
       <p className="text-xs text-quiet">

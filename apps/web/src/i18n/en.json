@@ -101,8 +101,11 @@
       "Moon": "Lunar orbit",
       "Mars": "Arrival"
     },
+    "descent": "Descending",
     "touchdown": "Touchdown",
+    "siteInset": "Where it lands",
     "notToScale": "Distances to scale; bodies enlarged",
+    "closeScale": "Moon and its orbit to scale",
     "phaseLabel": "Now",
     "phase": {
       "start": {
@@ -117,6 +120,7 @@
         "Moon": "In lunar orbit, before descent",
         "Mars": "Entry, descent and landing"
       },
+      "descent": "Descending to the site",
       "landed": "Landed at the site"
     },
     "time": "Date and time (UTC)",
