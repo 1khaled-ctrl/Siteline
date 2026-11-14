@@ -188,10 +188,20 @@ export function resampleToLocal(
  * agree exactly. NaN outside the grid or where a corner has no data.
  */
 export function gridUpAt(grid: LocalGrid, east: number, north: number): number {
-  const fx = (east + grid.halfM) / grid.spacingM;
-  const fz = (grid.halfM - north) / grid.spacingM;
   const last = grid.size - 1;
-  if (!(fx >= 0 && fz >= 0 && fx <= last && fz <= last)) return Number.NaN;
+  // A point a rounding error outside the edge is on it.
+  const fx = Math.min(last, Math.max(0, (east + grid.halfM) / grid.spacingM));
+  const fz = Math.min(last, Math.max(0, (grid.halfM - north) / grid.spacingM));
+  const slack = 1e-6 * last;
+  if (
+    !(
+      (east + grid.halfM) / grid.spacingM >= -slack &&
+      (grid.halfM - north) / grid.spacingM >= -slack &&
+      (east + grid.halfM) / grid.spacingM <= last + slack &&
+      (grid.halfM - north) / grid.spacingM <= last + slack
+    )
+  )
+    return Number.NaN;
   const c = Math.min(Math.floor(fx), last - 1);
   const r = Math.min(Math.floor(fz), last - 1);
   const x = fx - c;
@@ -398,6 +408,191 @@ export function discVisibility(
       const top = sample[r0 * coarse + c0] * (1 - wc) + sample[r0 * coarse + c1] * wc;
       const bottom = sample[r1 * coarse + c0] * (1 - wc) + sample[r1 * coarse + c1] * wc;
       out[row * grid.size + col] = top * (1 - wr) + bottom * wr;
+    }
+  }
+  return out;
+}
+
+/** A square grid of points to work something out at, laid out like a `LocalGrid` (row 0 north, west to east). */
+export interface PointGrid {
+  size: number;
+  spacingM: number;
+  halfM: number;
+}
+
+/**
+ * The share of a disc (the Sun's) seen from every point of `out`, over the nested terrain grids: the same answer as
+ * walking from each point toward the disc (`horizonAlongDeg`), found far faster. Points are taken along lines parallel
+ * to the disc's azimuth, `out.spacingM` apart; each line is walked from the far end on the disc's side toward the other,
+ * keeping the upper convex hull of the profile already passed, so each point's skyline is the hull's tangent from it:
+ * about one step per point, however low the disc. The answers are then read back onto `out`'s nodes.
+ *
+ * The profile beyond `out` toward the disc (out to the coarsest grid's edge, the Moon's curvature included as everywhere
+ * here) is walked at each grid's own spacing, once for every `shareFar` neighbouring lines: lines a few metres apart see
+ * the same ridges kilometres away.
+ */
+export function sweepDiscVisibility(
+  grids: readonly LocalGrid[],
+  out: PointGrid,
+  dir: Vec3,
+  radiusDeg: number,
+  shareFar = 8,
+): Float32Array {
+  const result = new Float32Array(out.size * out.size);
+  const { elevDeg, azDeg } = localElevAz(dir);
+  if (Math.hypot(dir[0], dir[1]) < 1e-9) return result.fill(elevDeg > 0 ? 1 : 0);
+  // Toward the disc on the ground (de, dn), and across the lines (pe, pn), a quarter turn clockwise.
+  const de = Math.sin(azDeg * DEG);
+  const dn = Math.cos(azDeg * DEG);
+  const pe = dn;
+  const pn = -de;
+  const step = out.spacingM;
+  const H = out.halfM;
+  const uMax = H * (Math.abs(pe) + Math.abs(pn));
+  const tMax = H * (Math.abs(de) + Math.abs(dn));
+  const lines = Math.ceil((2 * uMax) / step) + 1;
+  const points = Math.ceil((2 * tMax) / step) + 1;
+  const along = new Float32Array(lines * points);
+  const last = grids[grids.length - 1];
+  const outer = last.halfM;
+
+  const heightAt = (e: number, n: number): { h: number; spacing: number } => {
+    for (const g of grids) {
+      const edge = g.halfM * (1 + 1e-9);
+      if (Math.abs(e) > edge || Math.abs(n) > edge) continue;
+      const h = gridUpAt(g, e, n);
+      if (Number.isFinite(h)) return { h, spacing: g.spacingM };
+    }
+    return { h: Number.NaN, spacing: last.spacingM };
+  };
+  // Where a line leaves the coarsest grid on the disc's side.
+  const farEnd = (u: number): number => {
+    let t = Number.POSITIVE_INFINITY;
+    for (const [d, p] of [
+      [de, pe],
+      [dn, pn],
+    ]) {
+      if (d > 1e-12) t = Math.min(t, (outer - u * p) / d);
+      else if (d < -1e-12) t = Math.min(t, (-outer - u * p) / d);
+    }
+    return t;
+  };
+
+  // The hull: points (t, h) with t decreasing toward the top of the stack.
+  let hullT = new Float64Array(1024);
+  let hullH = new Float64Array(1024);
+  let top = -1;
+  const push = (t: number, h: number) => {
+    // Points under the segment from the new point to the next hull point can no longer be anyone's skyline.
+    while (top >= 1 && (hullH[top - 1] - h) / (hullT[top - 1] - t) >= (hullH[top] - h) / (hullT[top] - t)) top--;
+    if (top + 1 >= hullT.length) {
+      const grow = (a: Float64Array) => {
+        const b = new Float64Array(a.length * 2);
+        b.set(a);
+        return b;
+      };
+      hullT = grow(hullT);
+      hullH = grow(hullH);
+    }
+    top++;
+    hullT[top] = t;
+    hullH[top] = h;
+  };
+  /** The steepest rise from (t, h) to the hull, as a tangent; −∞ with nothing beyond. */
+  const skyline = (t: number, h: number): number => {
+    while (top >= 1 && (hullH[top - 1] - h) / (hullT[top - 1] - t) >= (hullH[top] - h) / (hullT[top] - t)) top--;
+    return top >= 0 ? (hullH[top] - h) / (hullT[top] - t) : Number.NEGATIVE_INFINITY;
+  };
+
+  let farT = new Float64Array(0);
+  let farH = new Float64Array(0);
+  for (let j = 0; j < lines; j++) {
+    const u = -uMax + j * step;
+    if (j % shareFar === 0) {
+      // The far profile for this group of lines, walked from the coarsest grid's edge in to `out`.
+      top = -1;
+      const uFar = Math.min(uMax, u + (shareFar * step) / 2);
+      for (let t = farEnd(uFar); t > tMax; ) {
+        const e = uFar * pe + t * de;
+        const n = uFar * pn + t * dn;
+        const { h, spacing } = heightAt(e, n);
+        if (Number.isFinite(h)) push(t, h);
+        t -= Math.max(spacing * 0.75, step);
+      }
+      farT = hullT.slice(0, top + 1);
+      farH = hullH.slice(0, top + 1);
+    }
+    // Every line starts from its group's far hull.
+    if (hullT.length < farT.length + points + 1) {
+      hullT = new Float64Array(farT.length + points + 1024);
+      hullH = new Float64Array(farT.length + points + 1024);
+    }
+    hullT.set(farT);
+    hullH.set(farH);
+    top = farT.length - 1;
+    for (let k = points - 1; k >= 0; k--) {
+      const t = -tMax + k * step;
+      const { h } = heightAt(u * pe + t * de, u * pn + t * dn);
+      const i = j * points + k;
+      if (!Number.isFinite(h)) {
+        along[i] = Number.NaN;
+        continue;
+      }
+      const tan = skyline(t, h);
+      along[i] = discFraction(elevDeg, toDeg(tan), radiusDeg);
+      push(t, h);
+    }
+  }
+
+  // Back onto `out`'s nodes, bilinearly between the lines and the points along them.
+  for (let r = 0; r < out.size; r++) {
+    const north = H - r * step;
+    for (let c = 0; c < out.size; c++) {
+      const east = -H + c * step;
+      const fj = Math.min(lines - 1, Math.max(0, (east * pe + north * pn + uMax) / step));
+      const fk = Math.min(points - 1, Math.max(0, (east * de + north * dn + tMax) / step));
+      const j0 = Math.max(0, Math.min(Math.floor(fj), lines - 2));
+      const k0 = Math.max(0, Math.min(Math.floor(fk), points - 2));
+      const wj = fj - j0;
+      const wk = fk - k0;
+      // Points with no terrain under them (past the data's edge) are left out of the blend.
+      let sum = 0;
+      let weight = 0;
+      for (const [jj, kk, w] of [
+        [j0, k0, (1 - wj) * (1 - wk)],
+        [j0, k0 + 1, (1 - wj) * wk],
+        [j0 + 1, k0, wj * (1 - wk)],
+        [j0 + 1, k0 + 1, wj * wk],
+      ]) {
+        const v = along[jj * points + kk];
+        if (Number.isFinite(v) && w > 0) {
+          sum += v * w;
+          weight += w;
+        }
+      }
+      result[r * out.size + c] = weight > 0 ? sum / weight : 0;
+    }
+  }
+  return result;
+}
+
+/** Values on one point grid read onto another covering the same square, bilinearly between `from`'s nodes. */
+export function resampleGrid(values: Float32Array, from: PointGrid, to: PointGrid): Float32Array {
+  const out = new Float32Array(to.size * to.size);
+  const last = from.size - 1;
+  const cell = Math.max(0, last - 1);
+  for (let r = 0; r < to.size; r++) {
+    const fr = Math.min(last, Math.max(0, (from.halfM - (to.halfM - r * to.spacingM)) / from.spacingM));
+    const r0 = Math.min(Math.floor(fr), cell);
+    const wr = fr - r0;
+    for (let c = 0; c < to.size; c++) {
+      const fc = Math.min(last, Math.max(0, (-to.halfM + c * to.spacingM + from.halfM) / from.spacingM));
+      const c0 = Math.min(Math.floor(fc), cell);
+      const wc = fc - c0;
+      const i = r0 * from.size + c0;
+      const top = values[i] * (1 - wc) + values[i + 1] * wc;
+      const bottom = values[i + from.size] * (1 - wc) + values[i + from.size + 1] * wc;
+      out[r * to.size + c] = top * (1 - wr) + bottom * wr;
     }
   }
   return out;

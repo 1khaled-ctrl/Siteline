@@ -24,7 +24,8 @@ type V3 = readonly [number, number, number];
 
 /** One ring of terrain, as the physics worker builds it. */
 export interface SurfaceMeshData {
-  name: string;
+  /** 0 is the walkable ground; each ring after it has cells twice the size and reaches twice as far. */
+  index: number;
   positions: Float32Array;
   normals: Float32Array;
   indices: Uint32Array;
@@ -43,6 +44,11 @@ export interface SurfaceLighting {
   earthRadiusDeg: number;
   /** The share of the Sun's disc each node of each ring sees above the terrain, ring by ring; omit to keep the last. */
   sunlit?: readonly Float32Array[];
+  /**
+   * The same over the walkable square at a finer spacing than its mesh, as bytes 0 to 255 laid out like a grid (row 0
+   * north): where it reaches, the ground's shadows are read from it, so their edges are as sharp as its cells.
+   */
+  shadowMap?: { data: Uint8Array; size: number; halfM: number };
 }
 
 export type SurfaceMode = 'idle' | 'descent' | 'explore';
@@ -60,6 +66,8 @@ export type SurfaceLabels = Record<SurfaceLabelKey, LabelPoint>;
 export interface SurfaceViewOptions {
   reducedMotion?: boolean;
   eyeHeightM?: number;
+  /** The ring you walk on (by its index): 0, or 1 when a finer ring lies inside it. */
+  walkIndex?: number;
   onMode?: (mode: SurfaceMode) => void;
   /** Why the last step was refused (the edge of the terrain, a hole in it), and null once walking freely again. */
   onBlocked?: (reason: MoveBlock | null) => void;
@@ -144,6 +152,10 @@ uniform float sunPower;
 uniform vec3 albedo;
 uniform float detail;
 uniform float inspect;
+uniform sampler2D shadowMap;
+uniform float shadowHalf;
+uniform float shadowSize;
+uniform float useShadowMap;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSunlit;
@@ -175,8 +187,14 @@ void main() {
     float t = 0.55 * vnoise(vWorld.xz * 0.9) + 0.3 * vnoise(vWorld.xz * 0.23) + 0.15 * vnoise(vWorld.xz * 3.7);
     grain = mix(1.0, 0.86 + 0.28 * t, fade);
   }
+  // The cast shadows: from the fine shadow map where it covers the ground, else from the mesh's own nodes.
+  float lit = vSunlit;
+  if (useShadowMap > 0.5 && abs(vWorld.x) < shadowHalf && abs(vWorld.z) < shadowHalf) {
+    vec2 uv = (vWorld.xz + shadowHalf) / (2.0 * shadowHalf) * ((shadowSize - 1.0) / shadowSize) + 0.5 / shadowSize;
+    lit = texture2D(shadowMap, uv).r;
+  }
   vec3 base = albedo * grain;
-  vec3 colour = base * sunPower * ls * vSunlit;
+  vec3 colour = base * sunPower * ls * lit;
   if (inspect > 0.5) {
     float lamp = mu / (1.0 + dist * dist / 900.0);
     colour += base * vec3(0.5, 0.66, 1.0) * lamp;
@@ -214,6 +232,17 @@ void main() {
 }
 `;
 
+/** A ring's geometry: its nodes, normals, the share of the Sun each node sees, and its triangles. */
+function ringGeometry(d: SurfaceMeshData, sunlit: Float32Array): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(d.positions, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(d.normals, 3));
+  geometry.setAttribute('sunlit', new THREE.BufferAttribute(sunlit, 1));
+  geometry.setIndex(new THREE.BufferAttribute(d.indices, 1));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 /** A soft round spot, white at the centre: the Sun's disc and its glare. */
 function spotTexture(size: number, falloff: (r: number) => number): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
@@ -242,6 +271,10 @@ export class SurfaceView {
     sunPower: { value: SUN_POWER },
     albedo: { value: new THREE.Color(0.5, 0.5, 0.5) },
     inspect: { value: 0 },
+    shadowMap: { value: SurfaceView.blankShadow() },
+    shadowHalf: { value: 0 },
+    shadowSize: { value: 1 },
+    useShadowMap: { value: 0 },
   };
   private readonly sunDisc: THREE.Sprite;
   private readonly sunGlare: THREE.Sprite;
@@ -306,11 +339,13 @@ export class SurfaceView {
   ) {
     this.eyeM = opts.eyeHeightM ?? EYE_HEIGHT_M;
     this.reducedMotion = opts.reducedMotion ?? false;
-    const grids = data
-      .filter((d) => d.up)
-      .map((d): LocalGrid => ({ size: d.size, spacingM: d.spacingM, halfM: d.halfM, up: d.up as Float32Array }));
-    if (grids.length === 0) throw new Error('the surface view needs the walkable ring’s heights');
-    this.walkGrid = grids[0];
+    const withHeights = data.filter((d) => d.up);
+    const grids = withHeights.map(
+      (d): LocalGrid => ({ size: d.size, spacingM: d.spacingM, halfM: d.halfM, up: d.up as Float32Array }),
+    );
+    const walk = withHeights.findIndex((d) => d.index === (opts.walkIndex ?? 0));
+    if (walk < 0) throw new Error('the surface view needs the walkable ring’s heights');
+    this.walkGrid = grids[walk];
     this.overGrids = grids;
 
     this.renderer = new THREE.WebGLRenderer({
@@ -331,24 +366,19 @@ export class SurfaceView {
     this.scene.background = new THREE.Color(0x000000);
     this.camera.rotation.order = 'YXZ';
 
-    data.forEach((d, i) => {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(d.positions, 3));
-      geometry.setAttribute('normal', new THREE.BufferAttribute(d.normals, 3));
-      geometry.setAttribute('sunlit', new THREE.BufferAttribute(new Float32Array(d.size * d.size).fill(1), 1));
-      geometry.setIndex(new THREE.BufferAttribute(d.indices, 1));
-      geometry.computeBoundingSphere();
+    for (const d of data) {
+      const geometry = ringGeometry(d, new Float32Array(d.size * d.size).fill(1));
       const material = new THREE.ShaderMaterial({
         vertexShader: TERRAIN_VERTEX,
         fragmentShader: TERRAIN_FRAGMENT,
-        uniforms: { ...this.uniforms, detail: { value: i <= 1 ? 1 : 0 } },
+        uniforms: { ...this.uniforms, detail: { value: d.index <= 1 ? 1 : 0 } },
       });
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.name = d.name;
+      mesh.name = `ring ${d.index}`;
       mesh.matrixAutoUpdate = false;
       this.meshes.push(mesh);
       this.scene.add(mesh);
-    });
+    }
 
     const disc = spotTexture(64, (r) => (r < 0.92 ? 1 : (1 - r) / 0.08));
     const glare = spotTexture(128, (r) => 0.55 * Math.exp(-r * 5.5) * (1 - r));
@@ -377,7 +407,7 @@ export class SurfaceView {
     this.scene.add(this.sunGlare, this.sunDisc, this.earth);
 
     // The touchdown target: a gold ring laid on the ground and, during the descent, a faint column above it.
-    const ground = gridUpAt(this.walkGrid, 0, 0);
+    const ground = this.groundAt(0, 0);
     this.touchdownTop = ground + 7;
     const ringShape = new THREE.RingGeometry(4, 6, 64, 2);
     const flat = ringShape.getAttribute('position') as THREE.BufferAttribute;
@@ -385,7 +415,7 @@ export class SurfaceView {
       // The ring's plane (x east, y north) onto the terrain, 20 cm above it.
       const east = flat.getX(i);
       const north = flat.getY(i);
-      const h = gridUpAt(this.walkGrid, east, north);
+      const h = this.groundAt(east, north);
       flat.setXYZ(i, east, (Number.isFinite(h) ? h : ground) + 0.2, -north);
     }
     flat.needsUpdate = true;
@@ -435,6 +465,7 @@ export class SurfaceView {
     toThree(light.sunDir, this.uniforms.sunDir.value).normalize();
     const elevDeg = (Math.asin(Math.max(-1, Math.min(1, light.sunDir[2]))) * 180) / Math.PI;
     this.uniforms.sunPower.value = SUN_POWER * exposureFor(elevDeg);
+    if (light.shadowMap) this.setShadowMap(light.shadowMap);
     if (light.sunlit) {
       light.sunlit.forEach((values, i) => {
         const attr = this.meshes[i]?.geometry.getAttribute('sunlit') as THREE.BufferAttribute | undefined;
@@ -444,6 +475,64 @@ export class SurfaceView {
       });
     }
     this.dirty = true;
+  }
+
+  /**
+   * Swaps in a ring rebuilt from its own detailed read for the coarse stand-in it was drawn from: a new geometry, the
+   * old one freed. Its shadows stay as they were until the light is worked out again.
+   */
+  updateRing(d: SurfaceMeshData): void {
+    const mesh = this.meshes[d.index];
+    if (!mesh) return;
+    const old = mesh.geometry;
+    const sunlit = (old.getAttribute('sunlit').array as Float32Array).slice();
+    mesh.geometry = ringGeometry(
+      d,
+      sunlit.length === d.size * d.size ? sunlit : new Float32Array(d.size * d.size).fill(1),
+    );
+    old.dispose();
+    if (d.up) {
+      const grid = this.overGrids.find((g) => g.spacingM === d.spacingM && g.halfM === d.halfM);
+      if (grid) grid.up = d.up;
+    }
+    this.dirty = true;
+  }
+
+  /** A 1 × 1 texture standing in until the first shadow map arrives (a sampler must always have one). */
+  private static blankShadow(): THREE.DataTexture {
+    const t = new THREE.DataTexture(new Uint8Array([255]), 1, 1, THREE.RedFormat, THREE.UnsignedByteType);
+    t.needsUpdate = true;
+    return t;
+  }
+
+  /** The walkable ground's fine shadow map, as a single-channel texture read with linear filtering. */
+  private setShadowMap(map: { data: Uint8Array; size: number; halfM: number }): void {
+    const current = this.uniforms.shadowMap.value;
+    if (current.image.width === map.size && current.image.height === map.size) {
+      (current.image.data as Uint8Array).set(map.data);
+      current.needsUpdate = true;
+    } else {
+      const texture = new THREE.DataTexture(
+        map.data.slice(),
+        map.size,
+        map.size,
+        THREE.RedFormat,
+        THREE.UnsignedByteType,
+      );
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearFilter;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      // Rows of an odd number of bytes: tell WebGL they are packed tight.
+      texture.unpackAlignment = 1;
+      texture.generateMipmaps = false;
+      texture.needsUpdate = true;
+      this.uniforms.shadowMap.value = texture;
+      current.dispose();
+    }
+    this.uniforms.shadowHalf.value = map.halfM;
+    this.uniforms.shadowSize.value = map.size;
+    this.uniforms.useShadowMap.value = 1;
   }
 
   /** Starts the descent from the top, facing `headingRad` at touchdown; with reduced motion, it is a cut. */
@@ -524,7 +613,7 @@ export class SurfaceView {
 
   /** The average share of the Sun the walkable ground gets within `radiusM` of a point: how dark it is around you. */
   sunlitAround(east: number, north: number, radiusM: number): number {
-    const mesh = this.meshes[0];
+    const mesh = this.meshes[this.opts.walkIndex ?? 0];
     const g = this.walkGrid;
     if (!mesh) return 1;
     const lit = mesh.geometry.getAttribute('sunlit').array as Float32Array;
@@ -595,6 +684,7 @@ export class SurfaceView {
       for (const m of Array.isArray(material) ? material : material ? [material] : []) m.dispose();
     });
     for (const t of this.textures) t.dispose();
+    this.uniforms.shadowMap.value.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     this.canvas.remove();
@@ -747,7 +837,8 @@ export class SurfaceView {
       cam.position.set(p.east, p.up, -p.north);
       cam.lookAt(this.tmp.copy(cam.position).add(toThree(p.look, this.tmp2)));
     } else {
-      const ground = gridUpAt(this.walkGrid, this.pos.east, this.pos.north);
+      // The ground you see is the finest ring's, which can lie inside the one you walk on (the 5 m inside the 10 m).
+      const ground = this.groundAt(this.pos.east, this.pos.north);
       cam.position.set(this.pos.east, (Number.isFinite(ground) ? ground : 0) + this.eyeM, -this.pos.north);
       cam.rotation.set(this.pitch, -this.heading, 0, 'YXZ');
     }

@@ -1,5 +1,15 @@
+import { MOON_RADIUS_M, polarToUnit, unitToLatLon } from '@siteline/physics';
 import { describe, expect, it } from 'vitest';
-import { coverageAt, gridReachLatDeg, latestOnly, TERRAIN_EXTENT, touchdownFromQuery, touchdownUtcMsOf } from './land';
+import fineRegions from './a3clrRegions.json';
+import {
+  coverageAt,
+  fineRegionAt,
+  gridReachLatDeg,
+  latestOnly,
+  TERRAIN_EXTENT,
+  touchdownFromQuery,
+  touchdownUtcMsOf,
+} from './land';
 
 describe('touchdown time', () => {
   const landingUtc = '2026-11-14T12:38:00.000Z';
@@ -63,5 +73,39 @@ describe('switching sites while one is loading', () => {
     latest.cancel();
     await third;
     expect(shown).toEqual(['second']);
+  });
+});
+
+describe('NASA’s 5 m terrain of the Artemis III regions', () => {
+  // The middle of the Connecting Ridge region, from the table's own corner and size.
+  const ridge = fineRegions.regions.find((r) => r.name === 'Connecting Ridge');
+  const centre =
+    ridge &&
+    unitToLatLon(
+      polarToUnit(ridge.cornerX + (ridge.width * ridge.pixM) / 2, ridge.cornerY - (ridge.height * ridge.pixM) / 2),
+    );
+
+  it('lists all thirteen regions, at 5 m, each with its download size', () => {
+    expect(fineRegions.regions).toHaveLength(13);
+    for (const r of fineRegions.regions) {
+      expect(r.pixM).toBe(5);
+      expect(r.compressedBytes).toBeGreaterThan(10_000_000);
+    }
+    expect(MOON_RADIUS_M).toBe(1_737_400);
+  });
+
+  it('offers the 5 m terrain inside a region and nowhere else', () => {
+    expect(centre).toBeDefined();
+    if (!centre) return;
+    expect(fineRegionAt(centre.latDeg, centre.lonDeg)?.name).toBe('Connecting Ridge');
+    expect(fineRegionAt(-80.5, 10)).toBeUndefined();
+    expect(fineRegionAt(0.67, 23.47)).toBeUndefined();
+  });
+
+  it('wants room for the 5 m ring around the point', () => {
+    if (!ridge || !centre) return;
+    const nearEdge = unitToLatLon(polarToUnit(ridge.cornerX + 100, ridge.cornerY - (ridge.height * ridge.pixM) / 2));
+    expect(fineRegionAt(nearEdge.latDeg, nearEdge.lonDeg)).toBeDefined();
+    expect(fineRegionAt(nearEdge.latDeg, nearEdge.lonDeg, 800)).toBeUndefined();
   });
 });

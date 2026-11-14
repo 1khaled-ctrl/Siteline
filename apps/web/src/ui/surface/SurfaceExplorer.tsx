@@ -12,9 +12,17 @@ import * as Comlink from 'comlink';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber, formatUtc } from '../../format';
-import { gridReachLatDeg, type LandingTarget, latestOnly, TERRAIN_EXTENT } from '../../land';
+import { fineRegionAt, gridReachLatDeg, type LandingTarget, latestOnly, TERRAIN_EXTENT } from '../../land';
 import { HOUR_MS, physics, URLS } from '../../physics';
-import type { EyeView, SurfaceProgress, SurfaceQuality, SurfaceScene, SurfaceSky } from '../../physics.worker';
+import type {
+  EyeView,
+  RingUpdate,
+  SurfaceLevelData,
+  SurfaceProgress,
+  SurfaceQuality,
+  SurfaceScene,
+  SurfaceSky,
+} from '../../physics.worker';
 import { sound } from '../../sound';
 import { FIRST_UTC_MS, LAST_UTC_MS, useApp } from '../../store';
 import { pressedGold } from '../Controls';
@@ -30,8 +38,14 @@ type Phase =
   | { kind: 'error'; reason: string }
   | { kind: 'lost' };
 
+type RingInfo = Omit<SurfaceLevelData, 'positions' | 'normals' | 'indices' | 'up'>;
+/** What the About panel says about a ring, without its arrays. */
+const infoOf = ({ positions: _p, normals: _n, indices: _i, up: _u, ...info }: SurfaceLevelData): RingInfo => info;
+
 /** The stages the loading panel lists, in order. */
-const STAGES = ['opening', 'near', 'middle', 'wide', 'horizon', 'building', 'light'] as const;
+const STAGES = ['opening', 'fine', 'walk', 'rings', 'building', 'light'] as const;
+/** Room the 5 m ring needs around the point inside a region's model, metres (the high-quality ring's half-width). */
+const FINE_RING_HALF_M = 800;
 type Stage = (typeof STAGES)[number];
 
 /** "Most of the ground around you is in shadow": under a fifth of the Sun, on average, within 150 m. */
@@ -78,6 +92,12 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const eyes = useMemo(latestOnly, []);
 
   const [attempt, setAttempt] = useState(0);
+  /** Whether NASA's 5 m terrain was asked for, where the point lies in an Artemis III region that has it. */
+  const [fine5, setFine5] = useState(false);
+  const fineRegion = useMemo(
+    () => fineRegionAt(target.latDeg, target.lonDeg, FINE_RING_HALF_M),
+    [target.latDeg, target.lonDeg],
+  );
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
   const [scene, setScene] = useState<SurfaceScene>();
   const [mode, setMode] = useState<SurfaceMode>('idle');
@@ -104,6 +124,13 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   /** The load in flight, for Cancel; and the moment whose full light is on screen, so it is not asked for twice. */
   const loadIdRef = useRef(0);
   const litUtcRef = useRef<number | null>(null);
+  /** Sharpened rings that arrived before the view was made, to hand it once it is. */
+  const pendingRings = useRef<SurfaceLevelData[]>([]);
+  /** Works the light out again in full (after the last ring is sharpened); set once the view exists. */
+  const refreshLightRef = useRef<() => void>(() => {});
+  /** The rings still drawn from coarse stand-ins: how many are sharpened so far, of how many. */
+  const [sharpening, setSharpening] = useState<{ done: number; total: number }>();
+  const [ringInfo, setRingInfo] = useState<RingInfo[]>([]);
 
   const close = useCallback(() => useApp.getState().setLanding(null), []);
 
@@ -126,15 +153,35 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     loadIdRef.current = id;
     setPhase({ kind: 'loading' });
     setScene(undefined);
+    pendingRings.current = [];
+    setSharpening(undefined);
     const onProgress = Comlink.proxy((progress: SurfaceProgress) => {
       if (loads.isCurrent(id)) setPhase({ kind: 'loading', progress });
     });
+    // The rings around the walkable ground, sharpened one by one after the first scene is up.
+    const onRing = Comlink.proxy((update: RingUpdate) => {
+      if (!loads.isCurrent(id)) return;
+      if (update.done) {
+        setSharpening((s) => s && { ...s, done: s.total });
+        refreshLightRef.current();
+        return;
+      }
+      const view = viewRef.current;
+      if (view) view.updateRing(update.level);
+      else pendingRings.current.push(update.level);
+      setRingInfo((all) => all.map((r) => (r.index === update.level.index ? infoOf(update.level) : r)));
+      setSharpening((s) => s && { ...s, done: Math.min(s.total, s.done + 1) });
+    });
     physics
-      .surface({ id, latDeg: target.latDeg, lonDeg: target.lonDeg, quality }, URLS, onProgress)
+      .surface({ id, latDeg: target.latDeg, lonDeg: target.lonDeg, quality, fine5 }, URLS, onProgress, onRing)
       .then((outcome) => {
         if (!loads.isCurrent(id)) return;
-        if (outcome.status === 'ready') setScene(outcome.scene);
-        else setPhase({ kind: outcome.status });
+        if (outcome.status === 'ready') {
+          const provisional = outcome.scene.levels.filter((l) => l.provisional).length;
+          setRingInfo(outcome.scene.levels.map(infoOf));
+          setSharpening(provisional ? { done: 0, total: provisional } : undefined);
+          setScene(outcome.scene);
+        } else setPhase({ kind: outcome.status });
       })
       .catch((e: unknown) => {
         if (loads.isCurrent(id)) setPhase({ kind: 'error', reason: e instanceof Error ? e.message : String(e) });
@@ -143,7 +190,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
       loads.cancel();
       void physics.surfaceCancel(id);
     };
-  }, [attempt, target.latDeg, target.lonDeg, quality, loads]);
+  }, [attempt, target.latDeg, target.lonDeg, quality, loads, fine5]);
 
   const cancelLoad = () => {
     loads.cancel();
@@ -168,8 +215,9 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
         earthDir: answer.earth.dir,
         earthRadiusDeg: answer.earth.radiusDeg,
         sunlit: answer.sunlit,
+        shadowMap: answer.shadowMap,
       });
-      const { sunlit: _, ...shown } = answer;
+      const { sunlit: _lit, shadowMap: _map, ...shown } = answer;
       setSky(shown);
       setDarkHere(view.sunlitAround(east, north, DARK_RADIUS_M) < DARK_SHARE);
       if (answer.eye) setEye(answer.eye);
@@ -191,6 +239,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
       view = new SurfaceView(container, scene.levels, {
         reducedMotion: reducedMotion(),
         eyeHeightM: EYE_HEIGHT_M,
+        walkIndex: scene.walkIndex,
         onMode: (m) => {
           setMode(m);
           if (m === 'explore') sound.chime();
@@ -221,6 +270,12 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     }
     viewRef.current = view;
     litUtcRef.current = null;
+    for (const level of pendingRings.current) view.updateRing(level);
+    pendingRings.current = [];
+    refreshLightRef.current = () => {
+      litUtcRef.current = null;
+      void requestSky(exploreRef.current, false).catch(() => setShadowsBusy(false));
+    };
     // For checking in development, as the sound has `__sitelineSound`. Not in the built app.
     if (import.meta.env.DEV) (window as Window & { __sitelineSurface?: SurfaceView }).__sitelineSurface = view;
     setPhase({ kind: 'loading', lighting: true });
@@ -235,6 +290,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     return () => {
       skies.cancel();
       eyes.cancel();
+      refreshLightRef.current = () => {};
       viewRef.current = null;
       view.dispose();
     };
@@ -264,7 +320,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
 
   const place = `${formatNumber(Math.abs(target.latDeg), 4)}° ${target.latDeg < 0 ? t('landers.south') : t('landers.north')}, ${formatNumber(Math.abs(target.lonDeg), 4)}° ${target.lonDeg < 0 ? t('landers.west') : t('landers.east')}`;
   const reach = formatNumber(Math.abs(gridReachLatDeg(TERRAIN_EXTENT.coarse.halfM)), 0);
-  const near = scene?.levels.find((l) => l.name === 'near');
+  const near = scene?.levels[scene.walkIndex];
   const fromTouchdownM = eye ? Math.hypot(eye.east, eye.north) : 0;
   const walkKm = near ? formatNumber((near.halfM - EDGE_MARGIN_M) / 1000, 1) : '';
   const off = offsetLabel(offsetMs);
@@ -285,13 +341,44 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     if (phase.kind !== 'loading') return 'later';
     if (phase.lighting) return s === 'light' ? 'now' : 'done';
     const p = phase.progress;
-    if (s === 'light') return 'later';
-    if (p?.finished.includes(s)) return 'done';
     const now = p?.now ?? 'opening';
-    if (s === 'opening') return now === 'opening' ? 'now' : 'done';
-    if (s === 'building') return now === 'building' ? 'now' : 'later';
-    return now === 'reading' ? 'now' : now === 'building' ? 'done' : 'later';
+    switch (s) {
+      case 'opening':
+        return now === 'opening' ? 'now' : 'done';
+      case 'fine':
+        return p?.fineTotal === undefined
+          ? 'later'
+          : p.fineBytes === p.fineTotal && p.walkRead
+            ? 'done'
+            : now === 'opening'
+              ? 'later'
+              : 'now';
+      case 'walk':
+        return p?.walkRead ? 'done' : now === 'reading' ? 'now' : 'later';
+      case 'rings':
+        return p?.farRead ? 'done' : now === 'reading' ? 'now' : 'later';
+      case 'building':
+        return now === 'building' ? 'now' : 'later';
+      default:
+        return 'later';
+    }
   };
+  const stageLabel = (s: Stage): string => {
+    const p = phase.kind === 'loading' ? phase.progress : undefined;
+    if (s === 'fine') {
+      const total = p?.fineTotal ?? fineRegion?.compressedBytes ?? 0;
+      // Once the terrain is in (the light being worked out), the download is whole.
+      const done = phase.kind === 'loading' && phase.lighting ? total : (p?.fineBytes ?? 0);
+      return t('land.stage.fine', {
+        region: fineRegion?.name ?? '',
+        done: formatNumber(done / 1e6, 1),
+        total: formatNumber(total / 1e6, 1),
+      });
+    }
+    return t(`land.stage.${s}`);
+  };
+  /** The 5 m stage is listed only when that terrain was asked for. */
+  const shownStages = STAGES.filter((s) => s !== 'fine' || fine5);
 
   const walkPad = (forward: number, right: number, label: string, glyph: string) => (
     <button
@@ -398,6 +485,19 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
               ) : (
                 <p className="mt-1">{t('land.readingsPending')}</p>
               )}
+              {fineRegion && !scene?.fineRegion && (
+                <div className="mt-2 border-t border-line pt-2">
+                  <button
+                    type="button"
+                    className={`${button} w-full border-sun/60 text-sun-ink`}
+                    onClick={() => setFine5(true)}
+                    data-testid="surface-fine5"
+                  >
+                    {t('land.fineOffer', { mb: formatNumber(fineRegion.compressedBytes / 1e6, 0) })}
+                  </button>
+                  <p className="mt-1 text-quiet">{t('land.fineOfferNote', { region: fineRegion.name })}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -475,22 +575,35 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                   })}
                 </p>
               )}
-              <h3 className="mt-2 font-display text-sm">{t('land.info.rings')}</h3>
+              <h3 className="mt-2 font-display text-sm">{t('land.info.ringsTitle')}</h3>
+              <p>{t('land.info.rings')}</p>
               <ul className="list-disc ps-4">
-                {scene.levels.map((l) => (
-                  <li key={l.name}>
-                    {t('land.info.ringLine', {
-                      ring: t(`land.info.ring.${l.name}`),
-                      id: l.datasetId,
-                      data: formatNumber(l.sourcePixM, 0),
-                      mesh: formatNumber(l.spacingM, 0),
-                      reach: formatNumber(l.halfM / 1000, 0),
-                    })}
-                    {l.filledPct >= 0.05 && `; ${t('land.info.filled', { pct: formatNumber(l.filledPct, 1) })}`}
-                    {l.missingPct >= 0.05 && `; ${t('land.info.missing', { pct: formatNumber(l.missingPct, 1) })}`}
-                  </li>
-                ))}
+                {ringInfo.map((l, i) => {
+                  const values = {
+                    id: l.datasetId,
+                    data: formatNumber(l.sourcePixM, 1),
+                    mesh: formatNumber(l.spacingM, 0),
+                    from: formatNumber((ringInfo[i - 1]?.halfM ?? 0) / 1000, 1),
+                    to: formatNumber(l.halfM / 1000, 1),
+                  };
+                  return (
+                    <li key={l.index}>
+                      {t(l.index === scene.walkIndex ? 'land.info.walkLine' : 'land.info.ringLine', values)}
+                      {l.filledPct >= 0.05 && `; ${t('land.info.filled', { pct: formatNumber(l.filledPct, 1) })}`}
+                      {l.missingPct >= 0.05 && `; ${t('land.info.missing', { pct: formatNumber(l.missingPct, 1) })}`}
+                      {l.provisional && `; ${t('land.info.provisional')}`}
+                    </li>
+                  );
+                })}
               </ul>
+              {scene.fineRegion && (
+                <p className="mt-2">
+                  {t('land.info.fineCredit', {
+                    region: scene.fineRegion,
+                    km: formatNumber(scene.levels[0].halfM / 1000, 1),
+                  })}
+                </p>
+              )}
               <p className="mt-2">{t('land.info.scale')}</p>
               <p className="mt-1">
                 {t('land.info.eye', {
@@ -565,6 +678,16 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 {t('land.backToTouchdown')}
               </button>
             </div>
+            {sharpening && sharpening.done < sharpening.total && (
+              <p
+                role="status"
+                className="flex items-center gap-1.5 text-xs text-quiet"
+                data-testid="surface-sharpening"
+              >
+                <Spinner className="size-3.5" />
+                {t('land.sharpening', { done: sharpening.done, total: sharpening.total })}
+              </p>
+            )}
             {shadowsBusy && (
               <p role="status" className="flex items-center gap-1.5 text-xs text-quiet">
                 <Spinner className="size-3.5" />
@@ -670,7 +793,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                   {place}
                 </p>
                 <ol className="mt-3 space-y-1 text-sm" data-testid="surface-stages">
-                  {STAGES.map((s) => {
+                  {shownStages.map((s) => {
                     const state = stageState(s);
                     return (
                       <li key={s} className={`flex items-center gap-2 ${state === 'later' ? 'text-quiet' : ''}`}>
@@ -683,7 +806,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                             '·'
                           )}
                         </span>
-                        {t(`land.stage.${s}`)}
+                        {stageLabel(s)}
                         <span className="sr-only">{state === 'done' ? ' ✓' : ''}</span>
                       </li>
                     );

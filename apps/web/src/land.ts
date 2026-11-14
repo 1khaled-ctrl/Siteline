@@ -1,5 +1,6 @@
 import type { StayQuery } from '@siteline/contracts';
 import { MOON_RADIUS_M, polarXY, siteFrame } from '@siteline/physics';
+import fineRegions from './a3clrRegions.json';
 
 /**
  * Land Here: the helpers the interface needs before and around the surface view. The view itself (and its terrain, its
@@ -85,4 +86,27 @@ export function latestOnly() {
       current++;
     },
   };
+}
+
+/** An Artemis III region with NASA's 5 m terrain (`a3clr-sfs-5m`), and what its model costs to download. */
+export interface FineRegionInfo {
+  name: string;
+  compressedBytes: number;
+}
+
+/**
+ * The Artemis III region whose 5 m terrain covers a point with room for the 5 m ring around it, if any: the surface view
+ * offers that terrain there. Reads the table `scripts/a3clr-regions.mjs` made from the regions' own files.
+ */
+export function fineRegionAt(latDeg: number, lonDeg: number, marginM = 0): FineRegionInfo | undefined {
+  if (latDeg > 0) return undefined;
+  const { x, y } = polarXY(siteFrame(latDeg, lonDeg).u);
+  const region = fineRegions.regions.find(
+    (r) =>
+      x - marginM > r.cornerX &&
+      x + marginM < r.cornerX + r.width * r.pixM &&
+      y + marginM < r.cornerY &&
+      y - marginM > r.cornerY - r.height * r.pixM,
+  );
+  return region && { name: region.name, compressedBytes: region.compressedBytes };
 }

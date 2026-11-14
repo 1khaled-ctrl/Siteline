@@ -21,8 +21,10 @@ import {
   localFrame,
   localToGeo,
   rayGrids,
+  resampleGrid,
   resampleToLocal,
   surfaceUpAt,
+  sweepDiscVisibility,
 } from './surface';
 import { DEG, type Vec3 } from './vec';
 
@@ -268,6 +270,82 @@ describe('directions and skylines', () => {
     const ridge = gridOf(10, 2000, (_, n) => (n > 300 ? 100 : 0));
     expect(eyeSky([ridge], 0, 0, EYE_HEIGHT_M, [0, Math.cos(5 * DEG), Math.sin(5 * DEG)], 0.27, 20)?.fraction).toBe(0);
     expect(eyeSky([ridge], 5000, 0, EYE_HEIGHT_M, [0, 1, 0], 0.27, 20)).toBeUndefined();
+  });
+});
+
+describe('shadows by sweeping toward the Sun', () => {
+  const R0 = MOON_RADIUS_M;
+  /** Rolling hills and a few sharp ridges on a curved Moon, in two nested grids. */
+  const terrain = (spacingM: number, halfM: number) =>
+    gridOf(spacingM, halfM, (e, n) => {
+      const curve = Math.sqrt(R0 * R0 - e * e - n * n) - R0;
+      return curve + 25 * Math.sin(e / 140) * Math.cos(n / 95) + (Math.abs(e - 300 + n * 0.3) < 15 ? 60 : 0);
+    });
+  const grids = [terrain(10, 1000), terrain(40, 6000)];
+  const sun = (elevDeg: number, azDeg: number): Vec3 => [
+    Math.sin(azDeg * DEG) * Math.cos(elevDeg * DEG),
+    Math.cos(azDeg * DEG) * Math.cos(elevDeg * DEG),
+    Math.sin(elevDeg * DEG),
+  ];
+
+  it('agrees with walking from every point toward the Sun', () => {
+    for (const [elev, az] of [
+      [1.5, 40],
+      [4, 200],
+      [0.8, 300],
+    ]) {
+      const swept = sweepDiscVisibility(grids, grids[0], sun(elev, az), 0.27, 1);
+      const walked = discVisibility(grids, 0, sun(elev, az), 0.27, 1);
+      let diff = 0;
+      let lit = 0;
+      for (let i = 0; i < swept.length; i++) {
+        diff += Math.abs(swept[i] - walked[i]);
+        lit += walked[i];
+      }
+      // The two sample the ground a little differently, so they differ only along shadow edges.
+      expect(diff / swept.length).toBeLessThan(0.03);
+      expect(lit / swept.length).toBeGreaterThan(0.05);
+      expect(lit / swept.length).toBeLessThan(0.97);
+    }
+  });
+
+  it('casts a ridge’s shadow the length its height and the Sun’s give it', () => {
+    const g = gridOf(10, 1000, (e) => (e > 500 ? 300 : 0));
+    const lit = sweepDiscVisibility([g], g, sun(5, 90), 0.27);
+    const at = (e: number, n: number) => lit[Math.round((1000 - n) / 10) * g.size + Math.round((e + 1000) / 10)];
+    expect(at(0, 0)).toBe(0);
+    expect(at(-990, 300)).toBe(0); // 3.4 km of shadow at 5°
+    expect(at(800, -200)).toBe(1); // on the ridge
+    expect(sweepDiscVisibility([g], g, sun(5, 270), 0.27).every((v) => v === 1)).toBe(true);
+  });
+
+  it('works out a finer grid of points than the terrain’s own, for sharper shadow edges', () => {
+    const g = gridOf(10, 1000, (e) => (e > 500 ? 300 : 0));
+    const fine = sweepDiscVisibility([g], { size: 801, spacingM: 2.5, halfM: 1000 }, sun(5, 90), 0.27);
+    expect(fine.length).toBe(801 * 801);
+    // The shadow's edge, 300 m / tan 5° = 3.43 km west of the ridge, lies outside this square, so the band is all dark.
+    const row = 400 * 801;
+    expect(fine[row + 0]).toBe(0);
+    expect(fine[row + 799]).toBe(1);
+  });
+
+  it('sees the whole disc with nothing in the way, and none of a Sun below the horizon', () => {
+    // Level ground with more level ground around it, as the far rings always give.
+    const level = [gridOf(20, 400, () => 0), gridOf(200, 4000, () => 0)];
+    expect(sweepDiscVisibility(level, level[0], sun(10, 123), 0.27).every((v) => v === 1)).toBe(true);
+    expect(sweepDiscVisibility(level, level[0], sun(-2, 123), 0.27).every((v) => v === 0)).toBe(true);
+  });
+});
+
+describe('reading values from one grid onto another', () => {
+  it('keeps the nodes they share and blends between them', () => {
+    const from = { size: 3, spacingM: 10, halfM: 10 };
+    const to = { size: 5, spacingM: 5, halfM: 10 };
+    // A ramp rising eastward: 0, 1, 2 along every row.
+    const values = Float32Array.from([0, 1, 2, 0, 1, 2, 0, 1, 2]);
+    const out = resampleGrid(values, from, to);
+    expect(Array.from(out.slice(0, 5))).toEqual([0, 0.5, 1, 1.5, 2]);
+    expect(out[12]).toBe(1); // the centre
   });
 });
 
