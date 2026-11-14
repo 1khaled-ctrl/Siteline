@@ -54,6 +54,22 @@ describe('bestSpots', () => {
     expect(behind?.score).toBeLessThan(spots[0].score);
   });
 
+  it('sees a far ridge with its full reach, and misses it with a short one', () => {
+    // A 6 km wall 40 km out toward the Sun hides it from the pole; a 20 km reach never gets that far.
+    const n = 201;
+    const dem: Dem = { n, pixM: 500, heightsM: new Float32Array(n * n) };
+    // The Sun is toward the 0° meridian, which is +y: rows above the centre (row 100), 80 rows = 40 km up.
+    for (let r = 18; r <= 22; r++) for (let c = 0; c < n; c++) dem.heightsM[r * n + c] = 6000;
+    const query = { ...DEFAULT_STAY, observerHeightM: 2, landingUtc: new Date(T0).toISOString() };
+    const at = (reachM?: number) =>
+      bestSpots({ centreLatDeg: -90, centreLonDeg: 0, sizeKm: 1, grid: 2, top: 1, reachM }, query, dem, ephemeris, {
+        sources: ['test'],
+        stepMinutes: 120,
+      })[0];
+    expect(at()?.result.sunFractionMin).toBe(0);
+    expect(at(20_000)?.result.sunFractionMin).toBeGreaterThan(0.99);
+  });
+
   it('scores a full pass above a fail with the same light', () => {
     const base = {
       uncertain: false,

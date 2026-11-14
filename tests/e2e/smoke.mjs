@@ -196,8 +196,14 @@ await page.getByRole('button', { name: 'Long-term Sun' }).click();
 await page.waitForTimeout(1500);
 await page.getByRole('button', { name: /^Pin to compare/ }).click();
 await page.getByText(/^1 pinned site$/).waitFor({ timeout: 10_000 });
-await page.getByRole('button', { name: 'Find the best spots in Malapert Massif' }).click();
-await page.getByText(/^1\. /).waitFor({ timeout: 60_000 });
+// The search lists only sites that pass all four checks for the date, each marked ✓, or says none does.
+await page
+  .getByRole('button', { name: /^Find landing sites in Malapert Massif that pass all four checks/ })
+  .click({ force: true });
+await page
+  .getByText(/^✓ 1\. |^No spot in Malapert Massif passes all four checks/)
+  .first()
+  .waitFor({ timeout: 120_000 });
 await page.getByRole('button', { name: '▶ Play a lunar day' }).click();
 await page.waitForTimeout(1500);
 await page.getByRole('button', { name: '❚❚ Pause' }).click();

@@ -122,7 +122,7 @@ export function ShareReport({ query, result, terrain, longTerm, slope, slopePend
       }),
       stats,
       note,
-      sources: `${t('report.sources')}: ${[...result.sources, ...(longTerm ? [longTerm.id] : [])].join(', ')}`,
+      sources: `${t('report.sources')}: ${[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : [])])].join(', ')}`,
       link: pageLink(),
       footer: t('share.footer'),
     };

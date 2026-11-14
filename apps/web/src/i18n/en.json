@@ -381,10 +381,14 @@
   },
   "best": {
     "button": "Best spot",
-    "find": "Find the best spots in {{region}}",
+    "find": "Find landing sites in {{region}} that pass all four checks for this landing date",
     "close": "Close the best spots in {{region}}",
-    "sun": "Sun ≥ {{pct}}%",
-    "none": "No spots inside the loaded terrain."
+    "none": "No spot in {{region}} passes all four checks for this landing date ({{checked}} checked in full). Try another date, a launch slip, or another region.",
+    "searching": "Searching…",
+    "readings": "Sun {{sun}}% · Earth {{earth}}% · slope {{slope}}°",
+    "all": "Find a site that passes all four checks",
+    "allSearching": "Searching every region… {{done}} of {{of}}",
+    "allNone": "No region has a spot that passes all four checks for this landing date ({{checked}} checked in full). Try another date or a launch slip."
   },
   "layers": {
     "heading": "Map layer",

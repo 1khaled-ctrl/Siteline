@@ -23,17 +23,20 @@ import {
   parseEphemeris,
   parsePlanets,
   polarScaleFactor,
+  polarToUnit,
   polarXY,
   type SolarBodyKey,
   siteFrame,
   siteSlopes,
   stayTest,
   subsolarPoint,
+  unitToLatLon,
   WALK_RADIUS_M,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 import type { GeoTIFFImage } from 'geotiff';
 import { type DayStrip, dayStrip } from './dayStrip';
+import { checksOf, verdictOf } from './verdict';
 
 const EPHEMERIS_SOURCES = ['spice-de440s', 'spice-moon-pa', 'spice-moon-fk', 'spice-naif0012'];
 /**
@@ -389,6 +392,43 @@ const slopeAt = (latDeg: number, lonDeg: number, url: string): Promise<SlopeInfo
 const within = <T>(p: Promise<T | undefined>, ms: number): Promise<T | undefined> =>
   Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
 
+/** A landing site that passes all four checks, as the site report itself judges them. */
+export interface PassingSite {
+  latDeg: number;
+  lonDeg: number;
+  /** The least share of the Sun's disc above the horizon over the stay, 0 to 1. */
+  sunFractionMin: number;
+  earthVisiblePct: number;
+  slope100mDeg: number;
+}
+
+export interface PassingSearch {
+  sites: PassingSite[];
+  /** Points screened on the coarse terrain, and candidates run through the full check. */
+  screened: number;
+  checked: number;
+}
+
+/** How many of the coarse screen's best points go through the full check, at most. */
+const PASSING_CANDIDATES = 8;
+/** How far the quick screen looks for each point's skyline, metres. */
+const SCREEN_REACH_M = 120_000;
+/** How many candidates go through the full check at once. */
+const CHECKS_AT_ONCE = 2;
+/** How far around a too-steep candidate to look for flatter ground, metres. */
+const FLATTER_STEPS_M = [120, 250];
+/** How long the full check may wait for a candidate's 30 m skyline and 10 m slope tiles. */
+const PASSING_PATIENCE_MS = 45_000;
+
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+/** The point `dx`, `dy` metres away in the polar plane (rounded as the app rounds a picked site). */
+function offset(latDeg: number, lonDeg: number, dxM: number, dyM: number): { latDeg: number; lonDeg: number } {
+  const { x, y } = polarXY(siteFrame(latDeg, lonDeg).u);
+  const p = unitToLatLon(polarToUnit(x + dxM, y + dyM));
+  return { latDeg: round4(p.latDeg), lonDeg: round4(p.lonDeg) };
+}
+
 const api = {
   /** The terrain grid for drawing; a copy crosses to the main thread. */
   dem(url: string): Promise<Dem> {
@@ -516,6 +556,11 @@ const api = {
   },
 
   /** Rank spots inside a region; the timelines are left out to keep the reply small. */
+  /** Sites in a region that pass all four checks for this landing date, by the site report's own verdict. */
+  passing(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<PassingSearch> {
+    return passingSites(search, query, urls);
+  },
+
   async best(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<BestSpot[]> {
     const ephemeris = await loadEphemeris(urls.data);
     // One read for the whole region: its own width plus the skyline's reach on every side, at 30 m where it can be
@@ -542,6 +587,89 @@ const api = {
     });
   },
 };
+
+/**
+ * Sites in a region that pass all four checks (Sun up for the whole stay, Earth in view, landing slope under 10°,
+ * within 6° of the pole) for this landing date. A fast screen ranks points on the 1.2 km grid; the best of them then
+ * go through exactly the check the site report runs (`stay`, at 30 m and 10 m) and are judged by the report's own
+ * verdict, so a site this returns is one the report passes. A candidate that passes everything but its slope is
+ * moved to the flattest ground within a few hundred metres that still passes.
+ */
+async function passingSites(
+  search: BestSearch,
+  query: Omit<StayQuery, 'site'>,
+  urls: DataUrls,
+): Promise<PassingSearch> {
+  const ephemeris = await loadEphemeris(urls.data);
+  const dem = await loadDrawnDem(urls.terrain);
+  const grid = search.grid ?? 9;
+  // The screen walks each skyline 120 km, not 300: quicker, and only ever more hopeful (see BestSearch.reachM).
+  const screen = bestSpots({ ...search, grid, top: grid * grid, reachM: SCREEN_REACH_M }, query, dem, ephemeris, {
+    sources: [...EPHEMERIS_SOURCES, DRAWN.id],
+    stepMinutes: 60,
+  });
+  // Candidates: points inside the zone with the Sun and the Earth up for the whole stay on the coarse terrain, best
+  // first. The coarse terrain is the optimistic one (it misses the rises near a site that shade it), so a point it
+  // fails would not pass at 30 m either; a region with none answers at once.
+  const blocks = new Set(['SUN_BELOW_HORIZON', 'EARTH_BELOW_HORIZON', 'OUTSIDE_ZONE']);
+  const candidates = screen
+    .filter((s) => !s.result.reasons.some((r) => blocks.has(r.code)))
+    .slice(0, PASSING_CANDIDATES);
+
+  const check = async (latDeg: number, lonDeg: number) => {
+    const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg };
+    const r = await api.stay({ ...query, site } as StayQuery, urls, PASSING_PATIENCE_MS);
+    return { r, checks: checksOf(r.result), passes: verdictOf(checksOf(r.result)) === 'pass' };
+  };
+  const found: PassingSite[] = [];
+  const top = search.top ?? 3;
+  let checked = 0;
+  /** One candidate through the full check, moved to flatter ground nearby if only its slope fails. */
+  const confirm = async (c: BestSpot): Promise<PassingSite | undefined> => {
+    const latDeg = round4(c.latDeg);
+    const lonDeg = round4(c.lonDeg);
+    checked++;
+    let at = { latDeg, lonDeg };
+    let verdict = await check(latDeg, lonDeg);
+    const onlySlope = verdict.checks.slope === 'no' && verdict.checks.sun === 'yes' && verdict.checks.earth === 'yes';
+    if (!verdict.passes && onlySlope && urls.fine) {
+      // Lit and in view but too steep: the flattest ground close by, if any is under the limit.
+      const fine = urls.fine;
+      const around = FLATTER_STEPS_M.flatMap((d) =>
+        [0, 45, 90, 135, 180, 225, 270, 315].map((a) =>
+          offset(latDeg, lonDeg, d * Math.sin((a * Math.PI) / 180), d * Math.cos((a * Math.PI) / 180)),
+        ),
+      );
+      const slopes = await Promise.all(around.map((p) => slopeAt(p.latDeg, p.lonDeg, fine).catch(() => undefined)));
+      const flattest = around
+        .map((p, i) => ({ p, deg: slopes[i]?.slope100mDeg ?? Number.POSITIVE_INFINITY }))
+        .filter((x) => x.deg < 10)
+        .sort((a, b) => a.deg - b.deg)[0];
+      if (flattest) {
+        checked++;
+        at = flattest.p;
+        verdict = await check(at.latDeg, at.lonDeg);
+      }
+    }
+    if (!verdict.passes) return undefined;
+    const { result } = verdict.r;
+    return {
+      ...at,
+      sunFractionMin: result.sunFractionMin,
+      earthVisiblePct: result.earthVisiblePct,
+      slope100mDeg: result.slope100mDeg,
+    };
+  };
+  for (let i = 0; i < candidates.length && found.length < top; i += CHECKS_AT_ONCE) {
+    const batch = await Promise.all(candidates.slice(i, i + CHECKS_AT_ONCE).map(confirm));
+    for (const site of batch) if (site) found.push(site);
+  }
+  found.sort(
+    (a, b) =>
+      b.sunFractionMin - a.sunFractionMin || b.earthVisiblePct - a.earthVisiblePct || a.slope100mDeg - b.slope100mDeg,
+  );
+  return { sites: found, screened: screen.length, checked };
+}
 
 export type PhysicsApi = typeof api;
 Comlink.expose(api);
