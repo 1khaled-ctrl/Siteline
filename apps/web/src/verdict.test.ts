@@ -137,4 +137,16 @@ describe('shareLink', () => {
       lon: String(222.69 - 360),
     });
   });
+
+  it('carries the robot and its landing circle only when one is chosen', () => {
+    const base = { landingUtc: '2028-03-03T00:00:00.000Z', slipDays: 0, latDeg: -89.45, lonDeg: -137.31 };
+    const withRobot = new URL(
+      shareLink('https://siteline.example/', { ...base, robot: 'rlldpTripod', landingRadiusM: 50 }),
+    );
+    expect(withRobot.searchParams.get('robot')).toBe('rlldpTripod');
+    expect(withRobot.searchParams.get('ring')).toBe('50');
+    const none = new URL(shareLink('https://siteline.example/', { ...base, robot: null, landingRadiusM: 50 }));
+    expect(none.searchParams.has('robot')).toBe(false);
+    expect(none.searchParams.has('ring')).toBe(false);
+  });
 });

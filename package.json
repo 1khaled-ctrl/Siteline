@@ -11,6 +11,7 @@
     "build": "pnpm --filter @siteline/web build",
     "test": "vitest run",
     "e2e": "node tests/e2e/smoke.mjs",
+    "copilot": "pnpm dlx wrangler@4.162.0 pages dev apps/copilot-worker/static --ai AI --port 8788",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "biome check .",
     "ephemeris": "cd pipeline && uv run python -m siteline_pipeline.ephemeris",

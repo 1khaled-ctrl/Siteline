@@ -97,9 +97,12 @@ export interface ShareState {
   slipDays: number;
   latDeg: number;
   lonDeg: number;
+  /** The robot the site is read against, and its landing circle; left out of the link when none is chosen. */
+  robot?: string | null;
+  landingRadiusM?: number;
 }
 
-/** A link that opens the south-pole check on this spot, landing date and slip. */
+/** A link that opens the south-pole check on this spot, landing date and slip, and the robot if one is chosen. */
 export function shareLink(base: string, s: ShareState): string {
   const p = new URLSearchParams({
     open: 'pole',
@@ -108,5 +111,9 @@ export function shareLink(base: string, s: ShareState): string {
     lat: String(s.latDeg),
     lon: String(s.lonDeg),
   });
+  if (s.robot) {
+    p.set('robot', s.robot);
+    if (s.landingRadiusM !== undefined) p.set('ring', String(s.landingRadiusM));
+  }
   return `${base}?${p}`;
 }
