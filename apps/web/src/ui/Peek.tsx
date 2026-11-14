@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FACT_BODIES, type FactBody } from '../bodyFacts';
 import { findLander } from '../landers';
 import { useStay } from '../physics';
-import { useStage } from '../stage';
+import { openFacts, useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { checksOf, verdictOf } from '../verdict';
 import { useBodyReadings } from './BodyFacts';
@@ -45,6 +45,7 @@ function Line({
 function WorldPeek() {
   const { t } = useTranslation();
   const world = useStage((s) => s.dialWorld);
+  const picked = useStage((s) => s.solarPicked);
   const { readings } = useWorldReadings();
   const r = readings(world);
   return (
@@ -58,7 +59,7 @@ function WorldPeek() {
         </>
       }
       action={
-        FLYABLE.has(world) && (
+        FLYABLE.has(world) ? (
           <button
             type="button"
             className="callout-go min-h-11 px-4"
@@ -67,6 +68,18 @@ function WorldPeek() {
           >
             {t('callout.fly')}
           </button>
+        ) : (
+          world !== 'sun' && (
+            <button
+              type="button"
+              className="callout-go min-h-11 px-4"
+              aria-pressed={picked === world}
+              aria-label={t('facts.openFor', { name: r.name })}
+              onClick={() => openFacts(world)}
+            >
+              {t('facts.open')}
+            </button>
+          )
         )
       }
     />

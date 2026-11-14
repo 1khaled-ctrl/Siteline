@@ -2,7 +2,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
 import { sound } from '../sound';
-import { useStage } from '../stage';
+import { openFacts, useStage } from '../stage';
 import { samePin, useApp } from '../store';
 import { FLYABLE, type Flyable, WORLDS, type World, worldColour } from './WorldsList';
 
@@ -66,9 +66,10 @@ export function OrbitDial() {
     }
   }
 
-  /** A tap on the middle: fly to the picked world, or back to the landing time. */
+  /** A tap on the middle: fly to the picked world, open or close another planet's facts, or go back to the landing time. */
   function press() {
     if (mode === 'worlds' && FLYABLE.has(world)) useApp.getState().commandSolar(world as Flyable);
+    else if (mode === 'worlds' && world !== 'sun') openFacts(world);
     else if (mode === 'time') useApp.getState().setPlay({ playing: false, playOffsetH: 0 });
   }
 

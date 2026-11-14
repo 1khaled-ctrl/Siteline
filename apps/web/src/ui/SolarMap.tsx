@@ -108,7 +108,8 @@ export function SolarMap() {
   const handled = useRef(command?.id ?? 0);
   // The worlds that carry a card in the scene: the three you can fly into, plus the one you point at or click.
   const [hovered, setHovered] = useState<SolarBodyKey | null>(null);
-  const [picked, setPicked] = useState<SolarBodyKey | null>(null);
+  // The picked planet lives in the stage store: its facts card opens in the panel, or the phone's sheet.
+  const picked = useStage((st) => st.solarPicked);
   const { readings } = useWorldReadings();
 
   useEffect(() => {
@@ -133,7 +134,7 @@ export function SolarMap() {
         };
         leaving = setTimeout(clear, 450);
       },
-      onPoint: (body) => setPicked((p) => (p === body ? null : body)),
+      onPoint: (body) => useStage.getState().toggleSolarPicked(body),
       // The opening holds the camera over the Sun and flies it out from there.
       introRingPx: INTRO_MODE === 'cinematic' && !useBoot.getState().opened ? RING_PX : undefined,
       arriveFrom,
@@ -146,6 +147,7 @@ export function SolarMap() {
     return () => {
       clearTimeout(leaving);
       if (useStage.getState().solar === created) useStage.getState().setSolar(null);
+      useStage.getState().toggleSolarPicked(null);
       created.dispose();
       setView(null);
     };

@@ -24,6 +24,19 @@ export const MISSIONS: readonly Mission[] = parseMissions(file);
 /** The pages each mission cites, by the short ids the missions use: `[label, url]`. */
 export const MISSION_SOURCES: Readonly<Record<string, SourceLink>> = file.sources;
 
+/** Statuses of a mission that has not reached its world yet. */
+const TO_COME: ReadonlySet<string> = new Set(['planned', 'next', 'onway']);
+
+/**
+ * How many missions in our list went to a body (landed, crashed or lost on the way down) and how many are still to
+ * come. Only what `data/missions.json` holds: a body it has none for gets zero and zero, never a guess.
+ */
+export function landersOn(missions: readonly Mission[], body: string): { past: number; toCome: number } {
+  const mine = missions.filter((m) => m.body === body);
+  const toCome = mine.filter((m) => TO_COME.has(m.status)).length;
+  return { past: mine.length - toCome, toCome };
+}
+
 /** The landers that have a place to put a pin, by planet. */
 export const PINNED = {
   Moon: MISSIONS.filter((m) => m.body === 'Moon' && hasPlace(m)),

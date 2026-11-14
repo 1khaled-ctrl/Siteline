@@ -27,6 +27,11 @@ export const TABLE_KEY: Readonly<Record<FactBody, SolarBodyKey>> = {
   Neptune: 'neptune',
 };
 
+/** The facts card for a body in the planets table: the way back from `TABLE_KEY`. */
+export const FACT_BODY_OF: Readonly<Record<SolarBodyKey, FactBody>> = Object.fromEntries(
+  FACT_BODIES.map((b) => [TABLE_KEY[b], b]),
+) as Record<SolarBodyKey, FactBody>;
+
 /** Exact: the metre is defined as the distance light travels in 1/299 792 458 of a second. */
 export const SPEED_OF_LIGHT_KM_S = 299_792.458;
 
@@ -229,6 +234,12 @@ export const bodyEscapeSpeedKmS = (c: BodyConstants): number =>
 /** Sunlight on a surface facing the Sun, in W/m²: the solar constant spread over the square of the Sun distance. */
 export const sunlightWM2 = (solarConstantWM2: number, sunDistAu: number): number => solarConstantWM2 / sunDistAu ** 2;
 
+/**
+ * Sunlight there as a share of Earth's: the solar constant is the sunlight at 1 AU, so the share is one over the
+ * distance in AU squared. What a lander's solar panels would get, against the same panels at home.
+ */
+export const sunlightVsEarth = (sunDistAu: number): number => 1 / sunDistAu ** 2;
+
 export const lightTimeS = (distKm: number): number => distKm / SPEED_OF_LIGHT_KM_S;
 
 export const kelvinToCelsius = (kelvin: number): number => kelvin - 273.15;
@@ -266,6 +277,11 @@ export interface Measure<U extends string> {
 export function dayLength(hours: number): Measure<'h' | 'd'> {
   const h = Math.abs(hours);
   return h < 72 ? { n: h, unit: 'h', digits: 1 } : { n: h / 24, unit: 'd', digits: 1 };
+}
+
+/** A distance from the Earth as kilometres below ten million, and as millions of kilometres beyond. */
+export function earthDistance(km: number): Measure<'km' | 'mkm'> {
+  return km < 1e7 ? { n: km, unit: 'km', digits: 0 } : { n: km / 1e6, unit: 'mkm', digits: 1 };
 }
 
 /** A signal's trip as seconds, minutes or hours, whichever reads best. */
