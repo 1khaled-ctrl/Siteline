@@ -16,7 +16,8 @@ concurrency:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # NASA's MEGDR tiles are 2 GB on a cold cache; every later run reads them from the cache below.
+    timeout-minutes: 60
     env:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -62,10 +63,22 @@ jobs:
             pipeline/raw/usgs
           key: raw-${{ hashFiles('pipeline/siteline_pipeline/kernels.py', 'pipeline/siteline_pipeline/mars_names.py') }}
 
+      # NASA's 16 MEGDR tiles (2 GB) and its three illumination maps (150 MB), keyed on the configs that name them, so
+      # a changed file list or checksum fetches afresh. The steps verify every file before reading it either way.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            pipeline/raw/mola
+            pipeline/raw/illumination
+          key: nasa-${{ hashFiles('pipeline/configs/*.yaml') }}
+
       - name: Download the raw datasets from R2
         run: |
           aws s3 cp --endpoint-url "$R2_URL" \
             "$R2_ROOT/raw/landfall/img/mars_height.png" pipeline/raw/landfall/img/mars_height.png
+          # The close-ups step keeps the demo's close-ups in the file it writes, so it needs the demo's headers.
+          aws s3 cp --endpoint-url "$R2_URL" \
+            "$R2_ROOT/raw/landfall/data/sites.json" pipeline/raw/landfall/data/sites.json
 
       - name: Install the pipeline
         working-directory: pipeline
@@ -75,17 +88,38 @@ jobs:
         working-directory: pipeline
         run: uv run python -m siteline_pipeline.ephemeris
 
+      # Each NASA-data step runs once its module is on main (#13, #11 and #9), so those PRs can land in any order.
       - name: Mars data
         working-directory: pipeline
         run: |
           uv run python -m siteline_pipeline.mars_names
+          # The height map from NASA's own MEGDR tiles first, so the slope map below is derived from it.
+          if [ -f siteline_pipeline/mars_height.py ]; then uv run python -m siteline_pipeline.mars_height; fi
           uv run python -m siteline_pipeline.mars_normal
+
+      - name: South-pole close-ups
+        working-directory: pipeline
+        run: |
+          if [ -f siteline_pipeline/site_patches.py ]; then uv run python -m siteline_pipeline.site_patches; fi
+
+      - name: Long-term illumination
+        working-directory: pipeline
+        run: |
+          if [ -f siteline_pipeline/illumination.py ]; then uv run python -m siteline_pipeline.illumination; fi
 
       - name: Check the outputs
         run: |
           for f in ephemeris/moon_sun_earth.bin ephemeris/planets.bin names/mars_names.json \
                    mars/mars_normal.png mars/mars_normal.manifest.json; do
             test -s "pipeline/out/$f" || { echo "::error::missing pipeline/out/$f"; exit 1; }
+          done
+          # The NASA-data outputs, wherever their step ran.
+          for pair in mars_height.py:mars/mars_height.png site_patches.py:sites/sites.json \
+                      illumination.py:illumination/maps.json; do
+            module="${pair%%:*}"; out="${pair#*:}"
+            if [ -f "pipeline/siteline_pipeline/$module" ]; then
+              test -s "pipeline/out/$out" || { echo "::error::missing pipeline/out/$out"; exit 1; }
+            fi
           done
           ls -lR pipeline/out
 
