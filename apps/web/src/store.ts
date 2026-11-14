@@ -176,8 +176,9 @@ function fromUrl(): Partial<View> {
     missionId: p.get('mission'),
     pins,
   });
-  // The close-up needs a lander that has terrain to show.
-  if (link.view === 'site' && !findLander(link.missionId ?? '')?.patch) link.view = 'solar';
+  // The close-up needs a lander. Whether it has terrain to show is known once the close-ups' headers arrive, and
+  // the close-up says so itself if not.
+  if (link.view === 'site' && !findLander(link.missionId ?? '')) link.view = 'solar';
   return link;
 }
 
@@ -212,7 +213,8 @@ export const useApp = create<AppState>((set) => ({
       if (!m) return { missionId: null, view: s.view === 'site' ? closedSiteView(s.missionId) : s.view };
       return { missionId: m.id, view: BODY_VIEW[m.body], missionFlySeq: s.missionFlySeq + 1 };
     }),
-  openSite: () => set((s) => (findLander(s.missionId ?? '')?.patch ? { view: 'site' } : {})),
+  // Asked only where the close-ups' headers name the lander (the site menu, the lander card).
+  openSite: () => set((s) => (findLander(s.missionId ?? '') ? { view: 'site' } : {})),
   closeSite: () => set((s) => ({ view: closedSiteView(s.missionId), missionFlySeq: s.missionFlySeq + 1 })),
   playOffsetH: 0,
   playing: false,

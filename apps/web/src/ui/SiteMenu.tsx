@@ -1,8 +1,9 @@
-import type { LanderBody, Mission } from '@siteline/engine';
+import { type LanderBody, type Mission, patchKey } from '@siteline/engine';
 import { type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PINNED, textOf } from '../landers';
 import { BODY_VIEW, useApp } from '../store';
+import { useLanderFiles } from '../useLanders';
 
 interface Props {
   body: LanderBody;
@@ -30,8 +31,11 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
   const byKeyboard = useRef(false);
 
   const sites = PINNED[body];
-  const closeUps = sites.filter((m) => m.patch);
-  const others = sites.filter((m) => !m.patch);
+  // A site has a close-up when the close-ups' headers name it; until they arrive, every site flies the globe.
+  const headers = useLanderFiles().sites;
+  const hasCloseUp = (m: Mission) => headers?.[patchKey(m) ?? ''] !== undefined;
+  const closeUps = sites.filter(hasCloseUp);
+  const others = sites.filter((m) => !hasCloseUp(m));
   const bodyName = t(`bodies.${body.toLowerCase()}`);
 
   const close = (refocus: boolean) => {
@@ -72,7 +76,7 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
   const pick = (m: Mission) => {
     const s = useApp.getState();
     s.selectMission(m.id);
-    if (m.patch) s.openSite();
+    if (hasCloseUp(m)) s.openSite();
     close(true);
   };
 

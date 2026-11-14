@@ -254,7 +254,7 @@ function MissionCard({ mission: m }: { mission: Mission }) {
       : undefined;
   const sources = m.sourceIds.flatMap((id) => (MISSION_SOURCES[id] ? [MISSION_SOURCES[id]] : []));
   const model = modelUrl(m);
-  const hasCloseUp = m.patch !== undefined && sites?.[patchKey(m) ?? ''] !== undefined;
+  const hasCloseUp = sites?.[patchKey(m) ?? ''] !== undefined;
 
   return (
     <section className={panel} data-testid="mission-card">

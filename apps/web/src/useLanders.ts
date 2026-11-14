@@ -10,7 +10,7 @@ import {
   type TracksJson,
 } from '@siteline/engine';
 import { useEffect, useRef, useState } from 'react';
-import { findLander, MISSIONS, SITES_URL, TRACKS_URL } from './landers';
+import { findLander, MISSIONS, SITES_URLS, TRACKS_URL } from './landers';
 import { DAY_MS, followLighting, physics, URLS } from './physics';
 import { useApp } from './store';
 
@@ -30,8 +30,17 @@ async function read<T>(url: string): Promise<T | undefined> {
   }
 }
 
+/** The first of the files that arrives. */
+async function readFirst<T>(urls: readonly string[]): Promise<T | undefined> {
+  for (const url of urls) {
+    const got = await read<T>(url);
+    if (got) return got;
+  }
+  return undefined;
+}
+
 function loadFiles(): Promise<LanderFiles> {
-  files ??= Promise.all([read<TracksJson>(TRACKS_URL), read<SitesJson>(SITES_URL)]).then(([tracks, sites]) => {
+  files ??= Promise.all([read<TracksJson>(TRACKS_URL), readFirst<SitesJson>(SITES_URLS)]).then(([tracks, sites]) => {
     // A file that did not arrive is asked for again by the next view that wants it, not given up on for good.
     if (!tracks || !sites) files = undefined;
     return { tracks: tracks && parseTracks(tracks), sites: sites && parseSites(sites) };

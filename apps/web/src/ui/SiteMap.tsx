@@ -25,6 +25,9 @@ const GLD100 = 'https://wms.lroc.asu.edu/lroc/view_rdr/WAC_GLD100';
 const MEGDR = 'https://pds-geosciences.wustl.edu/missions/mgs/megdr.html';
 const SSS = 'https://www.solarsystemscope.com/textures/';
 const CC_BY = 'https://creativecommons.org/licenses/by/4.0/';
+const SFS_PAPER = 'https://doi.org/10.3847/PSJ/ae5b70';
+const SFS_DATA = 'https://doi.org/10.5281/zenodo.17954508';
+const LOLA_10M = 'https://pgda.gsfc.nasa.gov/products/90';
 const DEFAULT_RELIEF = 3;
 
 /** Read a close-up height patch: the PNG decoded through a canvas, then the heights unpacked from red and green. */
@@ -70,7 +73,7 @@ export function SiteMap() {
   const [pixels, setPixels] = useState(0);
 
   useEffect(() => {
-    const url = mission && patchImageUrl(mission);
+    const url = mission && meta && patchImageUrl(mission, meta);
     if (!ref.current || !mission || !meta || !url) return;
     let live = true;
     let created: SiteView | undefined;
@@ -111,7 +114,7 @@ export function SiteMap() {
         m.body === mission.body &&
         at !== undefined &&
         Math.abs(at.latDeg - meta.latDeg) <= meta.halfDeg &&
-        Math.abs(at.lonDeg - meta.lonDeg) <= meta.halfDeg
+        Math.abs(at.lonDeg - meta.lonDeg) <= meta.lonHalfDeg
       );
     });
   }, [mission, meta, tracks, shownMs]);
@@ -123,9 +126,14 @@ export function SiteMap() {
   }, [view, insets]);
 
   if (!mission) return null;
+  // The coarser of the patch's own pixel spacing and its source's cell: a patch cut finer than its source resolves
+  // no more than the source did.
   const metresPerPixel =
     meta && pixels
-      ? (2 * meta.halfDeg * (Math.PI / 180) * SITE_BODY_RADIUS_KM[mission.body] * 1000) / pixels
+      ? Math.max(
+          meta.pixM ?? 0,
+          (2 * meta.halfDeg * (Math.PI / 180) * SITE_BODY_RADIUS_KM[mission.body] * 1000) / pixels,
+        )
       : undefined;
   const night =
     sunny && meta && subsolar && sunHeightDeg(meta.latDeg, meta.lonDeg, subsolar.latDeg, subsolar.lonDeg) < 0;
@@ -194,8 +202,12 @@ export function SiteMap() {
         <p className="pointer-events-auto max-w-2xl rounded-md bg-bar/80 px-2.5 py-1 text-center text-[11px] text-quiet">
           {metresPerPixel !== undefined && `${t('siteView.resolution', { m: formatNumber(metresPerPixel, 0) })} `}
           <Trans
-            i18nKey={`siteView.credit.${mission.body}`}
+            // A close-up the pipeline cut credits its own dataset; the demo's credit the planet's.
+            i18nKey={`siteView.credit.${meta?.source ?? mission.body}`}
             components={{
+              paper: <Ext href={SFS_PAPER} />,
+              zenodo: <Ext href={SFS_DATA} />,
+              pgda: <Ext href={LOLA_10M} />,
               gld: <Ext href={GLD100} />,
               megdr: <Ext href={MEGDR} />,
               sss: <Ext href={SSS} />,

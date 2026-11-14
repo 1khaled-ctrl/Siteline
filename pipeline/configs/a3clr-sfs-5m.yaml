@@ -1,0 +1,39 @@
+# The Artemis III candidate landing regions at 5 m a pixel (PGDA product 104; Zenodo 17954508): the finest terrain
+# the close-up site views can be cut from. Read by siteline_pipeline.site_patches.
+datasetId: a3clr-sfs-5m
+what: >-
+  Shape-from-shading elevation models of the 13 Artemis III candidate landing regions, 5 m a pixel, 32-bit metres on
+  the 1737.4 km sphere in the Moon (2015) south polar stereographic grid, each about 30 km across. Each zip also
+  holds LROC NAC mosaics, slope and roughness maps the pipeline does not read.
+# The project's R2 mirror of the Zenodo files, byte for byte.
+baseUrl: https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/a3clr_sfs5mpp
+# The one member of each zip the pipeline reads: the elevation model.
+member: _GLDELEV_005.tif
+licence: >-
+  Creative Commons Attribution 4.0 International, as Zenodo record 17954508 states. The PGDA product page states no
+  licence of its own and asks that the paper below be cited.
+citation: >-
+  Paper, as the PGDA page asks: Bertone, S., McKenna, T. E., Barker, M. K., Mazarico, E., Beyer, R. A., and
+  Petro, N., "Enhanced Topography Models for selected Lunar South Pole regions with Shape-from-Shading", The
+  Planetary Science Journal, doi:10.3847/PSJ/ae5b70. Data: Bertone, S., Barker, M., Mazarico, E., McKenna, T., and
+  Petro, N., 2025, "Archived geospatial products for manuscript "Enhanced Topography Models for selected Lunar South
+  Pole regions with Shape-from-Shading"", Zenodo, doi:10.5281/zenodo.17954508.
+links:
+  - https://pgda.gsfc.nasa.gov/products/104
+  - https://doi.org/10.5281/zenodo.17954508
+  - https://doi.org/10.3847/PSJ/ae5b70
+# Each archive and its size in bytes, which the step checks before reading anything from it.
+files:
+  - A3CLR22_0_Amundsen_Rim 1775016989
+  - A3CLR22_1_Nobile_Rim_2 1839070131
+  - A3CLR22_2_Haworth 4353812518
+  - A3CLR22_3_Faustini_Rim_A 1936729230
+  - A3CLR22_4_deGerlache_Rim_2 2187384204
+  - A3CLR22_5_Connecting_Ridge_Extension 2225897760
+  - A3CLR22_6_Connecting_Ridge 2206485514
+  - A3CLR22_7_Nobile_Rim_1 1962014939
+  - A3CLR22_8_Peak_Near_Shackleton 1360387336
+  - A3CLR22_9_deGerlache_Rim 1340667387
+  - A3CLR22_10_Leibnitz_Beta_Plateau 1050441742
+  - A3CLR22_11_Malapert_Massif 2213137537
+  - A3CLR22_12_deGerlache_Kocher_Massif 2108633565

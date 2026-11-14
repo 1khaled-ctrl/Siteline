@@ -19,6 +19,8 @@ export interface PinHost {
 
 /** Mean radius of each body, as the maps use it (kilometres). */
 export const SITE_BODY_RADIUS_KM: Record<SiteBody, number> = { Moon: 1737.4, Mars: 3389.5 };
+/** How many of the source's cells the view keeps across its width at the closest zoom. */
+const MIN_CELLS_ACROSS = 35;
 const GRID = 257;
 const PIN_LIFT_M = 60;
 const ROUTE_LIFT_M = 80;
@@ -141,7 +143,12 @@ export class SiteView implements PinHost {
     this.camera.up.copy(this.up);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enablePan = false;
-    this.controls.minDistance = this.widthKm * 0.05;
+    // No closer than the data resolves: keep at least MIN_CELLS_ACROSS of its cells in view, so the ground never
+    // turns into a few blurred squares. A cell is the coarser of the source's (the header's `pixM`, where known) and
+    // the patch's own pixel spacing, which is all a demo patch's header tells.
+    const cellM = Math.max(meta.pixM ?? 0, (this.widthKm * 1000) / patch.width);
+    const span = 2 * Math.tan((this.camera.fov / 2) * DEG);
+    this.controls.minDistance = Math.max(this.widthKm * 0.05, (MIN_CELLS_ACROSS * cellM) / 1000 / span);
     this.controls.maxDistance = this.widthKm * 3;
     this.controls.maxPolarAngle = 80 * DEG;
     this.controls.addEventListener('change', () => this.requestRender());
@@ -313,7 +320,7 @@ export class SiteView implements PinHost {
       for (let j = 0; j < GRID; j++) {
         // Clamp so the last row and column stay inside the patch despite rounding.
         const lat = meta.latDeg + meta.halfDeg * (1 - (2 * i) / (GRID - 1)) * 0.999999;
-        const lon = meta.lonDeg + meta.halfDeg * ((2 * j) / (GRID - 1) - 1) * 0.999999;
+        const lon = meta.lonDeg + meta.lonHalfDeg * ((2 * j) / (GRID - 1) - 1) * 0.999999;
         this.localPoint(lat, lon, 0, p);
         pos.setXYZ(i * GRID + j, p.x, p.y, p.z);
       }
@@ -362,7 +369,7 @@ export class SiteView implements PinHost {
         if (this.disposed) return resolve();
         const margin = 1.25;
         const halfLat = meta.halfDeg * margin;
-        const halfLon = meta.halfDeg * margin;
+        const halfLon = meta.lonHalfDeg * margin;
         const x0 = ((meta.lonDeg - halfLon + 180) / 360) * img.naturalWidth;
         const y0 = ((90 - (meta.latDeg + halfLat)) / 180) * img.naturalHeight;
         const sw = ((2 * halfLon) / 360) * img.naturalWidth;
