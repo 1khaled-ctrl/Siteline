@@ -5,10 +5,12 @@ import { describe, expect, it } from 'vitest';
 import bodiesJson from '../../../data/bodies.json';
 import {
   BODY_CONSTANTS,
+  bodyEscapeSpeedKmS,
   dayLength,
   distancesOf,
   escapeSpeedKmS,
   FACT_BODIES,
+  type FactBody,
   kelvinToCelsius,
   lightTimeS,
   parseBodies,
@@ -19,52 +21,212 @@ import {
 } from './bodyFacts';
 
 const tablePath = fileURLToPath(new URL('../../../pipeline/out/ephemeris/planets.bin', import.meta.url));
+const gmPath = fileURLToPath(new URL('../../../pipeline/raw/spice/gm_de440.tpc', import.meta.url));
 
-/** The published figures on NASA's Moon, Earth and Mars fact sheets (read 2026-11-11), to the digits they print. */
-const NASA = {
-  Moon: { gravity: 1.62, escapeKmS: 2.38 },
-  Earth: { gravity: 9.82, escapeKmS: 11.186 },
-  Mars: { gravity: 3.73, escapeKmS: 5.03 },
-} as const;
+const GIANTS = ['Jupiter', 'Saturn', 'Uranus', 'Neptune'] as const;
+
+/** A figure as a fact sheet prints it, and the decimals it is printed to. */
+type Printed = readonly [value: number, decimals: number];
+
+/**
+ * The figures NASA's fact sheets print (the Moon, Earth and Mars read 2026-11-11, the rest 2026-11-15), to the
+ * decimals they print: GM in 10⁶ km³/s², mean gravity (at 1 bar for the giants) and escape velocity. Mercury's escape
+ * velocity is not here: its own test below says why.
+ */
+const NASA: Readonly<Record<FactBody, { gm: Printed; gravity: Printed; escapeKmS?: Printed }>> = {
+  Mercury: { gm: [0.022032, 6], gravity: [3.7, 2] },
+  Venus: { gm: [0.32486, 5], gravity: [8.87, 2], escapeKmS: [10.36, 2] },
+  Earth: { gm: [0.3986, 5], gravity: [9.82, 2], escapeKmS: [11.186, 3] },
+  Moon: { gm: [0.0049, 5], gravity: [1.62, 2], escapeKmS: [2.38, 2] },
+  Mars: { gm: [0.042828, 6], gravity: [3.73, 2], escapeKmS: [5.03, 2] },
+  Jupiter: { gm: [126.687, 3], gravity: [25.92, 2], escapeKmS: [59.5, 1] },
+  Saturn: { gm: [37.931, 3], gravity: [11.19, 2], escapeKmS: [35.5, 1] },
+  Uranus: { gm: [5.794, 4], gravity: [9.01, 2], escapeKmS: [21.3, 1] },
+  Neptune: { gm: [6.8351, 4], gravity: [11.27, 2], escapeKmS: [23.5, 1] },
+};
+
+/** Each body's own NAIF id: its GM is `BODY<id>_GM`, never a system barycentre's such as `BODY5_GM`. */
+const NAIF_ID: Readonly<Record<FactBody, number>> = {
+  Mercury: 199,
+  Venus: 299,
+  Earth: 399,
+  Moon: 301,
+  Mars: 499,
+  Jupiter: 599,
+  Saturn: 699,
+  Uranus: 799,
+  Neptune: 899,
+};
+
+/** The file as plain objects, to break one part of it at a time. */
+type Editable = Record<string, unknown> & {
+  bodies: Record<string, Record<string, unknown> & { sources: Record<string, unknown> }>;
+};
+const copy = (): Editable => structuredClone(bodiesJson) as never;
 
 describe('data/bodies.json', () => {
-  it('has every number for the Moon, Earth and Mars, each with a source that is listed', () => {
+  it('has every number for the Moon and the eight planets, each citing its own fact sheet, or NAIF for GM', () => {
     const file = parseBodies(bodiesJson);
+    expect(Object.keys(file.bodies)).toEqual([...FACT_BODIES]);
     for (const name of FACT_BODIES) {
-      expect(file.bodies[name].radiusKm).toBeGreaterThan(1000);
-      expect(file.sources[file.bodies[name].factSheet]?.[1]).toMatch(/^https:\/\/nssdc\.gsfc\.nasa\.gov\//);
+      const b = file.bodies[name];
+      const [label, link] = file.sources[b.factSheet] ?? [];
+      expect(link, name).toMatch(/^https:\/\/nssdc\.gsfc\.nasa\.gov\/planetary\/factsheet\/[a-z]+fact\.html$/);
+      // Each sheet is listed with the update date it carried when it was read.
+      expect(label, name).toMatch(/ Fact Sheet, updated \d{1,2} [A-Z][a-z]{2} \d{4}$/);
+      const fields = [
+        'radiusKm',
+        'gmKm3PerS2',
+        'rotationH',
+        'solarDayH',
+        'obliquityDeg',
+        'temperatureK',
+        ...(b.surfacePressureMbar === null ? [] : ['surfacePressureMbar']),
+        ...(b.surface === 'none' ? ['equatorialRadiusKm', 'levelBar'] : []),
+      ];
+      expect(Object.keys(b.sources).sort(), name).toEqual(fields.sort());
+      for (const k of fields) {
+        expect(b.sources[k], `${name}.${k}`).toContain(k === 'gmKm3PerS2' ? 'spiceGm' : b.factSheet);
+      }
     }
   });
 
-  it('refuses a number that names no source, a source that is not listed, and a value that is not positive', () => {
-    const copy = (): { bodies: { Mars: Record<string, unknown> } } => structuredClone(bodiesJson) as never;
+  it('gives the four giants at the 1 bar level, with no surface pressure and no surface temperature', () => {
+    for (const name of GIANTS) {
+      const b = BODY_CONSTANTS[name];
+      expect(b, name).toMatchObject({ surface: 'none', levelBar: 1, surfacePressureMbar: null });
+      expect(Object.keys(b.temperatureK), name).toEqual(['atLevelK']);
+      expect(b.equatorialRadiusKm, name).toBeGreaterThan(b.radiusKm);
+    }
+    for (const name of FACT_BODIES.filter((n) => !(GIANTS as readonly string[]).includes(n))) {
+      expect(BODY_CONSTANTS[name].surface, name).toBeUndefined();
+    }
+  });
+
+  it("keeps NASA's minus sign for a retrograde spin, and every length of day positive", () => {
+    expect(BODY_CONSTANTS.Venus.rotationH).toBe(-5832.6);
+    expect(BODY_CONSTANTS.Uranus.rotationH).toBe(-17.24);
+    for (const name of FACT_BODIES) {
+      expect(BODY_CONSTANTS[name].solarDayH, name).toBeGreaterThan(0);
+      // Spinning backwards shows in the tilt too: past 90° exactly where the period is negative.
+      expect(BODY_CONSTANTS[name].obliquityDeg > 90, name).toBe(BODY_CONSTANTS[name].rotationH < 0);
+    }
+  });
+
+  it('refuses a number that names no source, a source that is not listed, and a value out of its range', () => {
     const noSource = copy();
-    Reflect.deleteProperty(noSource.bodies.Mars.sources as object, 'gmKm3PerS2');
+    Reflect.deleteProperty(noSource.bodies.Mars.sources, 'gmKm3PerS2');
     expect(() => parseBodies(noSource)).toThrow(/Mars.gmKm3PerS2 names no source/);
+    const noObliquitySource = copy();
+    Reflect.deleteProperty(noObliquitySource.bodies.Neptune.sources, 'obliquityDeg');
+    expect(() => parseBodies(noObliquitySource)).toThrow(/Neptune.obliquityDeg names no source/);
     const unlisted = copy();
-    (unlisted.bodies.Mars.sources as Record<string, unknown>).rotationH = ['nasaVenus'];
-    expect(() => parseBodies(unlisted)).toThrow(/cites nasaVenus/);
+    unlisted.bodies.Mars.sources.rotationH = ['nasaPluto'];
+    expect(() => parseBodies(unlisted)).toThrow(/cites nasaPluto/);
     const negative = copy();
     negative.bodies.Mars.radiusKm = -3389.5;
     expect(() => parseBodies(negative)).toThrow(/Mars.radiusKm is not a positive number/);
     const backwards = copy();
     backwards.bodies.Mars.temperatureK = { rangeK: [242, 184] };
     expect(() => parseBodies(backwards)).toThrow(/does not run from cold to hot/);
+    const stopped = copy();
+    stopped.bodies.Venus.rotationH = 0;
+    expect(() => parseBodies(stopped)).toThrow(/Venus.rotationH is not a non-zero number/);
+    const negativeDay = copy();
+    negativeDay.bodies.Venus.solarDayH = -2802;
+    expect(() => parseBodies(negativeDay)).toThrow(/Venus.solarDayH is not a positive number/);
+    const tipped = copy();
+    tipped.bodies.Uranus.obliquityDeg = 262.23;
+    expect(() => parseBodies(tipped)).toThrow(/Uranus.obliquityDeg is not an angle from 0° to 180°/);
+  });
+
+  it('refuses a surface value for a giant planet, and a 1 bar value for a body with a surface', () => {
+    const pressure = copy();
+    pressure.bodies.Jupiter.surfacePressureMbar = 1_000_000;
+    pressure.bodies.Jupiter.sources.surfacePressureMbar = ['nasaJupiter'];
+    expect(() => parseBodies(pressure)).toThrow(/Jupiter has no surface, so it has no surface pressure/);
+    const mean = copy();
+    mean.bodies.Saturn.temperatureK = { atLevelK: 134, meanK: 134 };
+    expect(() => parseBodies(mean)).toThrow(/Saturn has no surface, so it has no surface temperatures/);
+    const noLevel = copy();
+    Reflect.deleteProperty(noLevel.bodies.Uranus, 'levelBar');
+    expect(() => parseBodies(noLevel)).toThrow(/Uranus.levelBar is not a positive number/);
+    const onSolid = copy();
+    onSolid.bodies.Mars.temperatureK = { atLevelK: 214 };
+    expect(() => parseBodies(onSolid)).toThrow(/Mars.temperatureK.atLevelK is only for a body with no surface/);
+    const equatorial = copy();
+    equatorial.bodies.Earth.equatorialRadiusKm = 6378.1;
+    expect(() => parseBodies(equatorial)).toThrow(/Earth.equatorialRadiusKm is only for a body with no surface/);
+  });
+
+  it('refuses a field, a body or a part of the file it does not know, so no number slips past unread', () => {
+    const field = copy();
+    field.bodies.Mars.massKg = 6.4171e23;
+    expect(() => parseBodies(field)).toThrow(/Mars.massKg is not a field this file knows/);
+    const temperature = copy();
+    temperature.bodies.Venus.temperatureK = { meanK: 737, surfaceK: 737 };
+    expect(() => parseBodies(temperature)).toThrow(/Venus.temperatureK.surfaceK is not a field this file knows/);
+    const body = copy();
+    body.bodies.Pluto = structuredClone(body.bodies.Neptune);
+    expect(() => parseBodies(body)).toThrow(/bodies.Pluto is not a field this file knows/);
+    // The concept demo's translated text held temperatures with no source; no block like it can come back.
+    const part = copy();
+    part.text = { ar: {} };
+    expect(() => parseBodies(part)).toThrow(/^data\/bodies.json: text is not a field this file knows$/);
   });
 });
 
 describe('surface gravity and escape speed', () => {
-  it.each(FACT_BODIES)('match the figures NASA prints for the %s', (name) => {
+  it.each(FACT_BODIES)('match the GM and gravity NASA prints for %s', (name) => {
     const { gmKm3PerS2, radiusKm } = BODY_CONSTANTS[name];
-    // Printed to two or three decimals, so half a unit in the last place is the most they can differ by.
-    expect(surfaceGravityMS2(gmKm3PerS2, radiusKm)).toBeCloseTo(NASA[name].gravity, 2);
-    expect(escapeSpeedKmS(gmKm3PerS2, radiusKm)).toBeCloseTo(NASA[name].escapeKmS, 2);
+    const { gm, gravity } = NASA[name];
+    // Printed to a few decimals, so half a unit in the last place is the most they can differ by.
+    expect(gmKm3PerS2 / 1e6).toBeCloseTo(gm[0], gm[1]);
+    expect(surfaceGravityMS2(gmKm3PerS2, radiusKm)).toBeCloseTo(gravity[0], gravity[1]);
+  });
+
+  it.each(FACT_BODIES.filter((name) => NASA[name].escapeKmS))(
+    'match the escape velocity NASA prints for %s',
+    (name) => {
+      const [kmS, decimals] = NASA[name].escapeKmS ?? [Number.NaN, 0];
+      expect(bodyEscapeSpeedKmS(BODY_CONSTANTS[name])).toBeCloseTo(kmS, decimals);
+    },
+  );
+
+  it("use a giant's equatorial radius at 1 bar, as NASA does: Jupiter's mean radius would give 60.2 km/s, not 59.5", () => {
+    const { Jupiter, Earth } = BODY_CONSTANTS;
+    expect(escapeSpeedKmS(Jupiter.gmKm3PerS2, Jupiter.radiusKm)).toBeCloseTo(60.2, 1);
+    expect(bodyEscapeSpeedKmS(Jupiter)).toBeCloseTo(59.5, 1);
+    // A body with a surface keeps its mean radius.
+    expect(bodyEscapeSpeedKmS(Earth)).toBe(escapeSpeedKmS(Earth.gmKm3PerS2, Earth.radiusKm));
+  });
+
+  it('give Mercury 4.25 km/s from its own GM and radius, where its sheet prints 4.3', () => {
+    const kmS = bodyEscapeSpeedKmS(BODY_CONSTANTS.Mercury);
+    expect(kmS).toBeCloseTo(4.25, 2);
+    // More than half a unit in the printed figure's last place: the sheet's 4.3 is not what its own numbers give.
+    expect(Math.abs(kmS - 4.3)).toBeGreaterThan(0.05);
   });
 
   it('turn km³/s² and km into m/s² and km/s with the right powers', () => {
     // GM = 1 km³/s² on a 1 km sphere: 1 km/s² is 1000 m/s², and sqrt(2) km/s to leave.
     expect(surfaceGravityMS2(1, 1)).toBe(1000);
     expect(escapeSpeedKmS(1, 1)).toBeCloseTo(Math.SQRT2, 12);
+  });
+});
+
+// NAIF's kernel is fetched by `corepack pnpm ephemeris` into pipeline/raw/spice; CI does not fetch it.
+describe.skipIf(!existsSync(gmPath))("against NAIF's gm_de440.tpc", () => {
+  it("holds each body's own GM, to the six decimals the file stores", () => {
+    // Read here, not in the suite's body: Vitest runs that even when the suite is skipped.
+    const kernel = readFileSync(gmPath, 'utf8');
+    for (const name of FACT_BODIES) {
+      const found = new RegExp(`\\bBODY${NAIF_ID[name]}_GM\\s*=\\s*\\(\\s*(\\S+)\\s*\\)`).exec(kernel);
+      expect(found, name).not.toBeNull();
+      // SPICE text kernels may write the exponent with a D, as Fortran does.
+      const gm = Number((found?.[1] ?? '').replace(/D/i, 'E'));
+      expect(BODY_CONSTANTS[name].gmKm3PerS2, name).toBeCloseTo(gm, 6);
+    }
   });
 });
 
@@ -98,6 +260,12 @@ describe('sunlight and signal delay', () => {
     expect(dayLength(BODY_CONSTANTS.Moon.solarDayH).unit).toBe('d');
     expect(dayLength(BODY_CONSTANTS.Moon.solarDayH).n).toBeCloseTo(29.53, 10);
   });
+
+  it('reads a retrograde turn as its length: Uranus in 17.24 hours, Venus in 243.025 days', () => {
+    expect(dayLength(BODY_CONSTANTS.Uranus.rotationH)).toEqual({ n: 17.24, unit: 'h', digits: 1 });
+    expect(dayLength(BODY_CONSTANTS.Venus.rotationH)).toMatchObject({ unit: 'd' });
+    expect(dayLength(BODY_CONSTANTS.Venus.rotationH).n).toBeCloseTo(243.025, 10);
+  });
 });
 
 describe('temperatures', () => {
@@ -109,6 +277,10 @@ describe('temperatures', () => {
     // The Moon's sheet prints 95 K to 390 K with only Fahrenheit beside it: about -290 F to +240 F.
     const tens = (k: number) => Math.round(((kelvinToCelsius(k) * 9) / 5 + 32) / 10) * 10;
     expect(BODY_CONSTANTS.Moon.temperatureK.rangeK?.map(tens)).toEqual([-290, 240]);
+    expect(round(BODY_CONSTANTS.Mercury.temperatureK.meanK)).toBe(167);
+    expect(round(BODY_CONSTANTS.Venus.temperatureK.meanK)).toBe(464);
+    // The giants' temperatures at 1 bar, which their sheets print as -108, -139, -197 and -201 °C.
+    expect(GIANTS.map((name) => round(BODY_CONSTANTS[name].temperatureK.atLevelK))).toEqual([-108, -139, -197, -201]);
   });
 });
 
