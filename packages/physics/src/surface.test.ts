@@ -20,6 +20,7 @@ import {
   localElevAz,
   localFrame,
   localToGeo,
+  northTurnDeg,
   rayGrids,
   resampleGrid,
   resampleToLocal,
@@ -105,6 +106,42 @@ describe('local frame', () => {
     expect(d[1]).toBeCloseTo(1, 12);
     expect(d[2]).toBeCloseTo(0, 12);
     expect(localDirection(p, [0, 0, -2])[2]).toBeCloseTo(1, 12);
+  });
+
+  it('turns north under you near the pole, as the meridians meet', () => {
+    // A site 15 km from the pole: 1.6 km sideways, north leans away from the pole by atan(1.6 / 15), about 6.09°.
+    const near = localFrame(-90 + 15_000 / R / DEG, 30, 0);
+    expect(northTurnDeg(near, 0, 0)).toBe(0);
+    expect(northTurnDeg(near, 0, 1500)).toBeCloseTo(0, 9);
+    expect(northTurnDeg(near, 0, -1500)).toBeCloseTo(0, 9);
+    expect(northTurnDeg(near, 1600, 0)).toBeCloseTo(Math.atan(1600 / 15_000) / DEG, 1);
+    expect(northTurnDeg(near, -1600, 0)).toBeCloseTo(-Math.atan(1600 / 15_000) / DEG, 1);
+    // Far from the pole it barely turns: 200 km out, under half a degree.
+    expect(Math.abs(northTurnDeg(localFrame(-83.4, 0, 0), 1600, 0))).toBeLessThan(0.5);
+  });
+
+  it('agrees with north worked out again from the latitude and longitude of the point', () => {
+    for (const site of [localFrame(-85, -120, 800), localFrame(-89.5, 45, 1200), localFrame(-89.97, 170, -2000)]) {
+      for (const [e, n] of [
+        [1600, 0],
+        [-1200, 900],
+        [300, -1550],
+        [-1600, -1600],
+      ]) {
+        const at = localToGeo(site, e, n);
+        const d = localDirection(site, siteFrame(at.latDeg, at.lonDeg).n);
+        expect(northTurnDeg(site, e, n)).toBeCloseTo(Math.atan2(d[0], d[1]) / DEG, 6);
+      }
+    }
+  });
+
+  it('works exactly at the pole, where every way out is north', () => {
+    const pole = localFrame(-90, 0, 0);
+    expect(northTurnDeg(pole, 0, 0)).toBe(0);
+    expect(northTurnDeg(pole, 0, 1000)).toBeCloseTo(0, 9);
+    expect(northTurnDeg(pole, 1000, 0)).toBeCloseTo(90, 9);
+    expect(northTurnDeg(pole, -1000, 0)).toBeCloseTo(-90, 9);
+    expect(Math.abs(northTurnDeg(pole, 0, -1000))).toBeCloseTo(180, 9);
   });
 });
 

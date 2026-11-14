@@ -1,10 +1,10 @@
-import { DEFAULT_STAY } from '@siteline/contracts';
 import {
   EDGE_MARGIN_M,
   FAST_M_PER_S,
   type SurfaceLabelKey,
   type SurfaceLabels,
   type SurfaceMode,
+  type SurfacePointers,
   SurfaceView,
 } from '@siteline/engine/surface';
 import { EYE_HEIGHT_M, type MoveBlock } from '@siteline/physics';
@@ -28,6 +28,8 @@ import { FIRST_UTC_MS, LAST_UTC_MS, useApp } from '../../store';
 import { pressedGold } from '../Controls';
 import { SoundToggle } from '../SoundToggle';
 import { Spinner } from '../ViewStatus';
+import { type RingInfo, SurfaceAbout } from './SurfaceAbout';
+import { type CompassHandle, EarthIcon, SunIcon, SurfaceCompass } from './SurfaceCompass';
 
 type Phase =
   | { kind: 'loading'; progress?: SurfaceProgress; lighting?: boolean }
@@ -38,7 +40,6 @@ type Phase =
   | { kind: 'error'; reason: string }
   | { kind: 'lost' };
 
-type RingInfo = Omit<SurfaceLevelData, 'positions' | 'normals' | 'indices' | 'up'>;
 /** What the About panel says about a ring, without its arrays. */
 const infoOf = ({ positions: _p, normals: _n, indices: _i, up: _u, ...info }: SurfaceLevelData): RingInfo => info;
 
@@ -51,6 +52,14 @@ type Stage = (typeof STAGES)[number];
 /** "Most of the ground around you is in shadow": under a fifth of the Sun, on average, within 150 m. */
 const DARK_RADIUS_M = 150;
 const DARK_SHARE = 0.2;
+
+/**
+ * Pointers toward the Sun and the Earth keep to the open view: 28 px in from the sides, clear of the top panels by half
+ * a pointer, and of the clock by a pointer and its name.
+ */
+const POINTER_SIDE_PX = 28;
+const POINTER_CLEAR_TOP_PX = 24;
+const POINTER_CLEAR_BOTTOM_PX = 44;
 
 /** How far the clock can be moved from touchdown: three days before to thirty after, in hours. */
 const OFFSET_MIN_H = -72;
@@ -84,6 +93,14 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const viewRef = useRef<SurfaceView | null>(null);
   const labelEls = useRef<Partial<Record<SurfaceLabelKey, HTMLSpanElement | null>>>({});
   const labelsOnRef = useRef(true);
+  const compassRef = useRef<CompassHandle>(null);
+  /** The pointers at the screen's edge toward the Sun and the Earth, and the tips that turn toward them. */
+  const pointerEls = useRef<Partial<Record<'sun' | 'earth', HTMLDivElement | null>>>({});
+  const pointerTips = useRef<Partial<Record<'sun' | 'earth', HTMLSpanElement | null>>>({});
+  const modeRef = useRef<SurfaceMode>('idle');
+  const aboutButtonRef = useRef<HTMLButtonElement>(null);
+  const topPanelsRef = useRef<HTMLDivElement>(null);
+  const clockRef = useRef<HTMLDivElement>(null);
   const quality = useMemo(qualityFor, []);
   const coarsePointer = useMemo(() => window.matchMedia('(pointer: coarse)').matches, []);
   const narrow = useMemo(() => window.matchMedia('(max-width: 40rem)').matches, []);
@@ -116,6 +133,8 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   // On a narrow screen the view's options fold away behind one button, to keep the horizon in view.
   const [toolsOpen, setToolsOpen] = useState(!narrow);
 
+  /** Walking the terrain (loaded, and past the descent): when the compass, the readings and the clock show. */
+  const exploring = phase.kind === 'ready' && mode === 'explore';
   const exploreUtcMs = target.touchdownUtcMs + offsetMs;
   const exploreRef = useRef(exploreUtcMs);
   exploreRef.current = exploreUtcMs;
@@ -240,9 +259,25 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
         reducedMotion: reducedMotion(),
         eyeHeightM: EYE_HEIGHT_M,
         walkIndex: scene.walkIndex,
+        site: { latDeg: scene.latDeg, groundHeightM: scene.groundHeightM },
         onMode: (m) => {
+          modeRef.current = m;
           setMode(m);
           if (m === 'explore') sound.chime();
+        },
+        onHeading: (heading) => compassRef.current?.update(heading),
+        onPointers: (pointers: SurfacePointers) => {
+          for (const key of ['sun', 'earth'] as const) {
+            const el = pointerEls.current[key];
+            if (!el) continue;
+            const p = pointers[key];
+            const show = p.shown && labelsOnRef.current && modeRef.current === 'explore';
+            el.style.visibility = show ? 'visible' : 'hidden';
+            if (!show) continue;
+            el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
+            const tip = pointerTips.current[key];
+            if (tip) tip.style.transform = `rotate(${p.angleRad.toFixed(3)}rad)`;
+          }
         },
         onBlocked: setBlocked,
         onPointerLock: setLocked,
@@ -310,8 +345,33 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
 
   useEffect(() => {
     labelsOnRef.current = labelsOn;
-    for (const el of Object.values(labelEls.current)) if (el && !labelsOn) el.style.visibility = 'hidden';
+    const placed = [...Object.values(labelEls.current), ...Object.values(pointerEls.current)];
+    for (const el of placed) if (el && !labelsOn) el.style.visibility = 'hidden';
+    // Turned back on, they show from the next frame: draw one now rather than wait for a move.
+    if (labelsOn) viewRef.current?.redraw();
   }, [labelsOn]);
+  // The pointers keep to the open view between the panels at the top and the clock, however tall those grow.
+  useEffect(() => {
+    const container = containerRef.current;
+    const top = topPanelsRef.current;
+    const clock = clockRef.current;
+    if (!exploring || !container || !top || !clock) return;
+    const fit = () => {
+      const box = container.getBoundingClientRect();
+      const topPx = top.getBoundingClientRect().bottom - box.top + POINTER_CLEAR_TOP_PX;
+      const bottomPx = clock.getBoundingClientRect().top - box.top - POINTER_CLEAR_BOTTOM_PX;
+      const mid = (topPx + bottomPx) / 2;
+      viewRef.current?.setPointerBand({
+        sidePx: POINTER_SIDE_PX,
+        topPx: Math.min(topPx, mid),
+        bottomPx: Math.max(bottomPx, mid),
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    for (const el of [container, top, clock]) observer.observe(el);
+    fit();
+    return () => observer.disconnect();
+  }, [exploring]);
   useEffect(() => viewRef.current?.setTouchdownMarker(markerOn), [markerOn]);
   useEffect(() => viewRef.current?.setInspectionLight(inspectOn), [inspectOn]);
 
@@ -322,6 +382,9 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const reach = formatNumber(Math.abs(gridReachLatDeg(TERRAIN_EXTENT.coarse.halfM)), 0);
   const near = scene?.levels[scene.walkIndex];
   const fromTouchdownM = eye ? Math.hypot(eye.east, eye.north) : 0;
+  // The compass marks the Sun and the Earth as the eye sees them: where, and whether any of the disc shows.
+  const compassSun = useMemo(() => eye && { azDeg: eye.sun.azDeg, inView: eye.sun.fraction > 0 }, [eye]);
+  const compassEarth = useMemo(() => eye && { azDeg: eye.earth.azDeg, inView: eye.earth.fraction > 0 }, [eye]);
   const walkKm = near ? formatNumber((near.halfM - EDGE_MARGIN_M) / 1000, 1) : '';
   const off = offsetLabel(offsetMs);
   // The share of the Earth's face in sunlight as seen from here: (1 − cos θ) / 2, θ the Sun–Earth angle in this sky.
@@ -450,83 +513,136 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
         {(['north', 'east', 'south', 'west'] as const).map((k) =>
           labelSpan(k, <span className="font-display text-sm text-quiet">{t(`land.compass.${k}`)}</span>),
         )}
+        {/* Out of view, the Sun and the Earth get a pointer at the edge of the screen, its tip turned toward them. */}
+        {(['sun', 'earth'] as const).map((key) => (
+          <div
+            key={`pointer-${key}`}
+            ref={(el) => {
+              pointerEls.current[key] = el;
+            }}
+            className="absolute start-0 top-0"
+            style={{ visibility: 'hidden' }}
+            data-testid={`surface-pointer-${key}`}
+          >
+            <div className="relative -translate-x-1/2 -translate-y-1/2">
+              <div
+                className={`relative grid size-8 place-items-center rounded-full border bg-black/65 shadow-[0_2px_10px_rgb(0_0_0/0.6)] ${key === 'sun' ? 'border-sun/80' : 'border-accent/80'}`}
+              >
+                {key === 'sun' ? (
+                  <SunIcon inView={(eye?.sun.fraction ?? 0) > 0} />
+                ) : (
+                  <EarthIcon inView={(eye?.earth.fraction ?? 0) > 0} />
+                )}
+                <span
+                  ref={(el) => {
+                    pointerTips.current[key] = el;
+                  }}
+                  className="absolute inset-0"
+                >
+                  <span
+                    className={`absolute top-1/2 -end-2 -translate-y-1/2 border-y-[5px] border-s-[7px] border-y-transparent ${key === 'sun' ? 'border-s-sun' : 'border-s-accent'}`}
+                  />
+                </span>
+              </div>
+              <span
+                className={`absolute start-1/2 top-full mt-1 -translate-x-1/2 rounded bg-black/60 px-1.5 py-0.5 whitespace-nowrap ${key === 'sun' ? 'text-sun-ink' : 'text-accent'}`}
+              >
+                {t(`land.${key}`)}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Top: where this is and what the eye sees from it, and the way back. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-        <div className="flex max-w-[min(30rem,calc(100%-9.5rem))] flex-col gap-2">
-          <div className="glass pointer-events-auto px-3.5 py-2.5">
-            <h2 id="surface-title" className="font-display text-lg leading-tight">
-              {target.name ?? t('land.title')}
-            </h2>
-            <p className="font-mono text-sm" dir="ltr">
-              {place}
-            </p>
-            <p className="mt-0.5 text-xs text-quiet max-sm:hidden">{t('land.subtitle')}</p>
-          </div>
-          {phase.kind === 'ready' && mode === 'explore' && (
-            <div className="glass pointer-events-auto px-3 py-2 text-xs" data-testid="surface-readings">
-              <p className="text-quiet">
-                {t('land.eyeTitle', { eye: formatNumber(EYE_HEIGHT_M, 1) })} ·{' '}
-                {fromTouchdownM < 1
-                  ? t('land.atTouchdown')
-                  : t('land.fromTouchdown', { m: formatNumber(fromTouchdownM, 0) })}
-              </p>
-              {eye ? (
-                <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2">
-                  <dt className="text-sun-ink">{t('land.sun')}</dt>
-                  <dd data-text>{bodyLine(eye.sun)}</dd>
-                  <dt className="text-accent">{t('land.earth')}</dt>
-                  <dd data-text>
-                    {bodyLine(eye.earth)}
-                    {earthLitPct !== undefined && ` · ${t('land.earthLit', { pct: formatNumber(earthLitPct, 0) })}`}
-                  </dd>
-                </dl>
-              ) : (
-                <p className="mt-1">{t('land.readingsPending')}</p>
-              )}
-              {fineRegion && !scene?.fineRegion && (
-                <div className="mt-2 border-t border-line pt-2">
-                  <button
-                    type="button"
-                    className={`${button} w-full border-sun/60 text-sun-ink`}
-                    onClick={() => setFine5(true)}
-                    data-testid="surface-fine5"
-                  >
-                    {t('land.fineOffer', { mb: formatNumber(fineRegion.compressedBytes / 1e6, 0) })}
-                  </button>
-                  <p className="mt-1 text-quiet">{t('land.fineOfferNote', { region: fineRegion.name })}</p>
-                </div>
-              )}
-            </div>
-          )}
+      {/* Top: where this is, the compass, what the eye sees from here, and the way back. */}
+      <div
+        ref={topPanelsRef}
+        className="pointer-events-none absolute inset-x-0 top-0 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]"
+      >
+        <div className="glass pointer-events-auto col-start-1 row-start-1 max-w-[30rem] justify-self-start px-3.5 py-2.5">
+          <h2 id="surface-title" className="font-display text-lg leading-tight">
+            {target.name ?? t('land.title')}
+          </h2>
+          <p className="font-mono text-sm" dir="ltr">
+            {place}
+          </p>
+          <p className="mt-0.5 text-xs text-quiet max-sm:hidden">{t('land.subtitle')}</p>
         </div>
-        <div className="pointer-events-auto flex items-center gap-1.5">
+        {/* Kept while the descent runs (hidden), so it already faces the right way at touchdown. */}
+        <SurfaceCompass
+          ref={compassRef}
+          sun={compassSun}
+          earth={compassEarth}
+          touchdownShown={markerOn}
+          className={`col-span-2 row-start-2 w-full max-w-[28rem] justify-self-center lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:w-[clamp(18rem,34vw,28rem)] ${exploring ? '' : 'hidden'}`}
+        />
+        <div className="pointer-events-auto col-start-2 row-start-1 flex items-center gap-1.5 justify-self-end lg:col-start-3">
           <button type="button" className={`${button} border-sun/60`} onClick={close} data-testid="surface-return">
             <span aria-hidden="true">←</span> {t('land.return')}
           </button>
           <SoundToggle />
         </div>
+        {exploring && (
+          <div
+            className="glass pointer-events-auto col-span-2 row-start-3 max-w-[30rem] justify-self-start px-3 py-2 text-xs lg:col-span-1 lg:row-start-2"
+            data-testid="surface-readings"
+          >
+            <p className="text-quiet">
+              {t('land.eyeTitle', { eye: formatNumber(EYE_HEIGHT_M, 1) })} ·{' '}
+              {fromTouchdownM < 1
+                ? t('land.atTouchdown')
+                : t('land.fromTouchdown', { m: formatNumber(fromTouchdownM, 0) })}
+            </p>
+            {eye ? (
+              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-2">
+                <dt className="text-sun-ink">{t('land.sun')}</dt>
+                <dd data-text>{bodyLine(eye.sun)}</dd>
+                <dt className="text-accent">{t('land.earth')}</dt>
+                <dd data-text>
+                  {bodyLine(eye.earth)}
+                  {earthLitPct !== undefined && ` · ${t('land.earthLit', { pct: formatNumber(earthLitPct, 0) })}`}
+                </dd>
+              </dl>
+            ) : (
+              <p className="mt-1">{t('land.readingsPending')}</p>
+            )}
+            {/* No sunlight around you: say so here, at the side, with the inspection light beside it. */}
+            {(darkHere || inspectOn) && (
+              <div
+                role="status"
+                className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-line pt-2"
+                data-testid="surface-dark"
+              >
+                <p className={`min-w-0 flex-1 basis-44 ${inspectOn ? 'text-accent' : 'text-quiet'}`}>
+                  {inspectOn ? t('land.inspectOn') : t('land.darkHere')}
+                </p>
+                <button
+                  type="button"
+                  className={chip}
+                  aria-pressed={inspectOn}
+                  onClick={() => setInspectOn((v) => !v)}
+                  data-testid="surface-light"
+                >
+                  {t('land.inspect')}
+                </button>
+              </div>
+            )}
+            {fineRegion && !scene?.fineRegion && (
+              <div className="mt-2 border-t border-line pt-2">
+                <button
+                  type="button"
+                  className={`${button} w-full border-sun/60 text-sun-ink`}
+                  onClick={() => setFine5(true)}
+                  data-testid="surface-fine5"
+                >
+                  {t('land.fineOffer', { mb: formatNumber(fineRegion.compressedBytes / 1e6, 0) })}
+                </button>
+                <p className="mt-1 text-quiet max-sm:hidden">{t('land.fineOfferNote', { region: fineRegion.name })}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
-      {darkHere && !inspectOn && phase.kind === 'ready' && mode === 'explore' && (
-        <p
-          role="status"
-          className="pointer-events-auto absolute inset-x-3 top-1/2 mx-auto flex w-fit max-w-md -translate-y-1/2 flex-wrap items-center justify-center gap-2 rounded-md border border-line bg-black/70 px-3 py-2 text-center text-sm text-quiet"
-          data-testid="surface-dark"
-        >
-          {t('land.darkHere')}
-          <button type="button" className={`${button} text-ink`} onClick={() => setInspectOn(true)}>
-            {t('land.inspect')}
-          </button>
-        </p>
-      )}
-
-      {inspectOn && (
-        <p className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-fit -translate-y-1/2 rounded-md border border-accent/60 bg-black/70 px-3 py-1.5 text-sm text-accent">
-          {t('land.inspectOn')}
-        </p>
-      )}
 
       {blocked && (
         <p
@@ -543,6 +659,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
           <div className="min-w-0 flex-1">
             <p className="font-display text-base text-sun-ink">{t('land.descending')}</p>
             <p className="text-xs text-quiet">{t('land.descentNote')}</p>
+            {inspectOn && <p className="text-xs text-accent">{t('land.inspectOn')}</p>}
           </div>
           <button
             type="button"
@@ -557,72 +674,25 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
 
       {/* Bottom: the clock, the walk, and what this view assumes. */}
       {phase.kind === 'ready' && mode === 'explore' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3">
+        <div className="pointer-events-none absolute inset-0 flex flex-col justify-end gap-2 p-3">
           {infoOpen && scene && (
-            <section
-              className="glass pointer-events-auto max-h-[45dvh] max-w-2xl overflow-y-auto px-4 py-3 text-xs leading-relaxed"
-              aria-label={t('land.about')}
-              data-testid="surface-info"
-            >
-              <p>{t('land.info.what')}</p>
-              {target.source.kind === 'passing' && (
-                <p className="mt-2 text-sun-ink">
-                  {t('land.passing', {
-                    sun: formatNumber(target.source.sunFractionMin * 100, 0),
-                    earth: formatNumber(target.source.earthVisiblePct, 0),
-                    slope: formatNumber(target.source.slope100mDeg, 1),
-                    observer: formatNumber(DEFAULT_STAY.observerHeightM, 0),
-                  })}
-                </p>
-              )}
-              <h3 className="mt-2 font-display text-sm">{t('land.info.ringsTitle')}</h3>
-              <p>{t('land.info.rings')}</p>
-              <ul className="list-disc ps-4">
-                {ringInfo.map((l, i) => {
-                  const values = {
-                    id: l.datasetId,
-                    data: formatNumber(l.sourcePixM, 1),
-                    mesh: formatNumber(l.spacingM, 0),
-                    from: formatNumber((ringInfo[i - 1]?.halfM ?? 0) / 1000, 1),
-                    to: formatNumber(l.halfM / 1000, 1),
-                  };
-                  return (
-                    <li key={l.index}>
-                      {t(l.index === scene.walkIndex ? 'land.info.walkLine' : 'land.info.ringLine', values)}
-                      {l.filledPct >= 0.05 && `; ${t('land.info.filled', { pct: formatNumber(l.filledPct, 1) })}`}
-                      {l.missingPct >= 0.05 && `; ${t('land.info.missing', { pct: formatNumber(l.missingPct, 1) })}`}
-                      {l.provisional && `; ${t('land.info.provisional')}`}
-                    </li>
-                  );
-                })}
-              </ul>
-              {scene.fineRegion && (
-                <p className="mt-2">
-                  {t('land.info.fineCredit', {
-                    region: scene.fineRegion,
-                    km: formatNumber(scene.levels[0].halfM / 1000, 1),
-                  })}
-                </p>
-              )}
-              <p className="mt-2">{t('land.info.scale')}</p>
-              <p className="mt-1">
-                {t('land.info.eye', {
-                  eye: formatNumber(EYE_HEIGHT_M, 1),
-                  observer: formatNumber(DEFAULT_STAY.observerHeightM, 0),
-                })}
-              </p>
-              <p className="mt-1">
-                {t('land.info.shadows', { shadow: formatNumber(sky?.shadowM ?? near?.spacingM ?? 0, 0) })}
-              </p>
-              <p className="mt-1">{t('land.info.material')}</p>
-              <p className="mt-1">{t('land.info.detail')}</p>
-              <p className="mt-1">{t('land.info.earthLook')}</p>
-              <p className="mt-1">{t('land.info.slope')}</p>
-              <p className="mt-1">{t('land.info.descent')}</p>
-            </section>
+            <SurfaceAbout
+              target={target}
+              rings={ringInfo}
+              walkIndex={scene.walkIndex}
+              fineRegion={scene.fineRegion}
+              shadowM={sky?.shadowM ?? near?.spacingM ?? 0}
+              onClose={() => {
+                setInfoOpen(false);
+                aboutButtonRef.current?.focus();
+              }}
+            />
           )}
 
-          <div className="glass pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">
+          <div
+            ref={clockRef}
+            className="glass pointer-events-auto flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2"
+          >
             <div className="min-w-0 text-xs">
               <p className="text-quiet">
                 {t('land.touchdown')}: <span dir="ltr">{formatUtc(new Date(target.touchdownUtcMs).toISOString())}</span>
@@ -738,6 +808,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                     {t('land.inspect')}
                   </button>
                   <button
+                    ref={aboutButtonRef}
                     type="button"
                     className={chip}
                     aria-pressed={infoOpen}
