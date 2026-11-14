@@ -340,9 +340,15 @@
   },
   "facts": {
     "heading": {
-      "Moon": "About the Moon",
+      "Mercury": "About Mercury",
+      "Venus": "About Venus",
       "Earth": "About Earth",
-      "Mars": "About Mars"
+      "Moon": "About the Moon",
+      "Mars": "About Mars",
+      "Jupiter": "About Jupiter",
+      "Saturn": "About Saturn",
+      "Uranus": "About Uranus",
+      "Neptune": "About Neptune"
     },
     "gravity": "Gravity",
     "escape": "Escape speed",
@@ -360,23 +366,46 @@
       "h": "{{n}} h",
       "d": "{{n}} d",
       "s": "{{n}} s",
-      "min": "{{n}} min"
+      "min": "{{n}} min",
+      "km": "{{n}} km",
+      "mkm": "{{n}} million km",
+      "deg": "{{n}}°",
+      "sunlightPct": "{{n}} W/m², {{pct}}% of Earth's",
+      "sunlightTimes": "{{n}} W/m², {{x}} times Earth's"
     },
     "temp": {
       "Moon": "{{low}} to {{high}} °C at the equator from night to day; about {{coldest}} °C in some polar craters",
       "Earth": "{{mean}} °C on average",
-      "Mars": "{{mean}} °C on average; {{low}} to {{high}} °C from night to day at the Viking 1 landing site"
+      "Mars": "{{mean}} °C on average; {{low}} to {{high}} °C from night to day at the Viking 1 landing site",
+      "Mercury": "{{mean}} °C on average",
+      "Venus": "{{mean}} °C on average",
+      "atLevel": "{{level}} °C at the {{bar}} bar level"
     },
     "surfaceKind": {
       "Moon": "Solid rock, almost no air",
       "Earth": "Land and ocean, with air at {{mbar}} mbar",
-      "Mars": "Solid ground, with thin air at {{mbar}} mbar"
+      "Mars": "Solid ground, with thin air at {{mbar}} mbar",
+      "Mercury": "Solid rock, almost no air",
+      "Venus": "Solid rock, under air at {{mbar}} mbar",
+      "none": "No solid surface to land on"
     },
     "sources": {
       "Moon": "Sources: <fact>NASA Moon fact sheet</fact>, NAIF's <gm>gravitational parameters</gm> and, for the coldest craters, <paige>Paige et al. 2010</paige>. Sunlight and signal delay are for the date shown. Details in CREDITS.md.",
       "Earth": "Sources: <fact>NASA Earth fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight is for the date shown. Details in CREDITS.md.",
-      "Mars": "Sources: <fact>NASA Mars fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md."
-    }
+      "Mars": "Sources: <fact>NASA Mars fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md.",
+      "planet": "Sources: <fact>NASA {{name}} fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md."
+    },
+    "distance": "Distance from Earth",
+    "tilt": "Axial tilt",
+    "moonTilt": "So little tilt keeps the Sun near the horizon at the poles all year, where a hill can hide it for days: the problem SiteLine checks for at every landing site.",
+    "retrograde": "Spins backwards (retrograde)",
+    "gravityAtLevel": "Gravity at the {{bar}} bar level",
+    "landers": "Landers",
+    "landersCount": "{{past}} that have gone, {{toCome}} still to come, in our <list>mission list</list>",
+    "landersNone": "No landings in our <list>mission list</list>",
+    "close": "Close the facts card",
+    "open": "Facts",
+    "openFor": "Facts for {{name}}"
   },
   "compare": {
     "heading_one": "{{count}} pinned site",

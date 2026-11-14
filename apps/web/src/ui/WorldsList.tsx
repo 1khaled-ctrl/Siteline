@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { distancesOf, lightTimeS, type Measure, signalDelay } from '../bodyFacts';
 import { formatNumber } from '../format';
 import { usePlanetsAtHourState } from '../physics';
+import { openFacts, useStage } from '../stage';
 import { useApp } from '../store';
 import { panel } from './Controls';
 import { PanelError } from './ViewStatus';
@@ -66,6 +67,7 @@ export function WorldsList() {
   const { t } = useTranslation();
   const { readings, error, retry } = useWorldReadings();
   const commandSolar = useApp((s) => s.commandSolar);
+  const picked = useStage((s) => s.solarPicked);
 
   return (
     <section className={`${panel} lg:hidden`} data-testid="worlds">
@@ -112,8 +114,18 @@ export function WorldsList() {
                 >
                   {cells}
                 </button>
-              ) : (
+              ) : key === 'sun' ? (
                 <div className={row}>{cells}</div>
+              ) : (
+                // Any other planet opens its facts card, and a second press closes it.
+                <button
+                  type="button"
+                  className={`${row} hover:border-line-hover aria-pressed:border-sun`}
+                  aria-pressed={picked === key}
+                  onClick={() => openFacts(key)}
+                >
+                  {cells}
+                </button>
               )}
             </li>
           );

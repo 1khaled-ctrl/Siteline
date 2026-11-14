@@ -1,4 +1,5 @@
 import { type Insets, NO_INSETS, type SolarLabelKey, type SolarView } from '@siteline/engine';
+import type { SolarBodyKey } from '@siteline/physics';
 import { useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 
@@ -14,6 +15,12 @@ interface StageState {
   setDialWorld: (world: SolarLabelKey) => void;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
+  /**
+   * The planet clicked in the solar system, whose facts card is open; picking it again closes the card. Only the
+   * worlds with no view of their own: the Moon, the Earth and Mars fly in instead.
+   */
+  solarPicked: SolarBodyKey | null;
+  toggleSolarPicked: (body: SolarBodyKey | null) => void;
   /** The 3D view on screen, for what turns its camera from outside (the phone's tilt-to-look). */
   active: Lookable | null;
   setActive: (view: Lookable | null) => void;
@@ -42,6 +49,8 @@ export const useStage = create<StageState>((set) => ({
   setDialWorld: (dialWorld) => set({ dialWorld }),
   sheetOpen: false,
   setSheetOpen: (sheetOpen) => set({ sheetOpen }),
+  solarPicked: null,
+  toggleSolarPicked: (body) => set((s) => ({ solarPicked: body === null || s.solarPicked === body ? null : body })),
   active: null,
   setActive: (active) => set({ active }),
   orbOpen: false,
@@ -111,4 +120,17 @@ export function useStageInsets(): Insets {
     () => (wide ? (rtl ? { left: PANEL_PX, right: 0 } : { left: 0, right: PANEL_PX }) : NO_INSETS),
     [wide, rtl],
   );
+}
+
+/**
+ * On a phone: open or close a planet's facts card from the dial, the sheet or the worlds list. Opening it brings the
+ * sheet up and turns the dial to that planet, so the sheet's top line names the planet whose card is open.
+ */
+export function openFacts(world: SolarBodyKey) {
+  const s = useStage.getState();
+  s.toggleSolarPicked(world);
+  if (useStage.getState().solarPicked) {
+    s.setDialWorld(world);
+    s.setSheetOpen(true);
+  }
 }

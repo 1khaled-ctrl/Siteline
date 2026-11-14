@@ -8,16 +8,20 @@ import {
   bodyEscapeSpeedKmS,
   dayLength,
   distancesOf,
+  earthDistance,
   escapeSpeedKmS,
   FACT_BODIES,
+  FACT_BODY_OF,
   type FactBody,
   kelvinToCelsius,
   lightTimeS,
   parseBodies,
   SOLAR_CONSTANT_W_M2,
   signalDelay,
+  sunlightVsEarth,
   sunlightWM2,
   surfaceGravityMS2,
+  TABLE_KEY,
 } from './bodyFacts';
 
 const tablePath = fileURLToPath(new URL('../../../pipeline/out/ephemeris/planets.bin', import.meta.url));
@@ -332,5 +336,27 @@ describe('distancesOf', () => {
       // The Moon's own distance from the Sun (Horizons "r"), which adds its offset from the Earth.
       expect(moon.sunDistAu).toBeCloseTo(0.989846, 4);
     });
+  });
+});
+
+describe('the planet cards', () => {
+  it("finds each body's card from its key in the planets table, and back", () => {
+    for (const name of FACT_BODIES) expect(FACT_BODY_OF[TABLE_KEY[name]]).toBe(name);
+    expect(Object.keys(FACT_BODY_OF)).toHaveLength(FACT_BODIES.length);
+  });
+
+  it("gives sunlight as a share of Earth's: one over the distance in AU squared", () => {
+    expect(sunlightVsEarth(1)).toBe(1);
+    expect(sunlightVsEarth(2)).toBe(0.25);
+    // Mercury's sheet: 9082.7 W/m² against Earth's 1361.0, a ratio of 6.674, at its mean distance of 57.909 million km.
+    expect(sunlightVsEarth(57.909e6 / 149.598e6)).toBeCloseTo(6.674, 2);
+    // And it agrees with the sunlight in watts.
+    expect(sunlightWM2(SOLAR_CONSTANT_W_M2, 5.2) / SOLAR_CONSTANT_W_M2).toBeCloseTo(sunlightVsEarth(5.2), 12);
+  });
+
+  it('words a distance from Earth in kilometres up to ten million, and in millions of kilometres beyond', () => {
+    expect(earthDistance(384_400)).toEqual({ n: 384_400, unit: 'km', digits: 0 });
+    expect(earthDistance(9_999_999).unit).toBe('km');
+    expect(earthDistance(628.7e6)).toEqual({ n: 628.7, unit: 'mkm', digits: 1 });
   });
 });

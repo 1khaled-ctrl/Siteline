@@ -223,6 +223,26 @@ if (Math.abs(planned + 84.79) > 0.01) throw new Error(`Plan this site went to la
 await page.goto(`${new URL(url).origin}/?open=mars&mission=curiosity`, { waitUntil: 'networkidle' });
 await page.getByTestId('mission-card').getByText('38.16 km').waitFor({ timeout: 30_000 });
 
+// On a phone: a planet's row in the solar system opens its facts card, and a second press closes it. Jupiter's escape
+// speed is NASA's 59.5 km/s (its equatorial radius at 1 bar) and it has no surface; Venus spins backwards.
+const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+phone.on('pageerror', (e) => errors.push(e.message));
+await phone.goto(`${new URL(url).origin}/?open=solar&intro=0`, { waitUntil: 'networkidle' });
+await phone.waitForSelector('[data-testid="solar-map"] canvas', { timeout: 60_000 });
+await phone.getByTestId('sheet').getByRole('button', { name: 'Show the panel' }).click();
+const card = phone.locator('[data-testid="body-facts"]');
+await phone.getByTestId('world-jupiter').getByRole('button').click();
+await card.and(phone.locator('[data-body="Jupiter"]')).waitFor({ timeout: 10_000 });
+await card.getByText('59.5 km/s').waitFor({ timeout: 10_000 });
+await card.getByText('No solid surface to land on').waitFor();
+await card.getByText(/No landings in our/).waitFor();
+if (shots) await phone.screenshot({ path: `${shots}-phone-jupiter.png` });
+await phone.getByTestId('world-jupiter').getByRole('button').click();
+await card.waitFor({ state: 'detached', timeout: 10_000 });
+await phone.getByTestId('world-venus').getByRole('button').click();
+await card.getByTestId('retrograde').waitFor({ timeout: 10_000 });
+await phone.close();
+
 if (errors.length) {
   console.error(`FAIL: console errors:\n${errors.join('\n')}`);
   process.exitCode = 1;

@@ -1,7 +1,7 @@
 import { MotionConfig } from 'motion/react';
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FactBody } from './bodyFacts';
+import { FACT_BODY_OF, type FactBody } from './bodyFacts';
 import { useBoot } from './boot';
 import { useStage, useWide } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
@@ -38,11 +38,22 @@ const FACTS_BODY: Partial<Record<ViewName, FactBody>> = { earth: 'Earth', mars: 
  * pole, where the landing time and the site check come first and the Moon's facts go last.
  */
 function PanelContent({ view }: { view: ViewName }): ReactNode {
+  const picked = useStage((s) => s.solarPicked);
   const facts = FACTS_BODY[view];
   const factsCard = facts && <BodyFacts key={facts} body={facts} />;
   switch (view) {
     case 'solar':
-      return <WorldsList key="worlds" />;
+      // A planet clicked in the solar system opens its facts card above the worlds list; clicking it again closes it.
+      return [
+        picked && (
+          <BodyFacts
+            key={`picked-${picked}`}
+            body={FACT_BODY_OF[picked]}
+            onClose={() => useStage.getState().toggleSolarPicked(null)}
+          />
+        ),
+        <WorldsList key="worlds" />,
+      ];
     case 'earth':
       return [factsCard, <EarthPanel key="side" />];
     case 'mars':
