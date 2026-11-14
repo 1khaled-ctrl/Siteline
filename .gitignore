@@ -16,3 +16,6 @@ __pycache__/
 # Pipeline inputs and outputs live on R2, never in git
 pipeline/raw/
 pipeline/out/
+
+# Wrangler's local state (corepack pnpm copilot)
+.wrangler/

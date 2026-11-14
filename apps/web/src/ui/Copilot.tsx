@@ -1,3 +1,4 @@
+import { ARTEMIS_ZONE_LAT_DEG, LANDING_RADIUS_M, MAX_LANDING_SLOPE_DEG } from '@siteline/physics';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { type Confidence, confidenceOf, type Reading, SLOPE_NEEDS_M } from '../confidence';
@@ -103,9 +104,45 @@ export function Copilot() {
       const names = READINGS.filter((r) => confidenceOf(r, sure) === level).map((r) => t(`copilot.readingNames.${r}`));
       return names.length ? t(`copilot.confidenceLevels.${level}`, { list: names.join(', ') }) : '';
     }).filter(Boolean);
+    const where = t('copilot.friendly.where', { place: place(s), date: formatUtc(s.landingUtc) });
+    const firstFailed = CHECK_KEYS.find((k) => s.checks[k] === 'no');
+    const headline =
+      s.verdict === 'pass'
+        ? t('copilot.friendly.pass')
+        : s.verdict === 'fail' && firstFailed
+          ? t('copilot.friendly.fail', { why: t(`copilot.friendly.why.${firstFailed}`) })
+          : t('copilot.friendly.undecided', { unknown: unknown.join(', ') });
+    const sunLine =
+      s.sunMinPct >= 99.95
+        ? t('copilot.friendly.sunFull')
+        : s.sunMinPct <= 0
+          ? t('copilot.friendly.sunGone', { at: when(s.next.sunset) })
+          : t('copilot.friendly.sunPart', { pct: pct(s.sunMinPct) });
+    const earthLine =
+      s.earthPct >= 99.95
+        ? t('copilot.friendly.earthFull')
+        : t(
+            s.problem?.atLanding && s.problem.key === 'EARTH_BELOW_HORIZON'
+              ? 'copilot.friendly.earthLanding'
+              : 'copilot.friendly.earthPart',
+            {
+              pct: pct(s.earthPct),
+            },
+          );
+    const slopeLine =
+      s.checks.slope === 'yes'
+        ? t('copilot.friendly.slopeOk')
+        : s.checks.slope === 'no'
+          ? t('copilot.friendly.slopeSteep')
+          : t('copilot.friendly.slopeUnknown');
+    const longLine = s.longTerm
+      ? t('copilot.friendly.longTerm', { sun: pct(s.longTerm.sunPct), earth: pct(s.longTerm.earthPct) })
+      : undefined;
+    const nextStep = t(s.verdict === 'pass' ? 'copilot.friendly.nextPass' : 'copilot.friendly.nextFail');
+    const friendly = [where, headline, sunLine, earthLine, slopeLine, ...(longLine ? [longLine] : []), nextStep];
     const lines: Record<Aspect, string[]> = {
       confidence: [head, ...confidence],
-      verdict: [head, verdict],
+      verdict: [where, headline, nextStep],
       why: [head, problem ? t('copilot.firstProblem', { problem }) : t('copilot.noProblem'), verdict],
       sun: [head, t('copilot.sun', { pct: pct(s.sunMinPct) }), t('copilot.nextSunset', { at: when(s.next.sunset) })],
       earth: [
@@ -152,18 +189,9 @@ export function Copilot() {
           earthrise: when(s.next.earthrise),
         }),
       ],
-      summary: [
-        head,
-        verdict,
-        t('copilot.sun', { pct: pct(s.sunMinPct) }),
-        t('copilot.earth', { pct: pct(s.earthPct) }),
-        ...(s.longTerm
-          ? [t('copilot.longTerm', { sun: pct(s.longTerm.sunPct), earth: pct(s.longTerm.earthPct), shadow: '' })]
-          : []),
-        ...(problem ? [t('copilot.firstProblem', { problem })] : []),
-      ],
+      summary: friendly,
     };
-    return lines[aspect].join(' ');
+    return lines[aspect].join('\n');
   };
 
   /** The site check for the current site and date, waiting a few seconds for the 10 m slope as the report does. */
@@ -220,6 +248,13 @@ export function Copilot() {
           },
           firstProblem: s.problem ?? null,
           next: s.next,
+          rules: {
+            stayDays: query.stayDays,
+            minSunVisiblePct: query.minSunFraction * 100,
+            slopeLimitDeg: MAX_LANDING_SLOPE_DEG,
+            slopeOverM: 2 * LANDING_RADIUS_M,
+            artemisZoneSouthOfDeg: Math.abs(ARTEMIS_ZONE_LAT_DEG),
+          },
           caveat: 'Screening aid, not certification. Earth in view is not a radio link.',
         },
       };
@@ -285,20 +320,25 @@ export function Copilot() {
   };
 
   const run = async (message: string) => {
+    // A plain command ("Fly to Mars", "Show me Apollo 11") needs no model: the matcher does it at once, and the free
+    // daily allowance is kept for questions.
+    const intent = parseIntent(message, NAMES);
+    if (intent.tool === 'fly_to' || intent.tool === 'show_mission') return runBasic(message);
     const out = await askAi(message, appState(), history.current, runTool);
-    if (out.ok) {
+    if (out.ok && out.unverified.length === 0) {
       history.current = out.history;
       setMode('ai');
-      if (out.unverified.length) console.warn(`copilot: numbers no tool gave: ${out.unverified.join(', ')}`);
       return say({
         from: 'siteline',
         text: out.text,
         call: out.calls.map((c) => `↳ ${c}`).join('\n') || undefined,
         sources: out.sources,
-        unverified: import.meta.env.DEV && out.unverified.length ? out.unverified : undefined,
       });
     }
-    setMode('basic');
+    // A reply with a number no tool gave is never shown: the matcher answers from the check itself instead, and the
+    // chat the model sees stays as it was.
+    if (out.ok) console.warn(`copilot: dropped an AI reply with numbers no tool gave: ${out.unverified.join(', ')}`);
+    else setMode('basic');
     return runBasic(message);
   };
 
@@ -409,7 +449,7 @@ export function Copilot() {
                   {m.call.startsWith('↳') ? m.call : `↳ ${m.call}`}
                 </p>
               )}
-              <p>{m.text}</p>
+              <p className="whitespace-pre-line">{m.text}</p>
               {m.unverified && (
                 <p className="mt-1 text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
               )}

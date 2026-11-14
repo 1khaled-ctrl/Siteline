@@ -229,7 +229,31 @@
     "slopePending": "The slope can't be judged yet: it is measured on LOLA's 10 m terrain, which has not arrived for this spot or does not reach it (it stops at 83° S).",
     "noteBasic": "Basic mode: the free AI isn't reachable right now (or its daily allowance is used up), so a simple matcher in your browser is answering. It understands a few kinds of request and only reads data or moves the view.",
     "unverified": "Check: SiteLine didn't give these numbers: {{list}}",
-    "example7": "Would the NASA tripod lander fit here?"
+    "example7": "Would the NASA tripod lander fit here?",
+    "friendly": {
+      "where": "📍 {{place}}, landing {{date}}",
+      "pass": "✅ Good news: this spot passes all four landing checks for that date.",
+      "fail": "❌ Not a good landing spot for that date: {{why}}",
+      "undecided": "⏳ Nothing fails so far, but {{unknown}} can't be checked yet with the data loaded.",
+      "why": {
+        "sun": "the Sun goes down during the stay, so solar power would run out.",
+        "earth": "Earth drops out of view, so there'd be no direct radio contact with home.",
+        "slope": "the ground is too steep to land on safely.",
+        "zone": "it's outside NASA's Artemis zone near the pole."
+      },
+      "sunFull": "☀️ Sunlight: the Sun stays fully up for the whole stay.",
+      "sunPart": "☀️ Sunlight: at worst, {{pct}}% of the Sun is still visible.",
+      "sunGone": "☀️ Sunlight: the Sun disappears completely at some point (next sunset {{at}}).",
+      "earthFull": "🌍 Earth: in view the whole stay, so radio contact with home is possible throughout.",
+      "earthPart": "🌍 Earth: in view {{pct}}% of the stay.",
+      "earthLanding": "🌍 Earth: in view {{pct}}% of the stay, but below the horizon right when you land.",
+      "slopeOk": "⛰️ Ground: gentle enough to land on (under 10° across 100 m).",
+      "slopeSteep": "⛰️ Ground: too steep to land on (10° or more across 100 m).",
+      "slopeUnknown": "⛰️ Ground: slope not measured here yet (the 10 m map only covers inside 83°S).",
+      "longTerm": "📅 Over many years: sunlit {{sun}}% of the time, Earth visible {{earth}}%.",
+      "nextFail": "💡 Try the launch-slip slider to find a better date, or “Find a site that passes” in the side panel.",
+      "nextPass": "💡 Want to check a specific lander? Ask “Would the NASA tripod lander fit here?”"
+    }
   },
   "share": {
     "button": "Share",
