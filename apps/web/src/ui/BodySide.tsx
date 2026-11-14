@@ -17,17 +17,22 @@ interface Props {
   children: ReactNode;
   /** Shown under either tab, such as the credits for the maps. */
   footer?: ReactNode;
+  /** The tab shown first. */
+  startOn?: 'landers' | 'place';
 }
 
 /** The right-hand column of the Moon and Mars globes: the landers, or the place picked on the map. */
-export function BodySide({ body, placeLabel, placeKey, children, footer }: Props) {
+export function BodySide({ body, placeLabel, placeKey, children, footer, startOn = 'landers' }: Props) {
   const { t } = useTranslation();
   const missionId = useApp((s) => s.missionId);
-  const [tab, setTab] = useState<'landers' | 'place'>('landers');
+  const [tab, setTab] = useState<'landers' | 'place'>(startOn);
+  const seenMission = useRef(missionId);
   const seenPlace = useRef(placeKey);
 
+  // Picking a lander brings its card forward; picking a place (after it, when both change) brings the place forward.
   useEffect(() => {
-    if (missionId) setTab('landers');
+    if (missionId && missionId !== seenMission.current) setTab('landers');
+    seenMission.current = missionId;
   }, [missionId]);
   useEffect(() => {
     if (placeKey !== seenPlace.current) setTab('place');
@@ -62,11 +67,11 @@ export function BodySide({ body, placeLabel, placeKey, children, footer }: Props
 }
 
 /** The Moon globe's right column: the landers, or the site check for the place picked. */
-export function MoonSide() {
+export function MoonSide({ startOn }: { startOn?: 'landers' | 'place' }) {
   const { t } = useTranslation();
   const placeKey = useApp((s) => `${s.latDeg},${s.lonDeg}`);
   return (
-    <BodySide body="Moon" placeLabel={t('report.heading')} placeKey={placeKey}>
+    <BodySide body="Moon" placeLabel={t('report.heading')} placeKey={placeKey} startOn={startOn}>
       <SiteReport />
     </BodySide>
   );
@@ -83,9 +88,13 @@ export function MarsSide() {
   );
 }
 
-/** The close-up's right column: the card of the lander whose ground it shows. */
+/**
+ * The close-up's right column: the card of the lander whose ground it shows. On the Moon it also has the site check for
+ * the lander's spot, shown first, as on the whole Moon.
+ */
 export function SiteSide() {
   const missionId = useApp((s) => s.missionId);
   const body = missionId ? findLander(missionId)?.body : undefined;
+  if (body === 'Moon') return <MoonSide startOn="place" />;
   return body ? <LanderTracker body={body} /> : null;
 }

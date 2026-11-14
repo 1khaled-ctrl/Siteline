@@ -1,9 +1,11 @@
-import { type LanderBody, type Mission, patchKey } from '@siteline/engine';
+import { canPlanAtPole, type LanderBody, type Mission, patchKey } from '@siteline/engine';
 import { type KeyboardEvent, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PINNED, textOf } from '../landers';
 import { BODY_VIEW, useApp } from '../store';
 import { useLanderFiles } from '../useLanders';
+
+const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
 interface Props {
   body: LanderBody;
@@ -17,7 +19,8 @@ interface Props {
 
 /**
  * The planet's crumb as a menu of its landing sites. A site with close-up terrain opens the close-up; any other flies
- * the globe to it and opens its card, as picking it from the lander list does.
+ * the globe to it and opens its card, as picking it from the lander list does. On the Moon, either way, the site check
+ * moves to the lander's spot.
  */
 export function SiteMenu({ body, text, here, goHome }: Props) {
   const { t, i18n } = useTranslation();
@@ -75,8 +78,19 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
 
   const pick = (m: Mission) => {
     const s = useApp.getState();
+    // On the Moon the site check moves to the lander's spot, as clicking that spot on the whole Moon would.
+    if (m.body === 'Moon' && m.latDeg !== undefined && m.lonDeg !== undefined) {
+      s.set({ latDeg: round4(m.latDeg), lonDeg: round4(m.lonDeg) });
+    }
     s.selectMission(m.id);
     if (hasCloseUp(m)) s.openSite();
+    close(true);
+  };
+
+  // Clicking ground to check it works in the south-pole view, so a site there can open it at the lander's spot.
+  const check = (m: Mission) => {
+    if (m.latDeg === undefined || m.lonDeg === undefined) return;
+    useApp.getState().focusSite(round4(m.latDeg), round4(m.lonDeg));
     close(true);
   };
 
@@ -99,25 +113,40 @@ export function SiteMenu({ body, text, here, goHome }: Props) {
 
   const item = (m: Mission) => {
     const current = m.id === missionId;
+    const checkable = canPlanAtPole(m) && m.lonDeg !== undefined;
     return (
-      <button
-        key={m.id}
-        type="button"
-        role="menuitem"
-        tabIndex={-1}
-        aria-current={current ? 'true' : undefined}
-        data-testid={`site-menu-${m.id}`}
-        className={`flex min-h-11 w-full items-center gap-2 rounded-md px-2.5 py-1 text-start hover:bg-panel-raised focus-visible:bg-panel-raised ${current ? 'text-accent' : ''}`}
-        onClick={() => pick(m)}
-      >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm">{m.name}</span>
-          <span className="block truncate text-xs text-quiet">{textOf(m.site, i18n.language)}</span>
-        </span>
-        <span className="max-w-28 shrink-0 text-end font-mono text-xs text-quiet">
-          {m.dateLabel ? textOf(m.dateLabel, i18n.language) : new Date(m.tUtcMs).getUTCFullYear()}
-        </span>
-      </button>
+      <div key={m.id} className="flex items-center gap-1">
+        <button
+          type="button"
+          role="menuitem"
+          tabIndex={-1}
+          aria-current={current ? 'true' : undefined}
+          data-testid={`site-menu-${m.id}`}
+          className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md px-2.5 py-1 text-start hover:bg-panel-raised focus-visible:bg-panel-raised ${current ? 'text-accent' : ''}`}
+          onClick={() => pick(m)}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm">{m.name}</span>
+            <span className="block truncate text-xs text-quiet">{textOf(m.site, i18n.language)}</span>
+          </span>
+          <span className="max-w-28 shrink-0 text-end font-mono text-xs text-quiet">
+            {m.dateLabel ? textOf(m.dateLabel, i18n.language) : new Date(m.tUtcMs).getUTCFullYear()}
+          </span>
+        </button>
+        {checkable && (
+          <button
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            aria-label={t('crumbs.checkSite', { name: m.name })}
+            data-testid={`site-menu-check-${m.id}`}
+            className="min-h-11 shrink-0 rounded-md border border-line px-2.5 text-xs hover:border-line-hover hover:bg-panel-raised focus-visible:bg-panel-raised"
+            onClick={() => check(m)}
+          >
+            {t('crumbs.check')}
+          </button>
+        )}
+      </div>
     );
   };
 
