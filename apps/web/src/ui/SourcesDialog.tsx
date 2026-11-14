@@ -18,7 +18,7 @@ const METHODS: { key: string; ids: string[] }[] = [
   { key: 'earth', ids: [] },
   { key: 'slope', ids: ['lola-spole-10m'] },
   { key: 'zone', ids: [] },
-  { key: 'longTerm', ids: ['landfall-polar-maps'] },
+  { key: 'longTerm', ids: ['pgda-69-illumination', 'landfall-polar-maps'] },
   { key: 'planets', ids: ['spice-de440s'] },
   { key: 'facts', ids: ['body-facts', 'spice-gm-de440'] },
 ];

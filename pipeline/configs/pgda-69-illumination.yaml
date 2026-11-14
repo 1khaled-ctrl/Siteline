@@ -1,0 +1,31 @@
+# NASA's long-term illumination of the lunar south pole (PGDA product 69): average Sun and Earth visibility and the
+# permanently shadowed regions, 60 m a pixel inside 85 degrees south. Read by siteline_pipeline.illumination.
+datasetId: pgda-69-illumination
+what: >-
+  LRO LOLA-derived maps of the lunar south pole at 60 m a pixel, 5058 x 5058, in a polar stereographic grid on the
+  1737.4 km sphere reaching 82.9 degrees south: the average visibility of the Sun and of the Earth over the
+  2016-08 epoch's computation, and the permanently shadowed regions (PSRs). Each is a PDS3 image of little-endian
+  16-bit values with a scaling factor and offset the label states.
+baseUrl: https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/illumination
+licence: >-
+  NASA Goddard data (PGDA). NASA content is generally not subject to copyright in the United States. The product
+  page asks that the paper below be cited.
+citation: >-
+  Mazarico, E., et al. (2011), Illumination conditions of the lunar polar regions using LOLA topography, Icarus,
+  Vol. 211, pp. 1066-1081, doi:10.1016/j.icarus.2010.10.030 (as the PGDA product page gives it).
+links:
+  - https://pgda.gsfc.nasa.gov/products/69
+# The three images, each 51,166,728 bytes, pinned by the sha256 of NASA's own files on the LOLA PDS data node
+# (imbrium.mit.edu, http://imbrium.mit.edu/EXTRAS/ILLUMINATION/IMG/, the host PGDA product 69 links). The fetch step
+# refuses any other bytes. The labels come from the project's R2 copy.
+#
+# The R2 copy of the Sun file is corrupt: 30 of its 49 one-megabyte blocks are byte-for-byte copies of the Earth and
+# shadow files at the same offsets, and 23.7 % of its samples lie outside its own label's 0 to 22,111. All three
+# files are the same size, which is how a multi-URL download stitches them together unseen by a size check. Its
+# Earth and shadow files match NASA's exactly, so only the Sun file is read from NASA.
+bytes: 51166728
+nasaUrl: http://imbrium.mit.edu/EXTRAS/ILLUMINATION/IMG
+files:
+  - avgvisib_85s_060m_201608 82dadf321dee28f1947c1fed81858d4cf50fe8eb2aa405aae114e8ab21c1efe1 nasa
+  - avgvisib_85s_060m_201608_earth 0958313069d6039b2474c875ff662f28dbcba2bd853d9ea458aa807b7948c11f r2
+  - lpsr_85s_060m_201608 f8203cab342c817fc7851431e264def3cc64a3b8c30f032d61e0a44f1e4ef761 r2

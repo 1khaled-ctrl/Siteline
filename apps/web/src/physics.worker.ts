@@ -62,8 +62,12 @@ const NEAR_RADIUS_M = 3_000;
 const FAR_PIX_M = 2_000;
 /** How far the skyline is looked for, the same reach the horizon walk has always used. */
 const HORIZON_REACH_M = 300_000;
-// From the file's own description: 186 × 186 at 2.4 km, long-term sunlight and Earth view, never-sunlit flag.
-const MAPS = { id: 'landfall-polar-maps', n: 186, pixM: 2400 };
+/**
+ * The concept demo's long-term maps, from its file's own description: 186 × 186 at 2.4 km, sunlight and Earth view
+ * and the never-sunlit flag. Read only where NASA's (PGDA product 69, built by the pipeline) have not been published;
+ * those name their own grid, cell size and dataset in their header.
+ */
+const DEMO_MAPS = { id: 'landfall-polar-maps', n: 186, pixM: 2400 };
 /** LOLA's 10 m terrain of the south pole inside 83°S (PGDA product 90), read only around the sites asked about. */
 const FINE = { id: 'lola-spole-10m' };
 
@@ -78,6 +82,8 @@ export interface DataUrls {
   horizonTerrain?: string;
   /** LOLA's 10 m south pole terrain, a cloud-optimised GeoTIFF read by byte ranges; without it the slope is unknown. */
   fine?: string;
+  /** NASA's long-term maps (PGDA product 69), as the pipeline publishes them; `maps` is read where they are not. */
+  illumination?: string;
 }
 
 /** The slopes around a site, measured on the 10 m terrain. */
@@ -101,6 +107,8 @@ export interface LongTerm {
   sunPct: number;
   earthPct: number;
   shadowed?: boolean;
+  /** Distance to the nearest never-sunlit ground, km: where ice can persist, not where it is known to be. */
+  shadowDistanceKm?: number;
 }
 
 export interface StayResponse {
@@ -143,7 +151,11 @@ async function fetchOk(url: string): Promise<Response> {
 }
 
 async function fetchChecked(url: string): Promise<Uint8Array> {
-  const file = (await (await fetchOk(url)).json()) as Base64File;
+  return checked((await (await fetchOk(url)).json()) as Base64File, url);
+}
+
+/** A base64 file's bytes, refused unless their length and sha256 match its header. */
+async function checked(file: Base64File, url: string): Promise<Uint8Array> {
   const bytes = Uint8Array.from(atob(file.b64), (c) => c.charCodeAt(0));
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -256,8 +268,31 @@ const heightsAround = (
     return patches.length ? heightsFromPatches(patches) : undefined;
   });
 
-const loadMaps = (url: string): Promise<PolarMaps> =>
-  memo(`maps:${url}`, async () => mapsFromBytes(await fetchChecked(url), MAPS.n, MAPS.pixM));
+/** A maps file and the dataset it is, from its own header where it has one (the demo's has none). */
+interface LoadedMaps {
+  maps: PolarMaps;
+  id: string;
+}
+
+interface MapsFile extends Base64File {
+  n?: number;
+  pixM?: number;
+  distanceUnitKm?: number;
+  datasetId?: string;
+}
+
+const loadMapsFile = (url: string): Promise<LoadedMaps> =>
+  memo(`maps:${url}`, async () => {
+    const file = (await (await fetchOk(url)).json()) as MapsFile;
+    const bytes = await checked(file, url);
+    return file.n && file.pixM
+      ? { maps: mapsFromBytes(bytes, file.n, file.pixM, file.distanceUnitKm), id: file.datasetId ?? url }
+      : { maps: mapsFromBytes(bytes, DEMO_MAPS.n, DEMO_MAPS.pixM), id: DEMO_MAPS.id };
+  });
+
+/** NASA's maps where the pipeline has published them, the demo's otherwise. */
+const loadMaps = (urls: DataUrls): Promise<LoadedMaps> =>
+  urls.illumination ? loadMapsFile(urls.illumination).catch(() => loadMapsFile(urls.maps)) : loadMapsFile(urls.maps);
 
 type JudgedHorizon = DemHorizon & { resolutionM: number; id: string };
 
@@ -360,8 +395,9 @@ const api = {
     return loadDrawnDem(url);
   },
 
-  maps(url: string): Promise<PolarMaps> {
-    return loadMaps(url);
+  /** The long-term maps for the layers: NASA's where published, the demo's otherwise. */
+  async maps(urls: DataUrls): Promise<PolarMaps> {
+    return (await loadMaps(urls)).maps;
   },
 
   /** Sun position relative to the Moon's centre (km, MOON_ME), clamped to the table's range. */
@@ -430,7 +466,8 @@ const api = {
     });
     const ephemeris = await loadEphemeris(urls.data);
     let terrainError: string | undefined;
-    const maps = await quiet(loadMaps(urls.maps), () => {});
+    // NASA's long-term maps where the pipeline has published them, the demo's otherwise (#19).
+    const loaded = await quiet(loadMaps(urls), () => {});
     const [fineRaced, raced] = await Promise.all([within(fineRun, slopeWaitMs), within(slopeRun, slopeWaitMs)]);
     const fine = fineDone ? fineDone.value : fineRaced;
     const hz =
@@ -441,16 +478,24 @@ const api = {
     const terrainPending = fineDone === undefined;
     // The 30 m grid cannot resolve the 100 m landing-slope rule; the 10 m one can, where it reaches (inside 83°S).
     const slope = slopeDone ? slopeDone.value : raced;
+    const at = loaded && mapsAtSite(loaded.maps, query.site.latDeg, query.site.lonDeg);
     const result = stayTest(hz ? { ...query, site: { ...query.site, heightM: hz.groundHeightM } } : query, {
       ephemeris,
       horizon: hz?.mask ?? flatHorizon(),
       slope100mDeg: slope?.slope100mDeg ?? Number.NaN,
       slope2kmPctUnder20: slope?.slope2kmPctUnder20 ?? Number.NaN,
-      sources: [...EPHEMERIS_SOURCES, ...(hz ? [hz.id] : []), ...(slope ? [slope.id] : [])],
+      // The nearest permanent shadow, a cold trap where ice can persist: a proxy, named as one wherever it is shown.
+      iceDistanceKm: at?.shadowDistanceKm,
+      sources: [
+        ...EPHEMERIS_SOURCES,
+        ...(hz ? [hz.id] : []),
+        ...(slope ? [slope.id] : []),
+        ...(at?.shadowDistanceKm !== undefined && loaded ? [loaded.id] : []),
+      ],
     });
     const terrain = hz && { id: hz.id, resolutionM: hz.resolutionM, groundHeightM: hz.groundHeightM };
-    const at = maps && mapsAtSite(maps, query.site.latDeg, query.site.lonDeg);
-    const longTerm = at && Number.isFinite(at.sunPct) ? { id: MAPS.id, resolutionM: MAPS.pixM, ...at } : undefined;
+    const longTerm =
+      at && loaded && Number.isFinite(at.sunPct) ? { id: loaded.id, resolutionM: loaded.maps.pixM, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     const slopePending = slopeDone === undefined;
     return Comlink.transfer({ result, terrain, terrainError, longTerm, slope, slopePending, terrainPending }, [

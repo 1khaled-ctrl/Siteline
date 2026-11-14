@@ -167,7 +167,7 @@
       "sun": "Sun up",
       "earth": "Earth in view",
       "height": "ground height",
-      "longTerm": "the 19-year figures",
+      "longTerm": "the long-term figures",
       "slope": "the landing slope"
     },
     "confidenceLevels": {
@@ -177,7 +177,7 @@
       "notMeasured": "Not measured yet: {{list}}."
     },
     "note": "Runs in your browser and understands a few kinds of request. It only reads data and moves the view: it changes nothing and calls no outside service. A Claude-powered copilot is planned.",
-    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight over 19 years?\", \"How sure is that?\").",
+    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight in the long term?\", \"How sure is that?\").",
     "flying": "Flying to {{place}}.",
     "places": {
       "solar": "the solar system",
@@ -214,9 +214,9 @@
     },
     "height": "Ground height there: {{m}} m (NASA LOLA terrain).",
     "heightNone": "This spot is outside the loaded terrain, so there is no ground height.",
-    "longTerm": "Over the 19-year cycle: sunlight {{sun}}% of the time, Earth in view {{earth}}%.{{shadow}}",
+    "longTerm": "In the long term: sunlight {{sun}}% of the time, Earth in view {{earth}}%.{{shadow}}",
     "shadowed": " It never sees the Sun.",
-    "longTermNone": "This spot is outside the 19-year maps.",
+    "longTermNone": "This spot is outside the long-term maps.",
     "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}.",
     "slopePending": "The slope can't be judged yet: it is measured on LOLA's 10 m terrain, which has not arrived for this spot or does not reach it (it stops at 83° S)."
   },
@@ -250,7 +250,7 @@
       "earth": "Earth in view, for talking to the lander: the same test for the Earth, counting {{rule}}.",
       "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. Inside 83°S the slope is measured on LOLA’s 10 m terrain of the south pole, reading only the few tiles around the site: a plane fitted to the heights within 50 m gives the landing slope, and Horn’s method on each 10 m cell within 1 km gives how much of that 2 km area is under 20°, as steep as astronauts can walk. Outside 83°S, or if those tiles do not arrive, the report says it needs finer terrain instead of guessing.",
       "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
-      "longTerm": "Long-term sunlight and Earth view: maps over a 19-year cycle, computed from the same terrain by the Landfall concept demo, to be replaced by NASA's own product.",
+      "longTerm": "Long-term sunlight, Earth view and permanent shadow: NASA's maps from LOLA terrain (Mazarico et al. 2011, PGDA product 69) at 60 m, averaged to 360 m by our pipeline, which also works out the distance to the nearest permanent shadow from them. Until the pipeline has published them, the Landfall concept demo's 2.4 km maps.",
       "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
       "facts": "World facts: NASA's planetary fact sheets and NAIF's gravitational parameters. Gravity and escape speed are worked out from them."
     },
@@ -372,7 +372,7 @@
     "bestBadge": "Best",
     "bestValue": "(best in this row)",
     "winner": "Best of these for this date: {{site}}.",
-    "rule": "Ranked by the stay verdict first, then sunlight over 19 years, then time Earth is in view. Slope can't be compared until finer terrain is loaded.",
+    "rule": "Ranked by the stay verdict first, then long-term sunlight, then time Earth is in view. Slope can't be compared until finer terrain is loaded.",
     "introDeck": "Each site re-checked for the landing date and slip above, best first. Swipe a card away for the next; ★ marks the best value of a reading.",
     "deck": "Deck of pinned sites",
     "previous": "Previous site",
@@ -392,9 +392,9 @@
     "sun": "Long-term Sun",
     "earth": "Earth in view",
     "shadow": "Never lit",
-    "sunLegend": "Share of time the Sun is up, averaged over 19 years at 2.4 km. Dark blue 0% to yellow 92%.",
-    "earthLegend": "Share of time Earth is above the horizon, averaged over 19 years at 2.4 km. Dark blue 0% to yellow 100%.",
-    "shadowLegend": "Blue ground never sees the Sun over 19 years, where ice can survive."
+    "sunLegend": "Share of time the Sun is up, in the long term. Dark blue 0% to yellow {{top}}%.",
+    "earthLegend": "Share of time Earth is above the horizon, in the long term. Dark blue 0% to yellow 100%.",
+    "shadowLegend": "Blue ground is in permanent shadow: it never sees the Sun, so ice can survive there."
   },
   "checks": {
     "heading": "How we checked it",
@@ -432,8 +432,8 @@
     "noTerrain": "no terrain loaded yet",
     "needsFinerTerrain": "needs terrain finer than 100 m",
     "groundHeight": "Ground height",
-    "longTermSun": "Sunlight over 19 years",
-    "longTermEarth": "Earth in view over 19 years",
+    "longTermSun": "Long-term sunlight",
+    "longTermEarth": "Long-term Earth view",
     "shadowed": "Never sunlit",
     "pin": "Pin to compare (up to {{max}})",
     "unpin": "Unpin",
@@ -452,7 +452,8 @@
     "loading": "Checking the site…",
     "landingSlope": "Slope over 100 m",
     "walkable": "Ground under 20° within 1 km",
-    "measuringSlope": "measuring on 10 m terrain…"
+    "measuringSlope": "measuring on 10 m terrain…",
+    "coldTrap": "Nearest permanent shadow (where ice can last)"
   },
   "reason": {
     "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",

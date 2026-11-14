@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapsAtSite, mapsFromBytes, mapValue } from './maps';
+import { mapsAtSite, mapsFromBytes, mapValue, maxSunPct } from './maps';
 
 describe('polar maps', () => {
   const n = 3;
@@ -25,5 +25,28 @@ describe('polar maps', () => {
 
   it('rejects a file of the wrong size', () => {
     expect(() => mapsFromBytes(new Uint8Array(5), n, 2400)).toThrow();
+    // A fourth plane is expected only when its unit is given.
+    expect(() => mapsFromBytes(bytes, n, 2400, 0.25)).toThrow();
+  });
+
+  it('carries no shadow distance in a three-plane file', () => {
+    expect(maps.shadowDistanceKm).toBeUndefined();
+    expect(mapsAtSite(maps, -90, 0).shadowDistanceKm).toBeUndefined();
+  });
+
+  it('reads the distance to the nearest shadow from a fourth plane, in its unit', () => {
+    const four = new Uint8Array(4 * n * n);
+    four.set(bytes);
+    four.set([255, 8, 255, 8, 0, 8, 255, 8, 255], 3 * n * n); // 0 at the centre, 2 km beside it, out of reach at corners
+    const m = mapsFromBytes(four, n, 2400, 0.25);
+    expect(m.shadowDistanceCapKm).toBe(63.75);
+    expect(mapsAtSite(m, -90, 0).shadowDistanceKm).toBeCloseTo(0, 9);
+    // Out of reach reads as unknown, not as 63.75 km.
+    const corner = mapValue(m, m.shadowDistanceKm ?? new Float32Array(), -2400, 2400);
+    expect(corner).toBe(63.75);
+  });
+
+  it('finds the top of the sunlight plane', () => {
+    expect(maxSunPct(maps)).toBe(100);
   });
 });

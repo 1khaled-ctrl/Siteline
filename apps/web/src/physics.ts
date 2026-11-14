@@ -10,6 +10,8 @@ export const URLS: DataUrls = {
   data: import.meta.env.VITE_DATA_URL ?? '/data',
   terrain: `${ASSETS}/data/terrain.json`,
   maps: `${ASSETS}/data/maps.json`,
+  // NASA's long-term sunlight, Earth view and permanent shadow (PGDA product 69), built and published by the pipeline.
+  illumination: `${import.meta.env.VITE_DATA_URL ?? '/data'}/illumination/maps.json`,
   /*
    * LOLA's 30 m south pole terrain (PGDA product 90), read by byte ranges from the project's R2 copy: a tiled GeoTIFF
    * with overviews, which the worker reads around each site. The skyline every site is judged against: on the three

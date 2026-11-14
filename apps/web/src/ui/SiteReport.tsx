@@ -214,6 +214,11 @@ export function SiteReport() {
             <StatTile label={t('report.longTermEarth')} edge="earth" badge={mark('longTerm')}>
               {formatNumber(longTerm.earthPct, 0)}%
             </StatTile>
+            {longTerm.shadowDistanceKm !== undefined && (
+              <StatTile label={t('report.coldTrap')} badge={mark('longTerm')}>
+                {formatNumber(longTerm.shadowDistanceKm, 1)} km
+              </StatTile>
+            )}
             <StatTile label={t('report.shadowed')} badge={mark('longTerm')}>
               {longTerm.shadowed ? t('report.yes') : t('report.no')}
             </StatTile>
