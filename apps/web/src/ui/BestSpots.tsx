@@ -1,5 +1,6 @@
 import { DEFAULT_STAY } from '@siteline/contracts';
 import type { BestSearch } from '@siteline/physics';
+import * as Comlink from 'comlink';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
@@ -24,11 +25,29 @@ function stayQuery() {
   return { ...DEFAULT_STAY, landingUtc: new Date(touchdownUtcMsOf(landingUtc, slipDays)).toISOString() };
 }
 
-/** Sites in one area that pass all four checks, by the site report's own verdict. */
-export function searchArea(area: SearchArea, top = 3): Promise<PassingSearch> {
+/**
+ * Sites in one area that pass all four checks, by the site report's own verdict. `onSite` hears of each the moment it
+ * is confirmed.
+ */
+export function searchArea(area: SearchArea, top = 3, onSite?: (site: PassingSite) => void): Promise<PassingSearch> {
   const search: BestSearch = { centreLatDeg: area.lat, centreLonDeg: area.lon, sizeKm: area.sizeKm, top };
-  return physics.passing(search, stayQuery(), URLS);
+  return physics.passing(search, stayQuery(), URLS, onSite && Comlink.proxy(onSite));
 }
+
+/** Searched first: the regions where passing sites turn up most, so the first one shows within seconds. */
+const LIKELIEST = ['Mons Mouton', 'Mons Mouton Plateau', 'Nobile Rim 2'];
+
+type FoundSite = PassingSite & { region: string; regionIndex: number };
+
+/**
+ * Best first: the most sunlight, then the most Earth. Ties keep the regions' own order, then the flatter site, so the
+ * list does not depend on which region was searched first or which answer arrived first.
+ */
+const byBest = (a: FoundSite, b: FoundSite) =>
+  b.sunFractionMin - a.sunFractionMin ||
+  b.earthVisiblePct - a.earthVisiblePct ||
+  a.regionIndex - b.regionIndex ||
+  a.slope100mDeg - b.slope100mDeg;
 
 /**
  * One passing site, as a row that flies to it and opens its report, with Land Here beside it: the search's exact point,
@@ -154,25 +173,37 @@ export function BestSpots({ region }: { region: SearchArea }) {
 }
 
 /**
- * The same search over every region, one after another: the best passing sites across all of them, each with its
- * region, and a count while it works.
+ * The same search over every region, likeliest first: the best passing sites across all of them, each with its region,
+ * listed the moment each is confirmed, and a count of regions while it works.
  */
 export function SearchAll({ regions }: { regions: readonly SearchArea[] }) {
   const { t } = useTranslation();
-  const [state, setState] = useState<{ done: number; sites: (PassingSite & { region: string })[]; checked: number }>();
+  const [state, setState] = useState<{ done: number; sites: FoundSite[]; checked: number }>();
   const [busy, setBusy] = useState(false);
 
   const run = async () => {
     setBusy(true);
-    const all: (PassingSite & { region: string })[] = [];
+    let all: FoundSite[] = [];
     let checked = 0;
-    setState({ done: 0, sites: [], checked: 0 });
-    for (const [i, r] of regions.entries()) {
-      const found = await searchArea(r, 2).catch(() => undefined);
+    let done = 0;
+    const show = () => setState({ done, sites: [...all].sort(byBest).slice(0, 5), checked });
+    show();
+    const rank = (name: string) => {
+      const i = LIKELIEST.indexOf(name);
+      return i < 0 ? LIKELIEST.length : i;
+    };
+    const order = regions.map((r, regionIndex) => ({ r, regionIndex })).sort((a, b) => rank(a.r.name) - rank(b.r.name));
+    for (const { r, regionIndex } of order) {
+      const tag = (s: PassingSite): FoundSite => ({ ...s, region: r.name, regionIndex });
+      const found = await searchArea(r, 2, (s) => {
+        all.push(tag(s));
+        show();
+      }).catch(() => undefined);
+      // The region's reply is the word on it: the sites it streamed, or none if it failed part way.
+      all = [...all.filter((s) => s.regionIndex !== regionIndex), ...(found?.sites ?? []).map(tag)];
       checked += found?.checked ?? 0;
-      all.push(...(found?.sites ?? []).map((s) => ({ ...s, region: r.name })));
-      all.sort((a, b) => b.sunFractionMin - a.sunFractionMin || b.earthVisiblePct - a.earthVisiblePct);
-      setState({ done: i + 1, sites: all.slice(0, 5), checked });
+      done++;
+      show();
     }
     setBusy(false);
   };

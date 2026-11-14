@@ -2,12 +2,14 @@ import type { EarthRule, Reason, ReasonCode, StayQuery, StayResult } from '@site
 import { angularRadiusDeg, discFraction, EARTH_RADIUS_KM, SUN_RADIUS_KM } from './disc';
 import type { EphemBody, Ephemeris } from './ephemeris';
 import { elevAz, type SiteFrame, siteFrame } from './frames';
-import { type HorizonMask, horizonAt } from './horizon';
+import { HORIZON_BINS, HORIZON_STEP_DEG, type HorizonMask, horizonAt } from './horizon';
 
 export const ARTEMIS_ZONE_LAT_DEG = -84;
 export const MAX_LANDING_SLOPE_DEG = 10;
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
+/** The stay test's sample spacing when none is given. */
+const DEFAULT_STEP_MINUTES = 20;
 
 export interface Sky {
   elevDeg: number;
@@ -159,12 +161,50 @@ export interface StayInputs {
   timelineDays?: number;
 }
 
+/**
+ * The skyline bins the stay test's pass or fail reads: every azimuth the Sun and the Earth pass through during the
+ * stay, at the same sample times as the test and along the arc between them (where it narrows a crossing to the
+ * minute), widened by the body's disc and one bin for interpolation. A skyline walked in only these bins
+ * (`HorizonOptions.bins`) gives the same verdict, least sunlight and Earth share as the full one; the 30-day timeline
+ * after landing reads other directions, so it needs the full skyline. Empty when the ephemeris does not cover the
+ * stay, as the test then reads no skyline for it.
+ */
+export function stayBins(q: StayQuery, eph: Ephemeris, stepMinutes = DEFAULT_STEP_MINUTES): number[] {
+  const site = siteFrame(q.site.latDeg, q.site.lonDeg, q.site.heightM ?? 0, q.observerHeightM);
+  const stepMs = stepMinutes * MINUTE_MS;
+  const t0 = Date.parse(q.landingUtc);
+  const tEnd = t0 + q.stayDays * DAY_MS;
+  if (!(Number.isFinite(t0) && t0 >= eph.startUtcMs && tEnd <= eph.endUtcMs)) return [];
+  const need = new Uint8Array(HORIZON_BINS);
+  for (const body of ['sun', 'earth'] as const) {
+    const bodyRadiusKm = body === 'sun' ? SUN_RADIUS_KM : EARTH_RADIUS_KM;
+    let prevAzDeg: number | undefined;
+    // The same samples as checkLight.
+    for (let t = t0; ; t = Math.min(t + stepMs, tEnd)) {
+      const { azDeg, distKm } = elevAz(eph.positionKm(body, t), site);
+      const fromDeg = prevAzDeg ?? azDeg;
+      // The shorter way round from the last sample.
+      const toDeg = fromDeg + ((((azDeg - fromDeg) % 360) + 540) % 360) - 180;
+      const marginDeg = angularRadiusDeg(bodyRadiusKm, distKm) + HORIZON_STEP_DEG;
+      const lo = Math.floor((Math.min(fromDeg, toDeg) - marginDeg) / HORIZON_STEP_DEG);
+      // horizonAt also reads the bin after the one an azimuth falls in.
+      const hi = Math.floor((Math.max(fromDeg, toDeg) + marginDeg) / HORIZON_STEP_DEG) + 1;
+      for (let b = lo; b <= hi; b++) need[((b % HORIZON_BINS) + HORIZON_BINS) % HORIZON_BINS] = 1;
+      prevAzDeg = azDeg;
+      if (t >= tEnd) break;
+    }
+  }
+  const bins: number[] = [];
+  for (let j = 0; j < HORIZON_BINS; j++) if (need[j]) bins.push(j);
+  return bins;
+}
+
 const iso = (t: number | undefined) => (t === undefined ? undefined : new Date(t).toISOString());
 
 export function stayTest(q: StayQuery, inp: StayInputs): StayResult {
   const eph = inp.ephemeris;
   const ctx: Ctx = { q, eph, site: siteFrame(q.site.latDeg, q.site.lonDeg, q.site.heightM ?? 0, q.observerHeightM) };
-  const stepMs = (inp.stepMinutes ?? 20) * MINUTE_MS;
+  const stepMs = (inp.stepMinutes ?? DEFAULT_STEP_MINUTES) * MINUTE_MS;
   const t0 = Date.parse(q.landingUtc);
   const tEnd = t0 + q.stayDays * DAY_MS;
   const covered = Number.isFinite(t0) && t0 >= eph.startUtcMs && tEnd <= eph.endUtcMs;
