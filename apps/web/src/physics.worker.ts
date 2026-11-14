@@ -46,16 +46,20 @@ const DRAWN = { id: 'lola-ldem-75s-240m', n: 700, pixM: 1200, metresPerUnit: 0.5
  * GeoTIFF with overviews, read by byte ranges: never the whole 2.8 GB file.
  *
  * The horizon walk reaches 300 km, which at 30 m would be a 20,000 × 20,000 window, so each site is read as two
- * windows: the cells within `NEAR_RADIUS_M` at full 30 m, and the whole reach from an overview about 20 times
- * coarser. A ridge 300 km away is a few pixels of skyline whatever it was sampled at, while the ground near the site
+ * windows: the cells within `NEAR_RADIUS_M` at full 30 m, and the whole reach from its coarsest overview,
+ * about 1.9 km. A ridge 300 km away is a few pixels of skyline whatever it was sampled at, while the ground near the site
  * is what actually sets its horizon. `TerrainInfo.resolutionM` reports the near-site figure, the one the site is
  * judged by; CREDITS.md carries the caveat that the far skyline is coarser.
  */
 const TERRAIN = { id: 'lola-ldem-75s-30m' };
-/** How far around a site the terrain is read at its full resolution. */
-const NEAR_RADIUS_M = 6_000;
-/** The coarsest cell the far skyline may be read at; the file's overviews pick the nearest level at or under it. */
-const FAR_PIX_M = 1_000;
+/**
+ * How far around a site the terrain is read at its full resolution. Together with FAR_PIX_M, the configuration
+ * horizon30m.validation.test.ts checks against NASA's own sunlight maps, and a few tiles a site.
+ */
+const NEAR_RADIUS_M = 3_000;
+/** The coarsest cell the far skyline may be read at; the file's overviews pick the nearest level at or under it:
+ * its coarsest, 1.9 km, holds the whole 300 km reach in one tile. */
+const FAR_PIX_M = 2_000;
 /** How far the skyline is looked for, the same reach the horizon walk has always used. */
 const HORIZON_REACH_M = 300_000;
 // From the file's own description: 186 × 186 at 2.4 km, long-term sunlight and Earth view, never-sunlit flag.
@@ -107,6 +111,11 @@ export interface StayResponse {
   slope?: SlopeInfo;
   /** True when the slope's tiles were still on their way: asking again with more patience will bring the slope. */
   slopePending?: boolean;
+  /**
+   * True when the 30 m terrain was still on its way, so this answer was worked out on the 1.2 km grid: asking again
+   * with more patience brings the skyline the site is judged against.
+   */
+  terrainPending?: boolean;
   longTerm?: LongTerm;
 }
 
@@ -233,13 +242,16 @@ async function patchAround(
  * The heights around a site: full resolution within `NEAR_RADIUS_M`, an overview out to the horizon's whole reach.
  * Undefined if the site is off the terrain altogether.
  */
-const heightsAround = (grids: TerrainGrids, latDeg: number, lonDeg: number, reachM: number) =>
-  memo(`heights:${latDeg},${lonDeg},${reachM}`, async (): Promise<HeightSource | undefined> => {
+const heightsAround = (
+  grids: TerrainGrids,
+  latDeg: number,
+  lonDeg: number,
+  reachM: number,
+  nearM: number = NEAR_RADIUS_M,
+) =>
+  memo(`heights:${latDeg},${lonDeg},${reachM},${nearM}`, async (): Promise<HeightSource | undefined> => {
     const { x, y } = polarXY(siteFrame(latDeg, lonDeg).u);
-    const [near, far] = await Promise.all([
-      patchAround(grids.near, x, y, NEAR_RADIUS_M),
-      patchAround(grids.far, x, y, reachM),
-    ]);
+    const [near, far] = await Promise.all([patchAround(grids.near, x, y, nearM), patchAround(grids.far, x, y, reachM)]);
     const patches = [near, far].filter((p): p is HeightPatch => p !== undefined);
     return patches.length ? heightsFromPatches(patches) : undefined;
   });
@@ -247,19 +259,18 @@ const heightsAround = (grids: TerrainGrids, latDeg: number, lonDeg: number, reac
 const loadMaps = (url: string): Promise<PolarMaps> =>
   memo(`maps:${url}`, async () => mapsFromBytes(await fetchChecked(url), MAPS.n, MAPS.pixM));
 
+type JudgedHorizon = DemHorizon & { resolutionM: number; id: string };
+
 /**
- * The site's skyline and the ground under it, with the resolution it was judged at. From the 30 m terrain where
- * `urls.horizonTerrain` names it, otherwise from the small 1.2 km grid. Undefined where the terrain does not reach.
+ * The site's skyline from the 30 m terrain, read around it and cached; undefined where the terrain does not reach or
+ * cannot be read (no network, or a host the bucket does not serve), so the caller can fall back to the 1.2 km grid.
  */
-const horizonFor = (
-  urls: DataUrls,
-  latDeg: number,
-  lonDeg: number,
-  observerHeightM: number,
-): Promise<(DemHorizon & { resolutionM: number; id: string }) | undefined> =>
-  memo(`horizon:${urls.horizonTerrain ?? urls.terrain}:${latDeg},${lonDeg},${observerHeightM}`, async () => {
-    if (urls.horizonTerrain) {
-      const grids = await loadTerrain(urls.horizonTerrain);
+const fineHorizon = (urls: DataUrls, latDeg: number, lonDeg: number, observerHeightM: number) =>
+  memo(`horizon30:${urls.horizonTerrain}:${latDeg},${lonDeg},${observerHeightM}`, async () => {
+    if (!urls.horizonTerrain) return undefined;
+    const url = urls.horizonTerrain;
+    return (async (): Promise<JudgedHorizon | undefined> => {
+      const grids = await loadTerrain(url);
       const heights = await heightsAround(grids, latDeg, lonDeg, HORIZON_REACH_M);
       if (!heights) return undefined;
       const hz = horizonFromHeights(heights, latDeg, lonDeg, {
@@ -269,11 +280,21 @@ const horizonFor = (
       });
       // The resolution the site itself is judged at; the far skyline comes from a coarser overview (see TERRAIN).
       return hz && { ...hz, resolutionM: grids.near.pixM, id: TERRAIN.id };
-    }
+    })().catch(() => undefined);
+  });
+
+/** The site's skyline from the small 1.2 km grid the 3D view already has: instant, and the fallback. */
+const coarseHorizon = (urls: DataUrls, latDeg: number, lonDeg: number, observerHeightM: number) =>
+  memo(`horizon12:${urls.terrain}:${latDeg},${lonDeg},${observerHeightM}`, async () => {
     const dem = await loadDrawnDem(urls.terrain);
     const hz = horizonFromDem(dem, latDeg, lonDeg, { observerHeightM });
-    return hz && { ...hz, resolutionM: dem.pixM, id: DRAWN.id };
+    return hz && ({ ...hz, resolutionM: dem.pixM, id: DRAWN.id } satisfies JudgedHorizon);
   });
+
+/** The finest skyline there is, however long it takes: for the views that do not race it. */
+const horizonFor = async (urls: DataUrls, latDeg: number, lonDeg: number, observerHeightM: number) =>
+  (await fineHorizon(urls, latDeg, lonDeg, observerHeightM)) ??
+  (await coarseHorizon(urls, latDeg, lonDeg, observerHeightM));
 
 const quiet = <T>(p: Promise<T>, onError: (message: string) => void): Promise<T | undefined> =>
   p.catch((e: unknown) => {
@@ -399,14 +420,26 @@ const api = {
           return value;
         })
       : Promise.resolve(undefined);
+    // The 30 m skyline's tiles load alongside the rest and are raced the same way as the slope's.
+    let fineDone: { value: JudgedHorizon | undefined } | undefined = urls.horizonTerrain
+      ? undefined
+      : { value: undefined };
+    const fineRun = fineHorizon(urls, latDeg, lonDeg, query.observerHeightM).then((value) => {
+      fineDone = { value };
+      return value;
+    });
     const ephemeris = await loadEphemeris(urls.data);
     let terrainError: string | undefined;
     const maps = await quiet(loadMaps(urls.maps), () => {});
-    const hz = await quiet(horizonFor(urls, query.site.latDeg, query.site.lonDeg, query.observerHeightM), (m) => {
-      terrainError = m;
-    });
+    const [fineRaced, raced] = await Promise.all([within(fineRun, slopeWaitMs), within(slopeRun, slopeWaitMs)]);
+    const fine = fineDone ? fineDone.value : fineRaced;
+    const hz =
+      fine ??
+      (await quiet(coarseHorizon(urls, latDeg, lonDeg, query.observerHeightM), (m) => {
+        terrainError = m;
+      }));
+    const terrainPending = fineDone === undefined;
     // The 30 m grid cannot resolve the 100 m landing-slope rule; the 10 m one can, where it reaches (inside 83°S).
-    const raced = await within(slopeRun, slopeWaitMs);
     const slope = slopeDone ? slopeDone.value : raced;
     const result = stayTest(hz ? { ...query, site: { ...query.site, heightM: hz.groundHeightM } } : query, {
       ephemeris,
@@ -420,7 +453,7 @@ const api = {
     const longTerm = at && Number.isFinite(at.sunPct) ? { id: MAPS.id, resolutionM: MAPS.pixM, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     const slopePending = slopeDone === undefined;
-    return Comlink.transfer({ result, terrain, terrainError, longTerm, slope, slopePending }, [
+    return Comlink.transfer({ result, terrain, terrainError, longTerm, slope, slopePending, terrainPending }, [
       tUtcMs.buffer,
       sun.buffer,
       earth.buffer,
@@ -440,18 +473,26 @@ const api = {
   /** Rank spots inside a region; the timelines are left out to keep the reply small. */
   async best(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<BestSpot[]> {
     const ephemeris = await loadEphemeris(urls.data);
-    // One read for the whole region: its own width plus the skyline's reach on every side.
-    const terrain = urls.horizonTerrain
-      ? await heightsAround(
-          await loadTerrain(urls.horizonTerrain),
-          search.centreLatDeg,
-          search.centreLonDeg,
-          HORIZON_REACH_M + (search.sizeKm * 1000) / 2,
-        )
-      : await loadDrawnDem(urls.terrain);
+    // One read for the whole region: its own width plus the skyline's reach on every side, at 30 m where it can be
+    // read and on the 1.2 km grid otherwise.
+    const fine = urls.horizonTerrain
+      ? await loadTerrain(urls.horizonTerrain)
+          .then((grids) =>
+            heightsAround(
+              grids,
+              search.centreLatDeg,
+              search.centreLonDeg,
+              HORIZON_REACH_M + (search.sizeKm * 1000) / 2,
+              // Every spot in the region is read at 30 m around it, as a single site's check would be.
+              NEAR_RADIUS_M + (search.sizeKm * 1000) / 2,
+            ),
+          )
+          .catch(() => undefined)
+      : undefined;
+    const terrain = fine ?? (await loadDrawnDem(urls.terrain));
     if (!terrain) return [];
     return bestSpots(search, query, terrain, ephemeris, {
-      sources: [...EPHEMERIS_SOURCES, urls.horizonTerrain ? TERRAIN.id : DRAWN.id],
+      sources: [...EPHEMERIS_SOURCES, fine ? TERRAIN.id : DRAWN.id],
       stepMinutes: 60,
     });
   },
