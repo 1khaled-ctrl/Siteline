@@ -13,6 +13,7 @@ import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
 import { panel, smallButton } from './Controls';
 import { DayStripPanel } from './DayStrip';
 import { JourneyButton } from './Journey';
+import { RobotFit } from './RobotFit';
 import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
 import { PanelError, Spinner } from './ViewStatus';
@@ -225,6 +226,15 @@ export function SiteReport() {
           </>
         )}
       </dl>
+
+      <RobotFit
+        query={query}
+        result={result}
+        terrain={terrain}
+        longTerm={longTerm}
+        slope={slope}
+        slopePending={slopePending}
+      />
 
       <DayStripPanel
         latDeg={query.site.latDeg}

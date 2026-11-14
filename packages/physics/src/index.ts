@@ -8,6 +8,7 @@ export * from './horizon';
 export * from './lambert';
 export * from './maps';
 export * from './marsSun';
+export * from './mission';
 export * from './planets';
 export * from './slope';
 export * from './stay';

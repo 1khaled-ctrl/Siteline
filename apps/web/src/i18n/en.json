@@ -463,6 +463,86 @@
     "measuringSlope": "measuring on 10 m terrain…",
     "coldTrap": "Nearest permanent shadow (where ice can last)"
   },
+  "robot": {
+    "heading": "Fit for a robot",
+    "intro": "Read this site against one lander's or robot's published needs. The site's own four checks above stay as they are.",
+    "pick": "Robot",
+    "none": "None: the site's own checks only",
+    "name": {
+      "rlldpTripod": "NASA RLLDP tripod lander (2012 concept)",
+      "rlldpPallet": "NASA RLLDP pallet lander with rover (2012 concept)",
+      "im2": "IM-2 Athena's site criteria (2025)",
+      "artemis4": "Artemis IV crew (planned)"
+    },
+    "blurb": {
+      "rlldpTripod": "A small NASA concept lander: solar array by day, batteries at night, S-band radio to Earth's near side. Its designers had equatorial sites in mind, and the south pole's low Sun and Earth are harder.",
+      "rlldpPallet": "A NASA concept pallet that lands a rover of about 400 kg. The rover carries the navigation and does the surface work; the lander drops its solar panel during landing.",
+      "im2": "NASA says Intuitive Machines chose IM-2's site for a lit landing corridor and acceptable slope. Athena came down on its side in a crater near its target, so the circle around the aim point matters.",
+      "artemis4": "Two astronauts for about a week near the South Pole. NASA has not published the lander's own needs, so most checks stay open."
+    },
+    "ring": "Landing accuracy",
+    "ringOption": "{{m}} m",
+    "ringOwn": "Its source asks for about {{m}} m. NASA's precision-landing range is 50 to 100 m.",
+    "ringNasa": "Its own accuracy isn't published; NASA's precision-landing range is 50 to 100 m.",
+    "overall": {
+      "fits": "Fits, as far as the published data goes",
+      "does_not_fit": "Does not fit",
+      "not_enough_data": "Not enough data to say"
+    },
+    "status": {
+      "pass": "Pass",
+      "fail": "Fail",
+      "unknown": "Unknown",
+      "info": "Note",
+      "not_evaluated": "Not checked"
+    },
+    "limitNote": "(SiteLine's slope rule; this robot's own limit isn't published.)",
+    "check": {
+      "landingCircle": {
+        "all_gentle": "Every touchdown point within {{radius}} m of the aim is under {{limit}}° (steepest {{worst}}°).",
+        "steep_inside": "{{steep}}% of touchdown points within {{radius}} m are {{limit}}° or steeper (steepest {{worst}}°). A miss could land on them.",
+        "not_measured": "Landing circle not measured: the 10 m terrain only covers ground inside 83°S."
+      },
+      "litLanding": {
+        "lit": "Lit at landing: {{sun}}% of the Sun is above the skyline, so landing cameras have light.",
+        "dark": "Dark at landing: the Sun is behind the skyline, and this robot needs light to land.",
+        "need_unknown": "Sun at landing: {{sun}}% above the skyline. Whether this robot needs light to land isn't published.",
+        "not_required": "This robot's navigation doesn't need sunlight.",
+        "not_measured": "Sunlight at landing not worked out for this date."
+      },
+      "darkness": {
+        "never_dark": "The Sun is never fully hidden during the {{days}}-day stay.",
+        "battery_size_unknown": "Longest darkness in the stay: {{dark}} h. Its batteries must carry it, but their size isn't published.",
+        "night_plan_unknown": "Longest darkness in the stay: {{dark}} h. How this robot gets through darkness isn't published.",
+        "no_night_plan": "Longest darkness in the stay: {{dark}} h, and this robot has no way through darkness.",
+        "no_surface_power": "The lander has no power of its own on the surface, so its darkness isn't judged; the rover's power is what counts.",
+        "not_measured": "Darkness over the stay not worked out for this date."
+      },
+      "earth": {
+        "always_in_view": "Earth is in view the whole stay: line of sight for its direct-to-Earth radio. Signal strength isn't computed.",
+        "never_in_view": "Earth is never in view during the stay, and this robot radios Earth directly.",
+        "partly_in_view": "Earth is in view {{pct}}% of the stay. How much contact this robot needs isn't published.",
+        "need_unknown": "Earth is in view {{pct}}% of the stay. This robot's radio needs aren't published.",
+        "not_measured": "Earth's view not worked out for this date."
+      },
+      "ground": {
+        "rover": "Rover ground: {{walk}}% of the ground within 1 km is under 20°.",
+        "crew": "Walking ground: {{walk}}% of the ground within 1 km is under 20°.",
+        "hopper": "Nearest never-sunlit ground: {{km}} km. A hopper can fly in to survey it.",
+        "not_measured": "Ground around the site not measured (10 m terrain only inside 83°S).",
+        "stationary": "It stays where it lands."
+      }
+    },
+    "stayNote": "SiteLine checks a {{days}}-day stay; NASA plans about a week on the surface for Artemis IV.",
+    "neighbour": "Nearest other lander: {{name}}, {{km}} km away. For scale, Apollo 12's landing sandblasted Surveyor 3 from 155 m.",
+    "neighbourApprox": "Nearest other lander: {{name}}, about {{km}} km away (its spot is approximate). For scale, Apollo 12's landing sandblasted Surveyor 3 from 155 m.",
+    "about": "What these checks can and can't tell you",
+    "pro1": "They use NASA's own criteria: land where light and communication needs are met, within 50 to 100 m of the target (Moon to Mars white paper, 2023).",
+    "pro2": "Same site, different robot, different answer: each robot's needs come from its NASA source, and anything unpublished stays unknown.",
+    "con1": "10 m terrain can't show rocks or small craters. A lander still needs its own hazard tolerance or hazard detection.",
+    "con2": "Sun in view isn't power (dust, panel angle and battery size aren't modelled), and Earth in view isn't a working radio link.",
+    "con3": "These are published concepts and mission criteria, not flight specifications. A screening aid, not a certification."
+  },
   "reason": {
     "SUN_BELOW_HORIZON": "The Sun drops below the horizon on <d>{{at}}</d>.",
     "EARTH_BELOW_HORIZON": "Earth drops below the horizon on <d>{{at}}</d>.",

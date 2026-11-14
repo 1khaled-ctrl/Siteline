@@ -1,6 +1,7 @@
 import type { EarthPlace, LanderBody, MarsPlace, MissionFilter } from '@siteline/engine';
 import { create } from 'zustand';
 import { findLander } from './landers';
+import { isRobotId, LANDING_RADII_M, type LandingRadius, type RobotId } from './robots';
 
 /**
  * Where the camera is: the solar system, the Earth, Mars, the Moon as a globe, the Moon's south pole, or the close-up
@@ -34,6 +35,10 @@ export interface View {
   pins: Pin[];
   /** The lander whose card is open, by its id in `data/missions.json`. */
   missionId: string | null;
+  /** The robot the site is read against, beside its own four checks; null for none. */
+  robot: RobotId | null;
+  /** The landing accuracy the robot's landing circle uses, metres. */
+  landingRadiusM: LandingRadius;
 }
 
 interface AppState extends View {
@@ -105,6 +110,8 @@ const DEFAULTS: View = {
   layer: 'none',
   pins: [],
   missionId: null,
+  robot: null,
+  landingRadiusM: 100,
 };
 export const MAX_SLIP_DAYS = 15;
 export const PLAY_SPEEDS_H_PER_S = [6, 24, 72];
@@ -136,6 +143,9 @@ function clean(patch: Partial<View>): Partial<View> {
   if (patch.layer && LAYERS.includes(patch.layer)) out.layer = patch.layer;
   if (patch.missionId !== undefined)
     out.missionId = patch.missionId && findLander(patch.missionId) ? patch.missionId : null;
+  if (patch.robot !== undefined) out.robot = isRobotId(patch.robot) ? patch.robot : null;
+  if (patch.landingRadiusM !== undefined && (LANDING_RADII_M as readonly number[]).includes(patch.landingRadiusM))
+    out.landingRadiusM = patch.landingRadiusM;
   if (Array.isArray(patch.pins)) {
     out.pins = patch.pins.map(cleanPin).filter((p): p is Pin => p !== undefined);
     out.pins = out.pins.filter((p, i) => out.pins?.findIndex((q) => samePin(p, q)) === i).slice(0, MAX_PINS);
@@ -174,6 +184,8 @@ function fromUrl(): Partial<View> {
     view,
     layer: (p.get('layer') as Layer | null) ?? undefined,
     missionId: p.get('mission'),
+    robot: (p.get('robot') as RobotId | null) ?? undefined,
+    landingRadiusM: num('ring') as LandingRadius | undefined,
     pins,
   });
   // The close-up needs a lander. Whether it has terrain to show is known once the close-ups' headers arrive, and
@@ -249,6 +261,8 @@ useApp.subscribe((s) => {
   });
   if (s.layer !== 'none') p.set('layer', s.layer);
   if (s.missionId) p.set('mission', s.missionId);
+  if (s.robot) p.set('robot', s.robot);
+  if (s.robot && s.landingRadiusM !== DEFAULTS.landingRadiusM) p.set('ring', String(s.landingRadiusM));
   if (s.pins.length) p.set('pins', s.pins.map((x) => `${x.latDeg},${x.lonDeg}`).join(';'));
   const query = `?${p}`;
   if (query === shownQuery) return;

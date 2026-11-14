@@ -13,6 +13,9 @@ import {
   heightsFromPatches,
   horizonFromDem,
   horizonFromHeights,
+  type LandingCircle,
+  landingCircle,
+  MAX_LANDING_SLOPE_DEG,
   mapsAtSite,
   mapsFromBytes,
   marsSubsolarPoint,
@@ -95,7 +98,15 @@ export interface SlopeInfo {
   resolutionM: number;
   slope100mDeg: number;
   slope2kmPctUnder20: number;
+  /**
+   * The landing circles for NASA's 50 m and 100 m precision-landing radii: the landing-slope rule at every touchdown
+   * point within each, from the same 10 m window. Missing where under half a circle has data.
+   */
+  circles: LandingCircle[];
 }
+
+/** The landing accuracies whose circles are read: NASA's precision-landing range (Moon to Mars white paper, §2). */
+const LANDING_CIRCLES_M = [50, 100];
 
 export interface TerrainInfo {
   id: string;
@@ -384,8 +395,13 @@ const slopeAt = (latDeg: number, lonDeg: number, url: string): Promise<SlopeInfo
       samples: [0],
       interleave: true,
     });
-    const s = siteSlopes({ heightsM, n, pixM: grid.pixM, col: col - c0, row: row - r0 }, latDeg);
-    return Number.isFinite(s.slope100mDeg) ? { id: FINE.id, resolutionM: grid.pixM, ...s } : undefined;
+    const w = { heightsM, n, pixM: grid.pixM, col: col - c0, row: row - r0 };
+    const s = siteSlopes(w, latDeg);
+    if (!Number.isFinite(s.slope100mDeg)) return undefined;
+    const circles = LANDING_CIRCLES_M.map((r) => landingCircle(w, latDeg, r, MAX_LANDING_SLOPE_DEG)).filter(
+      (c): c is LandingCircle => c !== undefined,
+    );
+    return { id: FINE.id, resolutionM: grid.pixM, ...s, circles };
   });
 
 /** `p`, or undefined if it has not settled within `ms`. */
