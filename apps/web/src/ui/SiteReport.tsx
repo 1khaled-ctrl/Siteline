@@ -3,6 +3,7 @@ import { Fragment, useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
+import { touchdownFromQuery } from '../land';
 import { DAY_MS, useStay } from '../physics';
 import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
@@ -13,6 +14,7 @@ import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
 import { panel, smallButton } from './Controls';
 import { DayStripPanel } from './DayStrip';
 import { JourneyButton } from './Journey';
+import { LandHereButton } from './LandHere';
 import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
 import { PanelError, Spinner } from './ViewStatus';
@@ -233,7 +235,15 @@ export function SiteReport() {
         toMs={Date.parse(query.landingUtc) + query.stayDays * DAY_MS}
       />
 
-      <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
+      <div className="flex flex-col gap-2">
+        <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
+        <LandHereButton
+          latDeg={query.site.latDeg}
+          lonDeg={query.site.lonDeg}
+          touchdownUtcMs={touchdownFromQuery(query)}
+          source={{ kind: 'report' }}
+        />
+      </div>
 
       {result.reasons.length > 0 && (
         <ul className="list-disc space-y-1 ps-5 text-sm">
