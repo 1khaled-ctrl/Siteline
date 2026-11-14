@@ -1,13 +1,18 @@
-import { clampMove, EYE_HEIGHT_M, gridUpAt, type LocalGrid, type MoveBlock } from '@siteline/physics';
+import { clampMove, EYE_HEIGHT_M, gridUpAt, type LocalGrid, type MoveBlock, northTurnDeg } from '@siteline/physics';
 import * as THREE from 'three';
 import {
   clampPitch,
   DEFAULT_DESCENT,
   type DescentPlan,
   descentPose,
+  edgePointer,
+  headingDegOf,
   lookAngles,
+  type PointerBand,
   type Pose,
+  relativeDeg,
   walkStep,
+  wrapDeg,
 } from './surfaceMotion';
 
 /**
@@ -63,6 +68,33 @@ export interface LabelPoint {
 export type SurfaceLabelKey = 'sun' | 'earth' | 'touchdown' | 'north' | 'east' | 'south' | 'west';
 export type SurfaceLabels = Record<SurfaceLabelKey, LabelPoint>;
 
+/**
+ * Which way the view faces and where things lie from there, for the compass: after every frame that moved the view.
+ * The same object each time, updated in place.
+ */
+export interface SurfaceHeading {
+  /** Degrees clockwise from local north where the eye is, 0 to 360 (at the pole, north is the 0° meridian). */
+  headingDeg: number;
+  /** Where the Sun, the Earth and the touchdown point lie from that heading: degrees, −180 to 180, clockwise positive. */
+  sunRelDeg: number;
+  earthRelDeg: number;
+  touchdownRelDeg: number;
+  /** How far the eye is from the touchdown point along the ground, metres. */
+  fromTouchdownM: number;
+}
+
+/** A pointer at the screen's edge toward a body that is out of view (CSS pixels in the container). */
+export interface EdgePointerPoint {
+  x: number;
+  y: number;
+  /** Which way it points on the screen, radians from rightward, clockwise. */
+  angleRad: number;
+  /** The body is out of view, so the pointer is wanted. */
+  shown: boolean;
+}
+
+export type SurfacePointers = Record<'sun' | 'earth', EdgePointerPoint>;
+
 export interface SurfaceViewOptions {
   reducedMotion?: boolean;
   eyeHeightM?: number;
@@ -76,6 +108,12 @@ export interface SurfaceViewOptions {
   onSettled?: (east: number, north: number) => void;
   /** Screen positions of the labels, after every frame that moved them (CSS pixels in the container). */
   onLabels?: (labels: SurfaceLabels) => void;
+  /** The landing point, so the compass and the letters on the horizon follow local north as it turns near the pole. */
+  site?: { latDeg: number; groundHeightM: number };
+  /** Which way the view faces and where things lie from there, for the compass, after every frame that moved it. */
+  onHeading?: (heading: SurfaceHeading) => void;
+  /** Pointers at the screen's edge toward the Sun and the Earth while they are out of view, after every moving frame. */
+  onPointers?: (pointers: SurfacePointers) => void;
   /** The graphics context was lost (the GPU reset or ran out of memory); the view has stopped. */
   onLost?: () => void;
 }
@@ -112,13 +150,17 @@ export function exposureFor(sunElevDeg: number): number {
 export const LEVEL_GROUND_SHOWN = 0.35;
 const MAX_EXPOSURE = 6;
 
-/** The compass points, just under the level line where the horizon is. */
-const COMPASS: readonly [SurfaceLabelKey, THREE.Vector3][] = [
-  ['north', new THREE.Vector3(0, -0.004, -1).normalize()],
-  ['east', new THREE.Vector3(1, -0.004, 0).normalize()],
-  ['south', new THREE.Vector3(0, -0.004, 1).normalize()],
-  ['west', new THREE.Vector3(-1, -0.004, 0).normalize()],
-];
+/** The compass points on the horizon, a quarter turn apart clockwise from north. */
+const COMPASS_KEYS = ['north', 'east', 'south', 'west'] as const;
+
+/** Until told where the panels are, pointers keep to the middle of the screen's height, 28 px in from the sides. */
+const middleBand = (h: number): PointerBand => ({ sidePx: 28, topPx: 0.32 * h, bottomPx: 0.62 * h });
+
+/** Which way a camera looks along the ground: degrees clockwise from the scene's north (three.js −z), 0 to 360. */
+export function cameraHeadingDeg(camera: THREE.Camera, out = new THREE.Vector3()): number {
+  camera.getWorldDirection(out);
+  return headingDegOf(out.x, -out.z);
+}
 
 const TERRAIN_VERTEX = /* glsl */ `
 #include <common>
@@ -295,6 +337,12 @@ export class SurfaceView {
   private pitch = 0;
   /** The heading the walk starts facing and returns to on reset. */
   private homeHeading = 0;
+  /** The camera's heading from the touchdown point's north, and how far local north has turned where the eye is. */
+  private sceneHeadingDeg = 0;
+  private northTurn = 0;
+  /** The Sun's and the Earth's headings from the touchdown point's north. */
+  private sunAzDeg = 0;
+  private earthAzDeg = 0;
   private sunDir: V3 = [0, 0, 1];
   private earthDir: V3 = [0, 1, 0];
   private sunRadiusDeg = 0.27;
@@ -325,6 +373,19 @@ export class SurfaceView {
     south: { x: 0, y: 0, shown: false },
     west: { x: 0, y: 0, shown: false },
   };
+  private readonly facing: SurfaceHeading = {
+    headingDeg: 0,
+    sunRelDeg: 0,
+    earthRelDeg: 0,
+    touchdownRelDeg: 0,
+    fromTouchdownM: 0,
+  };
+  private readonly pointers: SurfacePointers = {
+    sun: { x: 0, y: 0, angleRad: 0, shown: false },
+    earth: { x: 0, y: 0, angleRad: 0, shown: false },
+  };
+  private readonly camDir = new THREE.Vector3();
+  private pointerBand: PointerBand | null = null;
   private readonly tmp = new THREE.Vector3();
   private readonly tmp2 = new THREE.Vector3();
   private readonly labelDir = new THREE.Vector3();
@@ -460,6 +521,8 @@ export class SurfaceView {
   setLighting(light: SurfaceLighting): void {
     this.sunDir = light.sunDir;
     this.earthDir = light.earthDir;
+    this.sunAzDeg = headingDegOf(light.sunDir[0], light.sunDir[1]);
+    this.earthAzDeg = headingDegOf(light.earthDir[0], light.earthDir[1]);
     this.sunRadiusDeg = light.sunRadiusDeg;
     this.earthRadiusDeg = light.earthRadiusDeg;
     toThree(light.sunDir, this.uniforms.sunDir.value).normalize();
@@ -606,6 +669,20 @@ export class SurfaceView {
     this.dirty = true;
   }
 
+  /** Draws the next frame even if nothing moved, so the labels, pointers and compass report where they are again. */
+  redraw(): void {
+    this.dirty = true;
+  }
+
+  /**
+   * Where pointers toward the Sun and the Earth may sit, CSS pixels in the container: the open view between the panels
+   * at the top and the bottom. Null puts them back in the middle of the screen's height.
+   */
+  setPointerBand(band: PointerBand | null): void {
+    this.pointerBand = band;
+    this.dirty = true;
+  }
+
   /** The eye's place on the ground now, local metres. */
   position(): { east: number; north: number; headingRad: number } {
     return { ...this.pos, headingRad: this.heading };
@@ -643,6 +720,9 @@ export class SurfaceView {
     clearanceM: number;
     pixelRatio: number;
     sunlitMean: number[];
+    headingDeg: number;
+    northTurnDeg: number;
+    facing: SurfaceHeading;
   } {
     const groundUpM = this.groundAt(this.camera.position.x, -this.camera.position.z);
     return {
@@ -651,6 +731,9 @@ export class SurfaceView {
       groundUpM,
       clearanceM: this.camera.position.y - groundUpM,
       pixelRatio: this.pixelRatio,
+      headingDeg: this.facing.headingDeg,
+      northTurnDeg: this.northTurn,
+      facing: { ...this.facing },
       sunlitMean: this.meshes.map((m) => {
         const a = m.geometry.getAttribute('sunlit').array as Float32Array;
         let sum = 0;
@@ -790,7 +873,7 @@ export class SurfaceView {
     this.dirty = false;
     this.applyCamera();
     this.renderer.render(this.scene, this.camera);
-    this.emitLabels();
+    this.report();
     if (moving) this.watchSpeed(dt);
   };
 
@@ -858,12 +941,32 @@ export class SurfaceView {
     this.earth.scale.setScalar(SKY_M * Math.tan((this.earthRadiusDeg * Math.PI) / 180));
   }
 
+  /** After a frame that moved the view: which way it faces, for the compass, and where its labels and pointers go. */
+  private report(): void {
+    const cam = this.camera;
+    const heading = cameraHeadingDeg(cam, this.forward);
+    // Straight up or down has no heading, so the last one stays; the pitch limit and the descent never quite get there.
+    if (Math.hypot(this.forward.x, this.forward.z) > 1e-6) this.sceneHeadingDeg = heading;
+    const east = cam.position.x;
+    const north = -cam.position.z;
+    this.northTurn = this.opts.site ? northTurnDeg(this.opts.site, east, north) : 0;
+    const facing = this.facing;
+    facing.headingDeg = wrapDeg(this.sceneHeadingDeg - this.northTurn);
+    // Where things lie from the view doesn't depend on which north it is measured from.
+    facing.sunRelDeg = relativeDeg(this.sunAzDeg, this.sceneHeadingDeg);
+    facing.earthRelDeg = relativeDeg(this.earthAzDeg, this.sceneHeadingDeg);
+    facing.touchdownRelDeg = relativeDeg(headingDegOf(-east, -north), this.sceneHeadingDeg);
+    facing.fromTouchdownM = Math.hypot(east, north);
+    this.opts.onHeading?.(facing);
+    this.emitLabels();
+  }
+
   private emitLabels(): void {
     const report = this.opts.onLabels;
-    if (!report) return;
+    const reportPointers = this.opts.onPointers;
+    if (!report && !reportPointers) return;
     const w = this.container.clientWidth;
     const h = this.container.clientHeight;
-    this.camera.getWorldDirection(this.forward);
     const place = (key: SurfaceLabelKey, at: THREE.Vector3) => {
       const label = this.labels[key];
       const ahead = this.tmp2.copy(at).sub(this.camera.position).dot(this.forward) > 0;
@@ -875,11 +978,43 @@ export class SurfaceView {
     const along = (dir: THREE.Vector3) => this.tmp.copy(this.camera.position).addScaledVector(dir, 1000);
     place('sun', along(toThree(this.sunDir, this.labelDir).normalize()));
     place('earth', along(toThree(this.earthDir, this.labelDir).normalize()));
-    for (const [key, dir] of COMPASS) place(key, along(dir));
+    // North, east, south and west as they are where the eye is (near the pole, north turns as you walk), just under the
+    // level line where the horizon is.
+    COMPASS_KEYS.forEach((key, k) => {
+      const az = ((k * 90 + this.northTurn) * Math.PI) / 180;
+      place(key, along(this.labelDir.set(Math.sin(az), -0.004, -Math.cos(az)).normalize()));
+    });
     this.tmp.set(0, this.touchdownTop, 0);
     place('touchdown', this.tmp);
     this.labels.touchdown.shown &&= this.touchdown.visible;
-    report(this.labels);
+    report?.(this.labels);
+    if (reportPointers) {
+      this.point('sun', this.sunDir, w, h);
+      this.point('earth', this.earthDir, w, h);
+      reportPointers(this.pointers);
+    }
+  }
+
+  /** The pointer toward the Sun or the Earth: wanted only while its label is not on screen. */
+  private point(key: 'sun' | 'earth', dir: V3, w: number, h: number): void {
+    const cam = this.camera;
+    const pointer = this.pointers[key];
+    // The direction in the camera's own frame: x right, y up, looking along −z.
+    const v = toThree(dir, this.camDir).normalize().transformDirection(cam.matrixWorldInverse);
+    const tanHalfY = Math.tan((cam.fov * Math.PI) / 360);
+    const at = this.labels[key].shown
+      ? null
+      : edgePointer(
+          [v.x, v.y, v.z],
+          { width: w, height: h, tanHalfX: tanHalfY * cam.aspect, tanHalfY },
+          this.pointerBand ?? middleBand(h),
+        );
+    pointer.shown = at !== null;
+    if (at) {
+      pointer.x = at.x;
+      pointer.y = at.y;
+      pointer.angleRad = at.angleRad;
+    }
   }
 
   /** On a machine that cannot keep up while moving, fewer pixels: down to three quarters of one per CSS pixel. */

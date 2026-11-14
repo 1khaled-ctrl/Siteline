@@ -105,3 +105,74 @@ export function walkStep(headingRad: number, forward: number, right: number, dis
   // Right of the heading is the heading turned 90° clockwise: (hn, −he).
   return [(f * he + r * hn) * distanceM, (f * hn - r * he) * distanceM];
 }
+
+/** Degrees wrapped to 0 (inclusive) to 360 (exclusive). */
+export function wrapDeg(deg: number): number {
+  return ((deg % 360) + 360) % 360;
+}
+
+/** Where a bearing lies from a heading: degrees, −180 (exclusive) to 180, positive clockwise (to the right of the view). */
+export function relativeDeg(bearingDeg: number, headingDeg: number): number {
+  const d = wrapDeg(bearingDeg - headingDeg);
+  return d > 180 ? d - 360 : d;
+}
+
+/** The heading of a direction along the ground (its east and north parts), degrees clockwise from north, 0 to 360. */
+export function headingDegOf(east: number, north: number): number {
+  return wrapDeg((Math.atan2(east, north) * 180) / Math.PI);
+}
+
+/** The screen a pointer goes on: its size in pixels, and the tangents of half the camera's field of view across and up. */
+export interface ScreenView {
+  width: number;
+  height: number;
+  tanHalfX: number;
+  tanHalfY: number;
+}
+
+/** Where pointers may sit: pixels in from each side, and the top and bottom of the band they keep to (y down). */
+export interface PointerBand {
+  sidePx: number;
+  topPx: number;
+  bottomPx: number;
+}
+
+/**
+ * A pointer at the edge of the screen toward a direction that is out of view, or null when the direction is on screen.
+ * The direction is in the camera's own frame: x right, y up, looking along −z.
+ *
+ * In front of the camera, the pointer sits where the line from the screen's centre toward the direction leaves the
+ * band. Behind it (or square to one side), it sits at the side to turn toward, at the band's height for the screen's
+ * centre: straight behind, that is the left. `angleRad` is the way it points on the screen, from rightward, clockwise.
+ */
+export function edgePointer(
+  dir: readonly [number, number, number],
+  view: ScreenView,
+  band: PointerBand,
+): { x: number; y: number; angleRad: number } | null {
+  const [x, y, z] = dir;
+  const cx = view.width / 2;
+  const cy = view.height / 2;
+  const left = band.sidePx;
+  const right = view.width - band.sidePx;
+  if (z > -1e-6) {
+    const toRight = x > 0;
+    return {
+      x: toRight ? right : left,
+      y: Math.min(band.bottomPx, Math.max(band.topPx, cy)),
+      angleRad: toRight ? 0 : Math.PI,
+    };
+  }
+  // Its place on the screen, pixels from the centre (y down).
+  const sx = (x / -z / view.tanHalfX) * cx;
+  const sy = (-y / -z / view.tanHalfY) * cy;
+  if (Math.abs(sx) <= cx && Math.abs(sy) <= cy) return null;
+  // Along the line from the centre to it, as far as the band goes.
+  let s = Number.POSITIVE_INFINITY;
+  if (sx > 0) s = Math.min(s, (right - cx) / sx);
+  if (sx < 0) s = Math.min(s, (left - cx) / sx);
+  if (sy > 0) s = Math.min(s, (band.bottomPx - cy) / sy);
+  if (sy < 0) s = Math.min(s, (band.topPx - cy) / sy);
+  // (`|| 0` turns the −0 of a level pointer into 0.)
+  return { x: cx + sx * s, y: cy + sy * s, angleRad: Math.atan2(sy, sx) || 0 };
+}

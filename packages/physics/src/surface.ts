@@ -75,6 +75,30 @@ export function localToGeo(
   };
 }
 
+/**
+ * How far local north at a point of the frame has turned from the frame's own north, degrees clockwise (−180 to 180).
+ * The meridians meet at the poles, so near one north turns under you as you walk: 1.6 km sideways at 15 km from the
+ * pole turns it by about 6°. North at the point is the way the Moon's spin axis leans as seen from there, and the turn
+ * is the heading of that on the frame's horizontal plane. At the pole itself north is the 0° meridian, which the
+ * frame's own north already follows, so the turn there is 0.
+ */
+export function northTurnDeg(f: Pick<LocalFrame, 'latDeg' | 'groundHeightM'>, east: number, north: number): number {
+  const lat = f.latDeg * DEG;
+  // In the frame, the Moon's centre is r straight down and its spin axis is (0, cos φ, sin φ).
+  const r = MOON_RADIUS_M + f.groundHeightM;
+  const axisN = Math.cos(lat);
+  const axisU = Math.sin(lat);
+  const len = Math.hypot(east, north, r);
+  const ue = east / len;
+  const un = north / len;
+  const along = axisN * un + axisU * (r / len);
+  // The axis less its part along the point's up is north there; its east and north parts give the heading.
+  const ne = -along * ue;
+  const nn = axisN - along * un;
+  if (Math.hypot(ne, nn) < 1e-12) return 0;
+  return Math.atan2(ne, nn) / DEG;
+}
+
 /** A body-fixed direction (any length) as a unit vector in local east, north, up. */
 export function localDirection(f: LocalFrame, d: Vec3): Vec3 {
   const len = Math.hypot(d[0], d[1], d[2]);
