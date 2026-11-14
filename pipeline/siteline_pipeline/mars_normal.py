@@ -2,12 +2,14 @@
 
 For each point it works out how steeply the ground tilts east and north, from the heights of the points around it, and
 stores the tilt of the surface normal in the red and green channels the way the globe's shader reads them. The
-height map is `mars_height.png` (NASA MGS MOLA MEGDR through Jaanga's height-map tiles, dataset `mola-mars-relief`).
+height map is `mars_height.png` (NASA MGS MOLA MEGDR, dataset `mola-mars-relief`): the mosaic `mars_height.py`
+builds from NASA's own tiles where that has been run, else the Landfall demo's coarse copy.
 """
 
 import hashlib
 import json
 import subprocess
+from pathlib import Path
 
 import numpy as np
 
@@ -19,8 +21,18 @@ MARS_RADIUS_M = 3_389_500.0
 # East-west distances shrink to nothing at the poles; keep them from dividing by zero. This only matters within
 # 3° of a pole, where the map has no heights finer than a few kilometres anyway.
 MIN_COS_LAT = 0.05
+# The app downloads this map; at 2048 wide it stays a few megabytes, and its source is now 463 m anyway.
 OUTPUT_SIZE = (2048, 1024)
-HEIGHT_PATH = PIPELINE / "raw" / "landfall" / "img" / "mars_height.png"
+# NASA's own MEGDR mosaic, built by `mars_height.py`; the Landfall demo's coarse map until that has been run.
+FINE_HEIGHT_PATH = PIPELINE / "out" / "mars" / "mars_height.png"
+COARSE_HEIGHT_PATH = PIPELINE / "raw" / "landfall" / "img" / "mars_height.png"
+
+
+def height_path() -> Path:
+    """The finest height map that has been built."""
+    return FINE_HEIGHT_PATH if FINE_HEIGHT_PATH.exists() else COARSE_HEIGHT_PATH
+
+
 OUT_PATH = PIPELINE / "out" / "mars" / "mars_normal.png"
 MANIFEST_PATH = OUT_PATH.with_suffix(".manifest.json")
 
@@ -90,7 +102,8 @@ def git_commit() -> str | None:
 
 
 def build() -> dict:
-    data = HEIGHT_PATH.read_bytes()
+    source = height_path()
+    data = source.read_bytes()
     heights = decode_heights(read_png_rgb(data))
     width, height = OUTPUT_SIZE
     fields = [resample(f, width, height) for f in tilt(heights)]
@@ -102,7 +115,8 @@ def build() -> dict:
         "outputSha256": hashlib.sha256(png).hexdigest(),
         "derivedBy": "siteline_pipeline.mars_normal: height-to-normal conversion of the input, nothing else",
         "input": {
-            "file": HEIGHT_PATH.name,
+            "file": source.name,
+            "path": str(source.relative_to(PIPELINE)),
             "sha256": hashlib.sha256(data).hexdigest(),
             "datasetId": "mola-mars-relief",
         },

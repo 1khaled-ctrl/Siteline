@@ -72,21 +72,26 @@ describe('elevation grid', () => {
   });
 });
 
-const imgDir = fileURLToPath(new URL('../../../pipeline/raw/landfall/img/', import.meta.url));
+// The mosaic `mars_height.py` builds from NASA's own MEGDR tiles, else the Landfall demo's coarse copy.
+const finePath = fileURLToPath(new URL('../../../pipeline/out/mars/mars_height.png', import.meta.url));
+const coarsePath = fileURLToPath(new URL('../../../pipeline/raw/landfall/img/mars_height.png', import.meta.url));
+const heightPath = existsSync(finePath) ? finePath : coarsePath;
+const fine = heightPath === finePath;
 const namesPath = fileURLToPath(new URL('../../../pipeline/out/names/mars_names.json', import.meta.url));
-const haveMars = existsSync(`${imgDir}mars_height.png`) && existsSync(namesPath);
+const haveMars = existsSync(heightPath) && existsSync(namesPath);
 
-describe.skipIf(!haveMars)('the Landfall Mars data', () => {
-  const png = haveMars ? readPngRgb(`${imgDir}mars_height.png`) : undefined;
+describe.skipIf(!haveMars)('the Mars data', () => {
+  const png = haveMars ? readPngRgb(heightPath) : undefined;
   const grid = png ? decodeHeights(png.rgba, png.width, png.height) : undefined;
   const namesFile = haveMars ? (JSON.parse(readFileSync(namesPath, 'utf8')) as MarsNamesJson) : undefined;
   const names: MarsFeatureRow[] = namesFile?.features ?? [];
 
   it('has MOLA heights that agree with the well-known elevations of Mars', () => {
     if (!grid) throw new Error('no grid');
-    expect([grid.width, grid.height]).toEqual([1025, 513]);
-    // The highest ground on Mars is Olympus Mons (18.65°N, 133.8°W), 21.2 km above the areoid; the lowest is the
-    // floor of the Hellas basin, about −8.2 km. A grid cell is 21 km wide, so each extreme lands a little short.
+    // The highest ground on Mars is Olympus Mons (18.65°N, 133.8°W), 21,229 m above the areoid; the lowest is the
+    // floor of the Hellas basin, −8,208 m (the figure the MEGDR labels give for the whole data set). How close each
+    // extreme lands depends on the grid: a cell is 21 km wide on the demo's map and about 463 m on NASA's own.
+    expect([grid.width, grid.height]).toEqual(fine ? [8192, 4096] : [1025, 513]);
     const where = (i: number) => ({
       latDeg: 90 - (Math.floor(i / grid.width) / (grid.height - 1)) * 180,
       lonDeg: ((i % grid.width) / (grid.width - 1)) * 360 - 180,
@@ -97,12 +102,14 @@ describe.skipIf(!haveMars)('the Landfall Mars data', () => {
       if (m > grid.metres[highest]) highest = i;
       if (m < grid.metres[lowest]) lowest = i;
     });
-    expect(grid.metres[highest]).toBeGreaterThan(20_500);
-    expect(grid.metres[highest]).toBeLessThan(22_000);
+    // On NASA's own grid both extremes should land within a few hundred metres of the published figures.
+    const slack = fine ? 400 : 1_000;
+    expect(grid.metres[highest]).toBeGreaterThan(21_229 - slack);
+    expect(grid.metres[highest]).toBeLessThan(21_229 + slack);
     expect(Math.abs(where(highest).latDeg - 18.65)).toBeLessThan(3);
     expect(Math.abs(where(highest).lonDeg + 133.8)).toBeLessThan(3);
-    expect(grid.metres[lowest]).toBeGreaterThan(-8_500);
-    expect(grid.metres[lowest]).toBeLessThan(-7_500);
+    expect(grid.metres[lowest]).toBeGreaterThan(-8_208 - slack);
+    expect(grid.metres[lowest]).toBeLessThan(-8_208 + slack);
     // Hellas Planitia is centred at 42.4°S, 70.5°E and 2,300 km across.
     expect(greatCircleKm(where(lowest).latDeg, where(lowest).lonDeg, -42.43, 70.5, MARS_RADIUS_KM)).toBeLessThan(1_150);
     // Viking 1 touched down near −3.6 km.
