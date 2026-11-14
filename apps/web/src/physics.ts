@@ -2,6 +2,7 @@ import { DEFAULT_STAY, type StayQuery, type StayResult } from '@siteline/contrac
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { touchdownUtcMsOf } from './land';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
 import { type MoonView, type Pin, useApp } from './store';
 
@@ -46,7 +47,8 @@ export function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQ
   return {
     ...DEFAULT_STAY,
     site: { id: `moon:${site.latDeg},${site.lonDeg}`, body: 'moon', latDeg: site.latDeg, lonDeg: site.lonDeg },
-    landingUtc: new Date(Date.parse(landingUtc) + slipDays * DAY_MS).toISOString(),
+    // The slip is added here and nowhere after: the query's landing date is the touchdown moment (land.ts).
+    landingUtc: new Date(touchdownUtcMsOf(landingUtc, slipDays)).toISOString(),
   };
 }
 

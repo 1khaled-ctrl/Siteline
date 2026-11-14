@@ -1,18 +1,34 @@
 import type { StayQuery, StayResult } from '@siteline/contracts';
 import {
+  angularRadiusDeg,
   type BestSearch,
   type BestSpot,
   bestSpots,
   type Dem,
   type DemHorizon,
   demFromInt16,
+  discVisibility,
+  EARTH_RADIUS_KM,
   type EphemerisTable,
+  EYE_HEIGHT_M,
+  elevAz,
+  eyeSky,
   flatHorizon,
+  gridNormals,
+  gridPositions,
+  gridTriangles,
   type HeightPatch,
   type HeightSource,
+  HORIZON_MIN_DIST_M,
   heightsFromPatches,
   horizonFromDem,
   horizonFromHeights,
+  type LocalFrame,
+  type LocalGrid,
+  levelsUpAt,
+  localDirection,
+  localFrame,
+  localToGeo,
   mapsAtSite,
   mapsFromBytes,
   marsSubsolarPoint,
@@ -22,15 +38,19 @@ import {
   type PolarMaps,
   parseEphemeris,
   parsePlanets,
+  patchHeightM,
   polarScaleFactor,
   polarToUnit,
   polarXY,
+  resampleToLocal,
   type SolarBodyKey,
+  SUN_RADIUS_KM,
   siteFrame,
   siteSlopes,
   stayTest,
   subsolarPoint,
   unitToLatLon,
+  type Vec3,
   WALK_RADIUS_M,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
@@ -210,16 +230,28 @@ const levelOf = (image: GeoTIFFImage, base: GeoTIFFImage): TerrainLevel => {
   return { image, cornerX: x - half, cornerY: y + half, pixM, width: image.getWidth(), height: image.getHeight() };
 };
 
-/** The terrain's levels, opened once: headers and tile indexes only, never the whole file. */
-const loadTerrain = (url: string): Promise<TerrainGrids> =>
-  memo(`terrain:${url}`, async () => {
+/**
+ * Every level of a terrain GeoTIFF, finest first, opened once per file: headers and tile indexes only, never the whole
+ * file. The stay check, the slope and the surface view all read through this one copy, so a file's header is fetched
+ * once and its tiles share one cache.
+ */
+const loadPyramid = (url: string): Promise<TerrainLevel[]> =>
+  memo(`pyramid:${url}`, async () => {
     const { fromUrl } = await import('geotiff');
     const tiff = await fromUrl(url);
     const base = await tiff.getImage();
-    const near = levelOf(base, base);
+    const levels = [levelOf(base, base)];
+    for (let i = 1; i < (await tiff.getImageCount()); i++) levels.push(levelOf(await tiff.getImage(i), base));
+    return levels;
+  });
+
+/** The terrain's full-resolution level and the overview the far skyline is read from. */
+const loadTerrain = (url: string): Promise<TerrainGrids> =>
+  memo(`terrain:${url}`, async () => {
+    const levels = await loadPyramid(url);
+    const near = levels[0];
     let far = near;
-    for (let i = 1; i < (await tiff.getImageCount()); i++) {
-      const level = levelOf(await tiff.getImage(i), base);
+    for (const level of levels.slice(1)) {
       // The coarsest level still at or under the far cell size, so the 300 km reach is a window of a few hundred cells.
       if (level.pixM <= FAR_PIX_M && level.pixM > far.pixM) far = level;
     }
@@ -351,17 +383,9 @@ interface FineGrid {
   height: number;
 }
 
-const loadFine = (url: string): Promise<FineGrid> =>
-  memo(`fine:${url}`, async () => {
-    const { fromUrl } = await import('geotiff');
-    const image = await (await fromUrl(url)).getImage();
-    const [x, y] = image.getOrigin();
-    const [pixM, pixY] = image.getResolution();
-    if (!(pixM > 0) || Math.abs(pixM + pixY) > 1e-9) throw new Error(`${url}: not a grid of square cells`);
-    // The tie point is the first cell's outer corner, or its centre for a grid of points.
-    const half = image.getGeoKeys()?.GTRasterTypeGeoKey === 2 ? pixM / 2 : 0;
-    return { image, cornerX: x - half, cornerY: y + half, pixM, width: image.getWidth(), height: image.getHeight() };
-  });
+// The full-resolution level's tie point is its first cell's outer corner, or its centre for a grid of points; `levelOf`
+// turns either into the outer corner.
+const loadFine = (url: string): Promise<FineGrid> => memo(`fine:${url}`, async () => (await loadPyramid(url))[0]);
 
 /**
  * The landing slope and the walkable share around a site, from the 10 m grid: only the cells within 1 km are read (one
@@ -421,6 +445,405 @@ const FLATTER_STEPS_M = [120, 250];
 const PASSING_PATIENCE_MS = 45_000;
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+// --- Land Here: the ground around one point at real scale, for the surface view ---
+
+/** One ring of the surface view's terrain: how far it reaches and how finely it is drawn. */
+interface SurfaceRing {
+  name: SurfaceLevelName;
+  spacingM: number;
+  halfM: number;
+}
+
+export type SurfaceLevelName = 'near' | 'middle' | 'wide' | 'horizon';
+export type SurfaceQuality = 'high' | 'low';
+
+/**
+ * The surface view's terrain, in four nested squares around the landing point: the walkable ground at the terrain's
+ * own 10 m, then coarser rings out to the skyline's 300 km reach (the stay check's own reach), so distant ridges stay
+ * on the horizon. Each side is a whole number of cells. `low` halves the work for modest machines.
+ */
+const SURFACE_RINGS: Record<SurfaceQuality, SurfaceRing[]> = {
+  high: [
+    { name: 'near', spacingM: 10, halfM: 2_000 },
+    { name: 'middle', spacingM: 50, halfM: 8_000 },
+    { name: 'wide', spacingM: 320, halfM: 40_000 },
+    { name: 'horizon', spacingM: 2_400, halfM: HORIZON_REACH_M },
+  ],
+  low: [
+    { name: 'near', spacingM: 20, halfM: 2_000 },
+    { name: 'middle', spacingM: 100, halfM: 8_000 },
+    { name: 'wide', spacingM: 640, halfM: 40_000 },
+    { name: 'horizon', spacingM: 4_000, halfM: HORIZON_REACH_M },
+  ],
+};
+
+export interface SurfaceRequest {
+  /** Names this request, so a newer one, or Cancel, can stop it. */
+  id: number;
+  latDeg: number;
+  lonDeg: number;
+  quality: SurfaceQuality;
+}
+
+export type SurfaceStage = 'opening' | SurfaceLevelName | 'building';
+
+export interface SurfaceProgress {
+  /** What is under way: opening the files' headers, reading the rings (all four at once), building the meshes. */
+  now: 'opening' | 'reading' | 'building';
+  /** The stages finished so far, in the order they finished. */
+  finished: SurfaceStage[];
+}
+
+export interface SurfaceLevelData {
+  name: SurfaceLevelName;
+  /** The terrain file the heights came from, by its id in CREDITS.md. */
+  datasetId: string;
+  /** The cell size of the level of that file that was read, metres. */
+  sourcePixM: number;
+  /** The drawn mesh's node spacing, metres. */
+  spacingM: number;
+  halfM: number;
+  size: number;
+  /** Nodes with no height at all, and nodes whose height came from a coarser read, percent. */
+  missingPct: number;
+  filledPct: number;
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  /** Local up of each node; sent for the rings the camera can stand over (near and middle). */
+  up?: Float32Array;
+}
+
+export interface SurfaceScene {
+  key: string;
+  latDeg: number;
+  lonDeg: number;
+  /** The ground's height at the point above the 1737.4 km sphere, metres. */
+  groundHeightM: number;
+  levels: SurfaceLevelData[];
+}
+
+export type SurfaceOutcome =
+  | { status: 'ready'; scene: SurfaceScene }
+  /** The point is outside every terrain file's grid. */
+  | { status: 'outside' }
+  /** Inside a grid, but no file has a height at the point itself. */
+  | { status: 'nodata' }
+  | { status: 'cancelled' };
+
+export interface SkyBody {
+  /** Local east, north, up unit vector from the landing point. */
+  dir: [number, number, number];
+  distKm: number;
+  radiusDeg: number;
+}
+
+export interface EyeView {
+  east: number;
+  north: number;
+  /** Where the eye is, and the ground under it: local up, metres. */
+  groundUpM: number;
+  eyeHeightM: number;
+  latDeg: number;
+  lonDeg: number;
+  /** Elevation and azimuth in the eye's own frame, degrees. */
+  sun: { elevDeg: number; azDeg: number; horizonDeg: number; fraction: number };
+  earth: { elevDeg: number; azDeg: number; horizonDeg: number; fraction: number };
+}
+
+export interface SurfaceSky {
+  /** The moment worked out, clamped to the ephemeris (`clamped` says if it was). */
+  tUtcMs: number;
+  clamped: boolean;
+  sun: SkyBody;
+  earth: SkyBody;
+  /** The share of the Sun's disc each node of each ring sees above the terrain, 0 to 1, ring by ring. */
+  sunlit?: Float32Array[];
+  /** How finely the shadows were worked out on the walkable ground, metres. */
+  shadowM?: number;
+  eye?: EyeView;
+}
+
+/** What is said about each ring, beside its grid. */
+type RingInfo = Omit<SurfaceLevelData, 'positions' | 'normals' | 'indices' | 'up' | 'size'>;
+
+/**
+ * A surface the worker has built: its frame and grids, kept for the light and the eye, and to draw again without
+ * reading the terrain again when the same point is visited twice.
+ */
+interface BuiltSurface {
+  frame: LocalFrame;
+  grids: LocalGrid[];
+  rings: RingInfo[];
+}
+
+/** The meshes of a built surface, ready to send to the main thread (fresh arrays, so they can be transferred). */
+function sceneOf(key: string, latDeg: number, lonDeg: number, built: BuiltSurface): SurfaceScene {
+  const levels = built.grids.map((grid, i): SurfaceLevelData => {
+    const ring = built.rings[i];
+    const finer = i > 0 ? built.rings[i - 1] : undefined;
+    return {
+      ...ring,
+      size: grid.size,
+      // Under a finer ring a coarse one sinks a little (5% of its cell, plus a metre), so the finer ground is the one seen.
+      positions: gridPositions(grid, finer ? 0.05 * ring.spacingM + 1 : 0, finer?.halfM),
+      normals: gridNormals(grid),
+      indices: gridTriangles(grid, finer?.halfM),
+      up: ring.name === 'near' || ring.name === 'middle' ? grid.up.slice() : undefined,
+    };
+  });
+  return { key, latDeg, lonDeg, groundHeightM: built.frame.groundHeightM, levels };
+}
+
+const surfaces = new Map<string, BuiltSurface>();
+const surfaceRequests = new Map<number, AbortController>();
+const SURFACES_KEPT = 3;
+
+const surfaceKey = (r: Pick<SurfaceRequest, 'latDeg' | 'lonDeg' | 'quality'>) => `${r.latDeg},${r.lonDeg},${r.quality}`;
+
+/**
+ * A rectangle of a terrain level around a local square, read by byte ranges: the square's outline is carried into the
+ * polar plane and its bounding box read, plus a margin. `cornerX`/`cornerY` are the first cell's centre, as
+ * `patchHeightM` reads them. Undefined where the level does not reach.
+ */
+async function windowFor(
+  level: TerrainLevel,
+  frame: LocalFrame,
+  halfM: number,
+  signal: AbortSignal,
+): Promise<HeightPatch | undefined> {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const along = -halfM + (2 * halfM * i) / steps;
+    for (const [e, n] of [
+      [along, halfM],
+      [along, -halfM],
+      [halfM, along],
+      [-halfM, along],
+    ]) {
+      // The square's outline on the site's horizontal plane, carried straight down onto the sphere.
+      const x = frame.origin[0] + e * frame.e[0] + n * frame.n[0];
+      const y = frame.origin[1] + e * frame.e[1] + n * frame.n[1];
+      const z = frame.origin[2] + e * frame.e[2] + n * frame.n[2];
+      const len = Math.hypot(x, y, z);
+      const q = polarXY([x / len, y / len, z / len]);
+      minX = Math.min(minX, q.x);
+      maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y);
+      maxY = Math.max(maxY, q.y);
+    }
+  }
+  // Heights shift where the ground meets the plane by up to about 1% of the reach; two cells more for the bilinear read.
+  const margin = 0.01 * halfM + 2 * level.pixM;
+  const c0 = Math.max(0, Math.floor((minX - margin - level.cornerX) / level.pixM));
+  const c1 = Math.min(level.width, Math.ceil((maxX + margin - level.cornerX) / level.pixM));
+  const r0w = Math.max(0, Math.floor((level.cornerY - maxY - margin) / level.pixM));
+  const r1w = Math.min(level.height, Math.ceil((level.cornerY - minY + margin) / level.pixM));
+  if (c1 - c0 < 2 || r1w - r0w < 2) return undefined;
+  const values = await level.image.readRasters({
+    window: [c0, r0w, c1, r1w],
+    samples: [0],
+    interleave: true,
+    signal,
+  });
+  const heightsM = values instanceof Float32Array ? values : Float32Array.from(values as ArrayLike<number>);
+  // The files mark missing cells NaN; anything else non-finite or absurd is treated the same.
+  for (let i = 0; i < heightsM.length; i++) if (!(Math.abs(heightsM[i]) < 20_000)) heightsM[i] = Number.NaN;
+  return {
+    cornerX: level.cornerX + (c0 + 0.5) * level.pixM,
+    cornerY: level.cornerY - (r0w + 0.5) * level.pixM,
+    pixM: level.pixM,
+    width: c1 - c0,
+    height: r1w - r0w,
+    heightsM,
+  };
+}
+
+/** The coarsest level of a pyramid that is still at least as fine as `spacingM`. */
+function levelFor(levels: readonly TerrainLevel[], spacingM: number): TerrainLevel {
+  let best = levels[0];
+  for (const level of levels) if (level.pixM <= spacingM * 1.001 && level.pixM > best.pixM) best = level;
+  return best;
+}
+
+/** A patch's height at a polar point, NaN where it has none. */
+const patchSource = (patch: HeightPatch): HeightSource => heightsFromPatches([patch]);
+
+function throwIfCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+}
+
+const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
+
+/**
+ * The surface view's terrain around a point: four rings read from LOLA's 10 m terrain where it reaches and its 30 m
+ * terrain beyond (and for the walkable ground itself outside 83°S, where the 10 m has nothing), resampled at real scale
+ * onto the point's local frame, with normals and triangles ready to draw. Never invents a height: a hole in one read is
+ * filled from a coarser read of real terrain, and a hole in all of them is left out of the mesh.
+ */
+async function buildSurface(
+  request: SurfaceRequest,
+  urls: DataUrls,
+  onProgress: (p: SurfaceProgress) => void,
+  signal: AbortSignal,
+): Promise<SurfaceOutcome> {
+  const rings = SURFACE_RINGS[request.quality];
+  const finished: SurfaceStage[] = [];
+  const report = (now: SurfaceProgress['now']) => onProgress({ now, finished: [...finished] });
+  report('opening');
+  if (!urls.horizonTerrain) throw new Error('no terrain is configured for the surface view');
+  const [coarseLevels, fineLevels] = await Promise.all([
+    loadPyramid(urls.horizonTerrain),
+    urls.fine ? loadPyramid(urls.fine).catch(() => undefined) : Promise.resolve(undefined),
+  ]);
+  throwIfCancelled(signal);
+  finished.push('opening');
+  const { latDeg, lonDeg } = request;
+  const site = polarXY(siteFrame(latDeg, lonDeg).u);
+  const inside = (l: TerrainLevel) =>
+    site.x > l.cornerX &&
+    site.x < l.cornerX + l.width * l.pixM &&
+    site.y < l.cornerY &&
+    site.y > l.cornerY - l.height * l.pixM;
+  if (!inside(coarseLevels[0]) && !(fineLevels && inside(fineLevels[0]))) return { status: 'outside' };
+
+  // A provisional frame for choosing windows; the ground height only shifts it by a fraction of a cell.
+  const guess = localFrame(latDeg, lonDeg, 0);
+  report('reading');
+  // The four rings are read at once: each is a few tiles of its own level.
+  const reads = await Promise.all(
+    rings.map(async (ring) => {
+      // The 10 m file for the walkable ground and the ring around it, where it reaches and has heights at the point.
+      let read: { patch: HeightPatch; datasetId: string } | undefined;
+      if (fineLevels && (ring.name === 'near' || ring.name === 'middle')) {
+        const patch = await windowFor(levelFor(fineLevels, ring.spacingM), guess, ring.halfM, signal);
+        if (patch && Number.isFinite(patchHeightM(patch, site.x, site.y))) read = { patch, datasetId: FINE.id };
+      }
+      if (!read) {
+        const patch = await windowFor(levelFor(coarseLevels, ring.spacingM), guess, ring.halfM, signal);
+        if (patch) read = { patch, datasetId: TERRAIN.id };
+      }
+      throwIfCancelled(signal);
+      finished.push(ring.name);
+      report('reading');
+      return read && { ring, ...read };
+    }),
+  );
+  const patches = reads.filter((r): r is NonNullable<typeof r> => r !== undefined);
+  report('building');
+  const near = patches.find((p) => p.ring.name === 'near');
+  const groundHeightM = near ? patchHeightM(near.patch, site.x, site.y) : Number.NaN;
+  if (!near || !Number.isFinite(groundHeightM)) return { status: 'nodata' };
+
+  const frame = localFrame(latDeg, lonDeg, groundHeightM);
+  const grids: LocalGrid[] = [];
+  const infos: RingInfo[] = [];
+  for (const [i, ring] of rings.entries()) {
+    const own = patches.find((p) => p.ring === ring);
+    if (!own) break;
+    // A ring's own read first, then the coarser rings' reads for any hole in it.
+    const sources = patches.filter((p) => rings.indexOf(p.ring) >= i).map((p) => patchSource(p.patch));
+    const grid = resampleToLocal(frame, sources, ring.spacingM, ring.halfM);
+    let missing = 0;
+    let filled = 0;
+    for (const f of grid.from ?? []) {
+      if (f === 255) missing++;
+      else if (f > 0) filled++;
+    }
+    grids.push(grid);
+    infos.push({
+      name: ring.name,
+      datasetId: own.datasetId,
+      sourcePixM: own.patch.pixM,
+      spacingM: ring.spacingM,
+      halfM: ring.halfM,
+      missingPct: (100 * missing) / grid.up.length,
+      filledPct: (100 * filled) / grid.up.length,
+    });
+    throwIfCancelled(signal);
+  }
+  const key = surfaceKey(request);
+  const built: BuiltSurface = { frame, grids, rings: infos };
+  const scene = sceneOf(key, latDeg, lonDeg, built);
+  throwIfCancelled(signal);
+  finished.push('building');
+  surfaces.delete(key);
+  surfaces.set(key, built);
+  for (const old of surfaces.keys()) {
+    if (surfaces.size <= SURFACES_KEPT) break;
+    surfaces.delete(old);
+  }
+  return { status: 'ready', scene };
+}
+
+/** The Sun and the Earth seen from a built surface at a moment, from the SPICE ephemeris table. */
+async function skyAt(
+  surface: BuiltSurface,
+  tUtcMs: number,
+  dataUrl: string,
+): Promise<{ t: number; clamped: boolean; sunKm: Vec3; earthKm: Vec3; sun: SkyBody; earth: SkyBody }> {
+  const table = await loadEphemeris(dataUrl);
+  const t = Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs));
+  const originKm: Vec3 = [
+    surface.frame.origin[0] / 1000,
+    surface.frame.origin[1] / 1000,
+    surface.frame.origin[2] / 1000,
+  ];
+  const body = (km: Vec3, radiusKm: number): SkyBody => {
+    const d: Vec3 = [km[0] - originKm[0], km[1] - originKm[1], km[2] - originKm[2]];
+    const distKm = Math.hypot(d[0], d[1], d[2]);
+    return { dir: [...localDirection(surface.frame, d)], distKm, radiusDeg: angularRadiusDeg(radiusKm, distKm) };
+  };
+  const sunKm = table.positionKm('sun', t);
+  const earthKm = table.positionKm('earth', t);
+  return {
+    t,
+    clamped: t !== tUtcMs,
+    sunKm,
+    earthKm,
+    sun: body(sunKm, SUN_RADIUS_KM),
+    earth: body(earthKm, EARTH_RADIUS_KM),
+  };
+}
+
+/** What an eye 1.7 m above the ground at (east, north) sees of the Sun and the Earth, from the drawn terrain. */
+function eyeAt(
+  surface: BuiltSurface,
+  east: number,
+  north: number,
+  sky: { sunKm: Vec3; earthKm: Vec3; sun: SkyBody; earth: SkyBody },
+): EyeView | undefined {
+  const { grids, frame } = surface;
+  const sun = eyeSky(grids, east, north, EYE_HEIGHT_M, sky.sun.dir, sky.sun.radiusDeg, HORIZON_MIN_DIST_M);
+  const earth = eyeSky(grids, east, north, EYE_HEIGHT_M, sky.earth.dir, sky.earth.radiusDeg, HORIZON_MIN_DIST_M);
+  if (!sun || !earth) return undefined;
+  const groundUpM = levelsUpAt(grids, east, north);
+  const at = localToGeo(frame, east, north, groundUpM);
+  // Elevation and azimuth in the eye's own frame (2 km from the point, the local vertical turns by 0.07°).
+  const own = siteFrame(at.latDeg, at.lonDeg, at.heightM, EYE_HEIGHT_M);
+  const sunSeen = elevAz(sky.sunKm, own);
+  const earthSeen = elevAz(sky.earthKm, own);
+  return {
+    east,
+    north,
+    groundUpM,
+    eyeHeightM: EYE_HEIGHT_M,
+    latDeg: at.latDeg,
+    lonDeg: at.lonDeg,
+    sun: { elevDeg: sunSeen.elevDeg, azDeg: sunSeen.azDeg, horizonDeg: sun.horizonDeg, fraction: sun.fraction },
+    earth: {
+      elevDeg: earthSeen.elevDeg,
+      azDeg: earthSeen.azDeg,
+      horizonDeg: earth.horizonDeg,
+      fraction: earth.fraction,
+    },
+  };
+}
 
 /** The point `dx`, `dy` metres away in the polar plane (rounded as the app rounds a picked site). */
 function offset(latDeg: number, lonDeg: number, dxM: number, dyM: number): { latDeg: number; lonDeg: number } {
@@ -559,6 +982,109 @@ const api = {
   /** Sites in a region that pass all four checks for this landing date, by the site report's own verdict. */
   passing(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<PassingSearch> {
     return passingSites(search, query, urls);
+  },
+
+  /**
+   * Land Here: the terrain around a point for the surface view, reported stage by stage through `onProgress`. Starting
+   * a request stops any other still running, so a site picked after another never shows the first one's ground; the
+   * main thread checks the id as well. A point visited lately is drawn again from what was read, without the network.
+   */
+  async surface(
+    request: SurfaceRequest,
+    urls: DataUrls,
+    onProgress: (p: SurfaceProgress) => void,
+  ): Promise<SurfaceOutcome> {
+    for (const [id, other] of surfaceRequests) {
+      other.abort();
+      surfaceRequests.delete(id);
+    }
+    const controller = new AbortController();
+    surfaceRequests.set(request.id, controller);
+    const send = (outcome: SurfaceOutcome): SurfaceOutcome => {
+      if (outcome.status !== 'ready') return outcome;
+      const buffers = outcome.scene.levels.flatMap((l) => [
+        l.positions.buffer,
+        l.normals.buffer,
+        l.indices.buffer,
+        ...(l.up ? [l.up.buffer] : []),
+      ]);
+      return Comlink.transfer(outcome, buffers);
+    };
+    try {
+      const key = surfaceKey(request);
+      const known = surfaces.get(key);
+      if (known) {
+        onProgress({ now: 'building', finished: ['opening', 'near', 'middle', 'wide', 'horizon'] });
+        return send({ status: 'ready', scene: sceneOf(key, request.latDeg, request.lonDeg, known) });
+      }
+      return send(await buildSurface(request, urls, onProgress, controller.signal));
+    } catch (e) {
+      if (isAbort(e) || controller.signal.aborted) return { status: 'cancelled' };
+      throw e;
+    } finally {
+      if (surfaceRequests.get(request.id) === controller) surfaceRequests.delete(request.id);
+    }
+  },
+
+  /** Stops a surface request (Cancel, or the view closing); it answers `cancelled`. */
+  surfaceCancel(id: number): void {
+    surfaceRequests.get(id)?.abort();
+    surfaceRequests.delete(id);
+  },
+
+  /**
+   * The Sun and the Earth over a built surface at a moment, the cast shadows on every ring, and what the eye at
+   * (east, north) sees of both. `quick` works the shadows out four times coarser, for a first answer while the clock
+   * is being dragged. Undefined if the surface is no longer kept.
+   */
+  async surfaceSky(
+    key: string,
+    tUtcMs: number,
+    dataUrl: string,
+    eye: { east: number; north: number } | null,
+    quick: boolean,
+  ): Promise<SurfaceSky | undefined> {
+    const surface = surfaces.get(key);
+    if (!surface) return undefined;
+    const sky = await skyAt(surface, tUtcMs, dataUrl);
+    // The walkable ground and the ring around it node by node; the far rings every other node.
+    const strides = surface.grids.map((_, k) => (quick ? 4 : k <= 1 ? 1 : 2));
+    const sunlit = surface.grids.map((_, k) =>
+      discVisibility(surface.grids, k, sky.sun.dir, sky.sun.radiusDeg, strides[k]),
+    );
+    const result: SurfaceSky = {
+      tUtcMs: sky.t,
+      clamped: sky.clamped,
+      sun: sky.sun,
+      earth: sky.earth,
+      sunlit,
+      shadowM: surface.grids[0].spacingM * strides[0],
+      eye: eye ? eyeAt(surface, eye.east, eye.north, sky) : undefined,
+    };
+    return Comlink.transfer(
+      result,
+      sunlit.map((s) => s.buffer),
+    );
+  },
+
+  /** Only what the eye at (east, north) sees of the Sun and the Earth: cheap, for after each walk. */
+  async surfaceEye(
+    key: string,
+    tUtcMs: number,
+    dataUrl: string,
+    east: number,
+    north: number,
+  ): Promise<SurfaceSky | undefined> {
+    const surface = surfaces.get(key);
+    if (!surface) return undefined;
+    const sky = await skyAt(surface, tUtcMs, dataUrl);
+    return {
+      tUtcMs: sky.t,
+      clamped: sky.clamped,
+      sun: sky.sun,
+      earth: sky.earth,
+      eye: eyeAt(surface, east, north, sky),
+    };
   },
 
   async best(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<BestSpot[]> {

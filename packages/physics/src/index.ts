@@ -11,4 +11,5 @@ export * from './marsSun';
 export * from './planets';
 export * from './slope';
 export * from './stay';
+export * from './surface';
 export * from './vec';

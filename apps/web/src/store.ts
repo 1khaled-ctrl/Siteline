@@ -1,5 +1,6 @@
 import type { EarthPlace, LanderBody, MarsPlace, MissionFilter } from '@siteline/engine';
 import { create } from 'zustand';
+import type { LandingTarget } from './land';
 import { findLander } from './landers';
 
 /**
@@ -76,6 +77,12 @@ interface AppState extends View {
   /** The landing the journey simulation flies to, while its dialog is open. */
   journey: JourneyTarget | null;
   setJourney: (journey: JourneyTarget | null) => void;
+  /**
+   * The point the surface view has landed on, while it is open (Land Here). Opening and closing it changes nothing
+   * else here, so the map, the site and the date are as they were when you come back. Not saved in the link.
+   */
+  landing: LandingTarget | null;
+  setLanding: (landing: LandingTarget | null) => void;
 }
 
 export interface JourneyTarget {
@@ -235,6 +242,8 @@ export const useApp = create<AppState>((set) => ({
   setSources: (sources) => set({ sources }),
   journey: null,
   setJourney: (journey) => set({ journey }),
+  landing: null,
+  setLanding: (landing) => set({ landing }),
 }));
 
 // The address bar keeps the site, pins, layer and lander, but not the view, date or slip, so opening the app again

@@ -1,5 +1,5 @@
 import { MotionConfig } from 'motion/react';
-import { type CSSProperties, type ReactNode, useCallback } from 'react';
+import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FactBody } from './bodyFacts';
 import { useBoot } from './boot';
@@ -16,6 +16,7 @@ import { useGlassLight } from './ui/glass';
 import { HeaderBrand } from './ui/HeaderBrand';
 import { Intro } from './ui/Intro';
 import { JourneyDialog } from './ui/Journey';
+import { SurfaceLoading } from './ui/LandHere';
 import { MoonView } from './ui/MoonView';
 import { Orb } from './ui/Orb';
 import { OrbitDial } from './ui/OrbitDial';
@@ -88,10 +89,14 @@ function usePanelShown(): (el: HTMLElement | null) => (() => void) | undefined {
   }, []);
 }
 
+/** The surface view (Land Here) and its 3D code load the first time someone lands, not with the app. */
+const SurfaceExplorer = lazy(() => import('./ui/surface/SurfaceExplorer'));
+
 export function App() {
   const { t } = useTranslation();
   const view = useApp((s) => s.view);
   const opened = useBoot((s) => s.opened);
+  const landing = useApp((s) => s.landing);
   useGlassLight();
   const panelRef = usePanelShown();
   const wide = useWide();
@@ -99,8 +104,8 @@ export function App() {
     <>
       <Intro />
       <SoundEffects />
-      {/* Out of reach of the keyboard and screen readers until the opening hands over. */}
-      <div className="flex h-dvh flex-col" inert={!opened}>
+      {/* Out of reach of the keyboard and screen readers until the opening hands over, and while on the surface. */}
+      <div className="flex h-dvh flex-col" inert={!opened || landing !== null}>
         <a
           href="#panel"
           className="sr-only z-30 rounded-md bg-accent px-3 py-2 text-sm font-semibold text-space focus:not-sr-only focus:absolute focus:inset-s-3 focus:top-3"
@@ -159,6 +164,12 @@ export function App() {
           )}
         </main>
       </div>
+      {landing && (
+        <Suspense fallback={<SurfaceLoading />}>
+          {/* A new point or moment is a new surface: everything about the last one is dropped. */}
+          <SurfaceExplorer key={`${landing.latDeg},${landing.lonDeg},${landing.touchdownUtcMs}`} target={landing} />
+        </Suspense>
+      )}
     </>
   );
 }
