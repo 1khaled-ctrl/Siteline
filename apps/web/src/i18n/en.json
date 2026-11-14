@@ -61,8 +61,8 @@
       "flatHorizon": "flat horizon"
     },
     "why": {
-      "high": "High confidence: needs no terrain, or uses LOLA's terrain at its full {{full}} m detail.",
-      "firstPass": "First pass: worked out on the {{km}} km terrain loaded here, where narrow ridges are smoothed out. Verify with finer terrain.",
+      "high": "High confidence: needs no terrain, or uses LOLA's terrain at {{full}} m detail or finer.",
+      "firstPass": "First pass: worked out on data coarser than LOLA's full {{full}} m detail, where narrow ridges are smoothed out. Verify with finer data.",
       "notMeasured": "Not measured: needs terrain finer than {{slope}} m, or data this spot is outside of.",
       "flatHorizon": "Flat horizon: this spot is off the loaded terrain, so hills that could hide the Sun or the Earth are left out."
     }
@@ -206,7 +206,7 @@
     "nextSunset": "Next sunset: {{at}}.",
     "earth": "Earth is in view {{pct}}% of the stay.",
     "nextEarthset": "Next earthset: {{at}}.",
-    "slopeUnknown": "The slope can't be judged yet: the rule needs terrain finer than 100 m, and the loaded LOLA terrain is {{km}} km per pixel.",
+    "slopeUnknown": "The slope can't be judged yet: the rule needs terrain finer than 100 m, and the loaded LOLA terrain is {{size}} per pixel.",
     "slopeNoTerrain": "The slope can't be judged: this spot is outside the loaded terrain.",
     "slope": {
       "yes": "The ground is flatter than the slope limit.",
@@ -217,7 +217,8 @@
     "longTerm": "Over the 19-year cycle: sunlight {{sun}}% of the time, Earth in view {{earth}}%.{{shadow}}",
     "shadowed": " It never sees the Sun.",
     "longTermNone": "This spot is outside the 19-year maps.",
-    "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}."
+    "events": "Next sunset: {{sunset}}. Next sunrise: {{sunrise}}. Next earthset: {{earthset}}. Next earthrise: {{earthrise}}.",
+    "slopePending": "The slope can't be judged yet: it is measured on LOLA's 10 m terrain, which has not arrived for this spot or does not reach it (it stops at 83° S)."
   },
   "share": {
     "button": "Share",
@@ -405,10 +406,12 @@
     "ridgeNote": "△ Point A sits on a ridge narrower than one terrain pixel.",
     "recorded": "Recorded by the test suite on {{date}}.",
     "fine": {
-      "heading": "Being checked: the same three points on NASA's 30 m terrain, which does not yet agree with the grid above.",
-      "coarse": "1.2 km",
-      "fine": "30 m",
-      "note": "The 30 m terrain resolves gentle rises within a few kilometres that the 1.2 km grid steps over, and at the pole the Sun sits so low that those rises shade a site. Which answer is right is open, so sites are judged on the 1.2 km grid, the one every published number here was checked against."
+      "heading": "Sunlight on NASA's 30 m terrain, which sites are judged on, agrees with NASA's own long-term maps within a point:",
+      "nasa": "NASA maps",
+      "fine": "SiteLine, 30 m",
+      "coarse": "1.2 km grid",
+      "bussey": "Bussey 2010",
+      "note": "NASA's maps (PGDA product 69, 60 m) and our 30 m horizon are independent computations on two LOLA products. The 1.2 km grid and Bussey et al.'s Kaguya-based study both give more sunlight: too coarse to see the gentle rises within a few kilometres that shade a site when the Sun sits a degree or two up."
     }
   },
   "report": {

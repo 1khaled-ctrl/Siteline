@@ -12,14 +12,13 @@ export const URLS: DataUrls = {
   maps: `${ASSETS}/data/maps.json`,
   /*
    * LOLA's 30 m south pole terrain (PGDA product 90), read by byte ranges from the project's R2 copy: a tiled GeoTIFF
-   * with overviews, which the worker reads around each site.
-   *
-   * Off by default. It is plumbed in and tested, but on the three points we validate against it gives about half the
-   * sunlight the 1.2 km grid does (see tests/reference/validation.json, section `sunlight30m`), and that question is
-   * open, so what the app judges sites by stays the grid every published number here was checked against. Set
-   * VITE_TERRAIN_30M_URL to switch a deployment over.
+   * with overviews, which the worker reads around each site. The skyline every site is judged against: on the three
+   * points we validate, the sunlight it gives agrees with NASA's own long-term maps (PGDA product 69) within a point
+   * (horizon30m.validation.test.ts). Where it cannot be read, the worker falls back to the 1.2 km grid.
    */
-  horizonTerrain: import.meta.env.VITE_TERRAIN_30M_URL,
+  horizonTerrain:
+    import.meta.env.VITE_TERRAIN_30M_URL ??
+    'https://pub-950982926f534224a9e16061b39f6217.r2.dev/raw/lola/LDEM_75S_30MPP_ADJ.TIF',
   // LOLA's 10 m south pole terrain, for the slope. NASA's server lets no other site's page read it (no CORS), so the
   // reads go through the site's own `/pgda`: the dev and preview servers' proxy (vite.config.ts), and on the deployed
   // site a Pages Function (the repository's functions/pgda). A host without either names a copy that allows cross-site
@@ -78,14 +77,20 @@ function stayOnce(query: StayQuery, fresh = false, slopeWaitMs = SLOPE_QUICK_MS)
 }
 
 /**
- * A stay check, and if its slope was still on the way (a site's first read of the 10 m terrain takes a few seconds),
- * the same check again once the slope is in: `use` gets each answer as it comes.
+ * A stay check, and if its slope or its 30 m skyline was still on the way (a site's first read of either takes a few
+ * seconds), the same check again once they are in: `use` gets each answer as it comes.
  */
 async function stayThenSlope(query: StayQuery, fresh: boolean, use: (r: StayResponse) => void): Promise<void> {
   const first = await stayOnce(query, fresh);
   use(first);
-  if (!first.slopePending) return;
-  use(await stayOnce(query, fresh, SLOPE_PATIENT_MS).catch(() => ({ ...first, slopePending: false })));
+  if (!first.slopePending && !first.terrainPending) return;
+  use(
+    await stayOnce(query, fresh, SLOPE_PATIENT_MS).catch(() => ({
+      ...first,
+      slopePending: false,
+      terrainPending: false,
+    })),
+  );
 }
 
 export function useStay(): StayState {
@@ -180,7 +185,7 @@ export function useStayMany(pins: Pin[]): (StayResponse | undefined)[] {
       setRows(all);
       // A site whose slope was still on the way gets its row again once the slope is in.
       all.forEach((row, i) => {
-        if (!row?.slopePending) return;
+        if (!row?.slopePending && !row?.terrainPending) return;
         stayOnce(queries[i], false, SLOPE_PATIENT_MS).then(
           (later) => live && setRows((rows) => rows.map((old, j) => (j === i ? later : old))),
           () => {},

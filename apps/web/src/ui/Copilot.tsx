@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type Confidence, confidenceOf, type Reading } from '../confidence';
+import { type Confidence, confidenceOf, type Reading, SLOPE_NEEDS_M } from '../confidence';
 import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, type Target } from '../copilot';
 import { formatNumber, formatUtc } from '../format';
 import { findLander, MISSIONS } from '../landers';
@@ -103,9 +103,15 @@ export function Copilot() {
       slope: [
         head,
         s.checks.slope === 'unknown'
-          ? s.terrainKm !== undefined
-            ? t('copilot.slopeUnknown', { km: formatNumber(s.terrainKm) })
-            : t('copilot.slopeNoTerrain')
+          ? s.terrainKm === undefined
+            ? t('copilot.slopeNoTerrain')
+            : s.terrainKm * 1000 > SLOPE_NEEDS_M
+              ? t('copilot.slopeUnknown', {
+                  size:
+                    s.terrainKm >= 1 ? `${formatNumber(s.terrainKm)} km` : `${formatNumber(s.terrainKm * 1000, 0)} m`,
+                })
+              : // Terrain fine enough for the rule is loaded, so the slope waits on the 10 m read.
+                t('copilot.slopePending')
           : t(`copilot.slope.${s.checks.slope}`),
       ],
       height: [

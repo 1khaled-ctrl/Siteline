@@ -1,0 +1,31 @@
+{
+ "source": "http://imbrium.mit.edu/EXTRAS/ILLUMINATION/IMG/AVGVISIB_85S_060M_201608.IMG",
+ "sha256": "82dadf321dee28f1947c1fed81858d4cf50fe8eb2aa405aae114e8ab21c1efe1",
+ "datasetId": "pgda-69-illumination",
+ "rows": [
+  {
+   "point": "A, Shackleton ridge",
+   "latDeg": -89.68,
+   "lonDeg": -166.0,
+   "cellPct": 38.42,
+   "windowMinPct": 24.09,
+   "windowMaxPct": 44.7
+  },
+  {
+   "point": "B, peak near the ridge",
+   "latDeg": -89.44,
+   "lonDeg": -141.8,
+   "cellPct": 36.22,
+   "windowMinPct": 29.41,
+   "windowMaxPct": 39.42
+  },
+  {
+   "point": "D, near Shackleton rim",
+   "latDeg": -88.79,
+   "lonDeg": 124.5,
+   "cellPct": 48.54,
+   "windowMinPct": 33.02,
+   "windowMaxPct": 53.52
+  }
+ ]
+}

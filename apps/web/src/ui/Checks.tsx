@@ -13,6 +13,7 @@ interface Sunlight30mRow {
   busseyPct: number;
   coarsePct: number;
   finePct: number;
+  nasaPct: number;
 }
 
 /** The validation table the tests wrote; every number here was measured, none typed by hand. */
@@ -20,8 +21,8 @@ export function Checks({ open }: { open?: boolean }) {
   const { t } = useTranslation();
   const spice = validation.spice as { cases: number; worstDeg: number; toleranceDeg: number; recordedUtc: string };
   const sun = validation.sunlight as { rows: SunlightRow[]; toleranceBusseyPct: number; terrain: string };
-  // Measured on LOLA's 30 m terrain, which disagrees with the grid the app judges sites on: an open question, shown
-  // as one rather than left out. Absent until the test that measures it has run.
+  // Measured on LOLA's 30 m terrain, which the app judges sites on, beside NASA's own maps and the older figures.
+  // Absent until the test that measures it has run.
   const fine = (validation as { sunlight30m?: { rows: Sunlight30mRow[] } }).sunlight30m;
 
   return (
@@ -66,24 +67,26 @@ export function Checks({ open }: { open?: boolean }) {
         </li>
         {fine && (
           <li>
-            <span className="text-warn">△ </span>
+            <span className="text-pass">✓ </span>
             {t('checks.fine.heading')}
             <table className="mt-2 w-full">
               <thead className="text-xs text-quiet">
                 <tr>
                   <th className="text-start font-normal">{t('checks.point')}</th>
-                  <th className="text-end font-normal">{t('checks.published')}</th>
-                  <th className="text-end font-normal">{t('checks.fine.coarse')}</th>
+                  <th className="text-end font-normal">{t('checks.fine.nasa')}</th>
                   <th className="text-end font-normal">{t('checks.fine.fine')}</th>
+                  <th className="text-end font-normal">{t('checks.fine.coarse')}</th>
+                  <th className="text-end font-normal">{t('checks.fine.bussey')}</th>
                 </tr>
               </thead>
               <tbody>
                 {fine.rows.map((r) => (
                   <tr key={r.point} className="border-t border-line">
                     <td className="py-1">{r.point}</td>
-                    <td className="py-1 text-end">{formatNumber(r.busseyPct, 0)}%</td>
+                    <td className="py-1 text-end">{formatNumber(r.nasaPct, 1)}%</td>
+                    <td className="py-1 text-end text-pass">{formatNumber(r.finePct, 1)}%</td>
                     <td className="py-1 text-end">{formatNumber(r.coarsePct, 1)}%</td>
-                    <td className="py-1 text-end text-warn">{formatNumber(r.finePct, 1)}%</td>
+                    <td className="py-1 text-end">{formatNumber(r.busseyPct, 0)}%</td>
                   </tr>
                 ))}
               </tbody>
