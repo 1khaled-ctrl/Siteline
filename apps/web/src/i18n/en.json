@@ -490,7 +490,9 @@
     "sitesMenu": "Landing sites on the {{name}}",
     "wholeBody": "Whole {{name}}",
     "closeUps": "Open the close-up terrain",
-    "onGlobe": "Show on the globe (no close-up yet)"
+    "onGlobe": "Show on the globe (no close-up yet)",
+    "check": "Check",
+    "checkSite": "Check the ground around {{name}} at the south pole"
   },
   "bodies": {
     "sun": "Sun",
