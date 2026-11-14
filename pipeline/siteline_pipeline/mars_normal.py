@@ -21,7 +21,8 @@ MARS_RADIUS_M = 3_389_500.0
 # East-west distances shrink to nothing at the poles; keep them from dividing by zero. This only matters within
 # 3° of a pole, where the map has no heights finer than a few kilometres anyway.
 MIN_COS_LAT = 0.05
-OUTPUT_SIZE = (4096, 2048)
+# The app downloads this map; at 2048 wide it stays a few megabytes, and its source is now 463 m anyway.
+OUTPUT_SIZE = (2048, 1024)
 # NASA's own MEGDR mosaic, built by `mars_height.py`; the Landfall demo's coarse map until that has been run.
 FINE_HEIGHT_PATH = PIPELINE / "out" / "mars" / "mars_height.png"
 COARSE_HEIGHT_PATH = PIPELINE / "raw" / "landfall" / "img" / "mars_height.png"

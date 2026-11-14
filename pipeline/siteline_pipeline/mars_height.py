@@ -68,15 +68,27 @@ class Tile:
         self.centre_lon = float(label_value(label_text, "CENTER_LONGITUDE"))
         self.north_lat = float(label_value(label_text, "MAXIMUM_LATITUDE"))
         self.west_lon = float(label_value(label_text, "WESTERNMOST_LONGITUDE"))
-        self.heights = np.fromfile(img, dtype=">i2").reshape(self.rows, self.cols)
+        # Mapped, not read: a tile is 130 MB and only the rows an output needs are ever touched.
+        self.heights = np.memmap(img, dtype=">i2", mode="r", shape=(self.rows, self.cols))
+        self.south_lat = self.north_lat - self.rows / self.resolution
+        self.east_lon = self.west_lon + self.cols / self.resolution
 
-    def place(self, grid: np.ndarray, grid_north_lat: float, resolution: float) -> None:
-        """Copy this tile onto a global grid whose first row is `grid_north_lat` and whose pixels are 1/resolution."""
-        if self.resolution != resolution:
-            raise ValueError(f"{self.name}: {self.resolution} pixels a degree, not {resolution}")
-        row = round((grid_north_lat - self.north_lat) * resolution)
-        col = round((self.west_lon % 360) * resolution)
-        grid[row : row + self.rows, col : col + self.cols] = self.heights
+    def paint(self, out: np.ndarray, lat_deg: np.ndarray, lon_deg: np.ndarray) -> int:
+        """Write this tile's nearest sample into every cell of `out` whose latitude and longitude it covers.
+
+        `lat_deg` and `lon_deg` are the output grid's row and column coordinates (longitude from -180 to 180). Returns
+        how many output cells the tile painted.
+        """
+        west = self.west_lon % 360
+        lon = lon_deg % 360
+        rows = np.nonzero((lat_deg <= self.north_lat) & (lat_deg > self.south_lat))[0]
+        cols = np.nonzero((lon >= west) & (lon < west + self.cols / self.resolution))[0]
+        if rows.size == 0 or cols.size == 0:
+            return 0
+        r = np.clip(np.floor((self.north_lat - lat_deg[rows]) * self.resolution).astype(int), 0, self.rows - 1)
+        c = np.clip(np.floor((lon[cols] - west) * self.resolution).astype(int), 0, self.cols - 1)
+        out[np.ix_(rows, cols)] = self.heights[np.ix_(r, c)]
+        return rows.size * cols.size
 
 
 def fetch(url: str, into: Path) -> None:
@@ -108,46 +120,47 @@ def ensure_tiles() -> list[tuple[Path, Path]]:
     return files
 
 
-def mosaic(tiles: list[Tile]) -> tuple[np.ndarray, float]:
-    """The tiles on one grid of the band they cover, and the resolution they agree on, in pixels a degree."""
-    resolution = tiles[0].resolution
-    north = max(t.north_lat for t in tiles)
-    rows = round(2 * north * resolution)
-    cols = round(360 * resolution)
-    grid = np.zeros((rows, cols), dtype=np.int16)
-    for tile in tiles:
-        tile.place(grid, north, resolution)
-    return grid, resolution
+def output_grid(width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
+    """The latitude of each row and longitude of each column of the map the app reads.
 
-
-def resample_band(band: np.ndarray, north_lat: float, width: int, height: int) -> np.ndarray:
-    """The band's heights at the centres of a whole-globe width x height image, nearest row and column.
-
-    Rows outside the band keep their nearest row inside it, which only matters for the caps `build` overwrites.
+    Node-registered, the way `decode_heights`' readers and `mars_normal.tilt` take it: row 0 is 90 degrees north and
+    the last row 90 south, column 0 is 180 west and the last column 180 east (the same meridian as the first).
     """
-    lat = 90 - (np.arange(height) + 0.5) / height * 180
-    lon = (np.arange(width) + 0.5) / width * 360
-    rows = np.clip(np.rint((north_lat - lat) * band.shape[0] / (2 * north_lat)).astype(int), 0, band.shape[0] - 1)
-    cols = np.clip(np.rint(lon * band.shape[1] / 360).astype(int), 0, band.shape[1] - 1)
-    return band[np.ix_(rows, cols)]
+    lat = 90 - np.arange(height) / (height - 1) * 180
+    lon = -180 + np.arange(width) / (width - 1) * 360
+    return lat, lon
 
 
-def read_coarse_caps(width: int, height: int, north_lat: float) -> np.ndarray | None:
-    """The old coarse map's heights wherever the MEGDR band does not reach, or None if that map is not here."""
+def mosaic(tiles: list[Tile], width: int, height: int) -> tuple[np.ndarray, float, float]:
+    """The tiles painted onto one map of the given size.
+
+    Returns the heights (NaN where no tile reaches), the resolution the tiles agree on in pixels a degree, and the
+    latitude the band stops at.
+    """
+    resolution = tiles[0].resolution
+    for tile in tiles:
+        if tile.resolution != resolution:
+            raise ValueError(f"{tile.name}: {tile.resolution} pixels a degree, not {resolution}")
+    lat, lon = output_grid(width, height)
+    out = np.full((height, width), np.nan, dtype=np.float32)
+    for tile in tiles:
+        tile.paint(out, lat, lon)
+    north = max(t.north_lat for t in tiles)
+    return out, resolution, north
+
+
+def read_coarse_caps(width: int, height: int) -> np.ndarray | None:
+    """The old coarse map resampled to the output grid (nearest node), or None if that map is not here."""
     if not COARSE_PATH.exists():
         return None
     from .pngio import read_png_rgb
 
     rgb = read_png_rgb(COARSE_PATH.read_bytes())
-    coarse = rgb[..., 0].astype(np.float64) * 256 + rgb[..., 1] - HEIGHT_OFFSET_M
+    coarse = rgb[..., 0].astype(np.float32) * 256 + rgb[..., 1] - HEIGHT_OFFSET_M
     rows, cols = coarse.shape
-    lat = 90 - (np.arange(height) + 0.5) / height * 180
-    lon = (np.arange(width) + 0.5) / width * 360
-    r = np.clip(np.rint((90 - lat) / 180 * (rows - 1)).astype(int), 0, rows - 1)
-    c = np.clip(np.rint(lon / 360 * (cols - 1)).astype(int), 0, cols - 1)
-    out = coarse[np.ix_(r, c)]
-    out[np.abs(lat) <= north_lat, :] = 0
-    return out
+    r = np.clip(np.rint(np.arange(height) / (height - 1) * (rows - 1)).astype(int), 0, rows - 1)
+    c = np.clip(np.rint(np.arange(width) / (width - 1) * (cols - 1)).astype(int), 0, cols - 1)
+    return coarse[np.ix_(r, c)]
 
 
 def encode(heights_m: np.ndarray) -> np.ndarray:
@@ -161,15 +174,15 @@ def encode(heights_m: np.ndarray) -> np.ndarray:
 def build() -> dict:
     files = ensure_tiles()
     tiles = [Tile(img.stem, img, label.read_text()) for img, label in files]
-    band, resolution = mosaic(tiles)
     width, height = OUTPUT_SIZE
-    north = max(t.north_lat for t in tiles)
-    heights = resample_band(band, north, width, height).astype(np.float64)
-    caps = read_coarse_caps(width, height, north)
-    lat = 90 - (np.arange(height) + 0.5) / height * 180
-    outside = np.abs(lat) > north
+    heights, resolution, north = mosaic(tiles, width, height)
+    # The caps beyond the band, and any cell no tile painted, come from the old coarse map.
+    caps = read_coarse_caps(width, height)
+    missing = np.isnan(heights)
     if caps is not None:
-        heights[outside, :] = caps[outside, :]
+        heights[missing] = caps[missing]
+    elif missing.any():
+        raise ValueError(f"{int(missing.sum())} cells have no tile and the coarse map is not here to fill them")
     png = write_png_rgb(encode(heights))
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_bytes(png)
@@ -188,6 +201,7 @@ def build() -> dict:
         "resolutionPixelsPerDegree": resolution,
         "bandLatitudeDeg": north,
         "capsFrom": "mola-mars-relief" if caps is not None else None,
+        "capCells": int(missing.sum()),
         "outputSize": list(OUTPUT_SIZE),
         "inputs": [{"file": img.name, "sha256": hashlib.sha256(img.read_bytes()).hexdigest()} for img, _ in files],
     }

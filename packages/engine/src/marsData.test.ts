@@ -91,7 +91,7 @@ describe.skipIf(!haveMars)('the Mars data', () => {
     // The highest ground on Mars is Olympus Mons (18.65°N, 133.8°W), 21,229 m above the areoid; the lowest is the
     // floor of the Hellas basin, −8,208 m (the figure the MEGDR labels give for the whole data set). How close each
     // extreme lands depends on the grid: a cell is 21 km wide on the demo's map and about 463 m on NASA's own.
-    expect([grid.width, grid.height]).toEqual(fine ? [4096, 2048] : [1025, 513]);
+    expect([grid.width, grid.height]).toEqual(fine ? [8192, 4096] : [1025, 513]);
     const where = (i: number) => ({
       latDeg: 90 - (Math.floor(i / grid.width) / (grid.height - 1)) * 180,
       lonDeg: ((i % grid.width) / (grid.width - 1)) * 360 - 180,

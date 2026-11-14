@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from siteline_pipeline.mars_height import HEIGHT_OFFSET_M, Tile, encode, label_value, mosaic, resample_band
+from siteline_pipeline.mars_height import HEIGHT_OFFSET_M, Tile, encode, label_value, mosaic, output_grid
 
 # A label like NASA's, with the keys the reader uses. Four tiles of 4 rows x 8 columns cover the globe at 1/45 of a
 # degree per pixel in this test's small world: 2 bands of 44 degrees, 4 quarters of 90 degrees.
@@ -69,27 +69,33 @@ def test_a_tile_that_is_not_big_endian_16_bit_is_refused(tmp_path) -> None:
 
 
 def test_tiles_land_where_their_labels_say(tmp_path) -> None:
-    """Four tiles, each a different constant, end up in their own quarter of the mosaic."""
+    """Four tiles, each a different constant, paint their own quarter of the map and nothing else."""
     resolution = 1.0
     rows, cols = 4, 90
     tiles = []
     for i, (north, west) in enumerate([(4, 0), (4, 90), (0, 0), (0, 90)]):
         heights = np.full((rows, cols), (i + 1) * 100, dtype=np.int16)
         tiles.append(write_tile(tmp_path, f"t{i}", heights, north, west, resolution))
-    grid, got_resolution = mosaic(tiles)
-    assert got_resolution == resolution
-    assert grid.shape == (8, 360)
-    assert grid[0, 0] == 100  # north, 0 to 90 degrees east
-    assert grid[0, 90] == 200  # north, 90 to 180
-    assert grid[4, 0] == 300  # south, 0 to 90
-    assert grid[4, 90] == 400
+    out, got_resolution, north = mosaic(tiles, 361, 181)
+    assert (got_resolution, north) == (resolution, 4)
+    lat, lon = output_grid(361, 181)
+
+    def at(lat_deg: float, lon_deg: float) -> float:
+        return float(out[int(np.argmin(abs(lat - lat_deg))), int(np.argmin(abs(lon - lon_deg)))])
+
+    assert at(3, 10) == 100  # north band, 0 to 90 east
+    assert at(3, 100) == 200  # north band, 90 to 180 east
+    assert at(-1, 10) == 300  # south band
+    assert at(-1, 100) == 400
+    assert np.isnan(at(3, -100))  # the western half has no tile
+    assert np.isnan(at(10, 10))  # north of the tiles
 
 
 def test_tiles_of_different_resolutions_are_refused(tmp_path) -> None:
     a = write_tile(tmp_path, "a", np.zeros((4, 90), dtype=np.int16), 4, 0, 1.0)
     b = write_tile(tmp_path, "b", np.zeros((8, 180), dtype=np.int16), 4, 90, 2.0)
     with pytest.raises(ValueError, match="pixels a degree"):
-        mosaic([a, b])
+        mosaic([a, b], 10, 10)
 
 
 def test_heights_survive_the_round_trip_through_the_png_encoding() -> None:
@@ -99,10 +105,8 @@ def test_heights_survive_the_round_trip_through_the_png_encoding() -> None:
     assert back.tolist() == heights.tolist()
 
 
-def test_the_band_resamples_onto_a_whole_globe() -> None:
-    """A band covering 88 degrees either way keeps its own rows in the middle of a full-height image."""
-    band = np.arange(176, dtype=np.int16)[:, None] * np.ones((1, 360), dtype=np.int16)
-    out = resample_band(band, 88.0, 8, 180)
-    assert out.shape == (180, 8)
-    # The middle row of the image is the middle of the band.
-    assert abs(int(out[90, 0]) - 88) <= 1
+def test_the_output_grid_is_node_registered() -> None:
+    """Row 0 is the north pole, the last row the south; column 0 is 180 west and the last column the same meridian."""
+    lat, lon = output_grid(5, 3)
+    assert lat.tolist() == [90, 0, -90]
+    assert lon.tolist() == [-180, -90, 0, 90, 180]
