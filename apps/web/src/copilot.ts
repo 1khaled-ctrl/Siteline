@@ -25,6 +25,8 @@ export type Intent =
   | { tool: 'show_mission'; input: { id: string } }
   | { tool: 'analyze_site'; input: { aspect: Aspect } }
   | { tool: 'find_landing_sites' }
+  | { tool: 'land_here' }
+  | { tool: 'simulate_journey' }
   | { tool: 'space'; input: { body: SpaceBodyName; show: boolean; facts: boolean } }
   | { tool: 'chat'; input: { kind: ChatKind } }
   | { tool: 'help' };
@@ -71,6 +73,10 @@ const TARGETS: [Target, RegExp][] = [
   ['moon', / (moon|lunar) /],
 ];
 const MOVE = / (fly|go|take me|travel|head|show me|open|back to|zoom to|switch to) /;
+const LAND_HERE =
+  / (land here|land there|walk (on|around|there|here|on the moon|on the surface)|stand (on|there|here)|go down to the surface|descend|touch down|simulate (the |a )?landing|let me land|take me down) /;
+const JOURNEY =
+  / (journey|simulate (the |a )?(trip|flight|mission|launch)|the flight there|fly from earth|trip from earth|launch to the moon|how do we get there) /;
 const SEARCH = / (find|search|look for|recommend|suggest|best|where should|where can|pick|choose) /;
 const PLACE = / (site|sites|spot|spots|land|landing|place|places|location) /;
 
@@ -150,6 +156,11 @@ export function parseIntent(text: string, missions: readonly MissionName[]): Int
   const s = normal(text);
   if (s.trim() === '') return { tool: 'chat', input: { kind: 'about' } };
   const words = s.trim().split(' ').length;
+
+  // "Land here", "let me walk on the Moon", "simulate the landing": down to the surface, at the selected site.
+  if (LAND_HERE.test(s)) return { tool: 'land_here' };
+  // "Simulate the journey", "show me the flight there": the trip from Earth.
+  if (JOURNEY.test(s)) return { tool: 'simulate_journey' };
 
   // "Find me a landing site", "where should I land?", "where should the IM-2 hopper land?": the search, even when a
   // craft is named, and not a check of this site.

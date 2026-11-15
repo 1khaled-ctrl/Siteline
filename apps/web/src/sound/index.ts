@@ -101,13 +101,15 @@ export const sound = {
   /** A very quiet tick for one click of the phone's dial. */
   tick: () => use((e) => e.tick()),
   /** Breathing in the helmet while you walk the surface: calm, or quicker while travelling fast. */
-  breath: {
-    start: (fast: boolean) => use((e) => e.breathStart(fast)),
+  breathing: {
+    start: (fast: boolean) => use((e) => e.breathingStart(fast)),
     // Stopping runs whether or not sound is on, so turning sound off mid-walk never leaves a breath going.
-    stop: () => void engine?.then((e) => e.breathStop()),
+    stop: () => void engine?.then((e) => e.breathingStop()),
   },
   /** A small chime when the copilot answers. */
   chime: () => use((e) => e.chime()),
+  /** One slow breath inside a helmet, now and then while standing on the surface. */
+  breath: () => use((e) => e.breath()),
   /** The opening's hum, built from its load progress (0 to 1), swelling into the reveal. */
   drone: {
     start: (progress: number) => use((e) => e.droneStart(progress)),

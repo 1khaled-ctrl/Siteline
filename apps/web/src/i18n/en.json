@@ -160,10 +160,10 @@
     },
     "close": "Close",
     "inputLabel": "Message",
-    "placeholder": "Ask about this site, or say where to go",
+    "placeholder": "Ask Luna anything…",
     "send": "Send",
     "thinking": "Checking…",
-    "intro": "I'm Luna, SiteLine's guide. Ask me to find a landing site, check the selected one, open a mission, or say where to go. Type, or tap the mic and talk. Try one of these:",
+    "intro": "Ask me anything about space or SiteLine. I can give you a tour, fly you to a planet, find a safe place to land on the Moon, land you there, or play the journey from Earth.",
     "example1": "Does this site pass?",
     "example2": "Why does it fail?",
     "example3": "When does the Sun set?",
@@ -278,7 +278,10 @@
         "set_date": "Changing the landing date",
         "pin_sites": "Pinning sites to compare",
         "show_layer": "Changing the map layer",
-        "space_facts": "Looking up the numbers"
+        "space_facts": "Looking up the numbers",
+        "land_here": "Landing on the surface",
+        "simulate_journey": "Starting the journey simulation",
+        "close_view": "Back to the map"
       },
       "sitesTitle": "Sites that pass all four checks, landing {{date}}",
       "sitesNone": "No site passes all four checks for a landing on {{date}}. Try a date a few days later, or a launch slip.",
@@ -321,7 +324,15 @@
       "note": "Live call with Luna, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks.",
       "ctaTitle": "Talk to Luna live 🎙️",
       "ctaText": "Your voice assistant: just ask out loud, and she answers and moves the screen for you.",
-      "onHint": "Just talk. Luna answers out loud and flies the view for you."
+      "onHint": "Just talk. Somewhere noisy? Mute your mic so background sound won't cut Luna off.",
+      "mutedHint": "Mic muted: Luna can finish without interruption. Unmute to talk, or type below.",
+      "muteShort": "Mute mic",
+      "unmuteShort": "Unmute mic",
+      "hearing": "Listening…",
+      "typePlaceholder": "Or type to Luna…",
+      "ctaTextShort": "Tap and just talk. She answers out loud.",
+      "muteTip": "Turn your microphone off, so noise around you doesn't interrupt Luna",
+      "unmuteTip": "Turn your microphone back on to talk to Luna"
     },
     "chat": {
       "greet": "Hi! I'm Luna 👋 I can fly you to any planet, tell you how far away it is and how long the trip takes, or find a safe place to land on the Moon. What would you like to do?",
@@ -348,7 +359,26 @@
       "surface": "🌡️ Around {{c}} °C on average, with gravity of {{g}} m/s².",
       "gravity": "🌍 Gravity: {{g}} m/s².",
       "more": "💡 Want to see another planet, or find a landing site on the Moon?"
-    }
+    },
+    "go": {
+      "land_here": {
+        "done": "🧑‍🚀 Touchdown! You're standing on the Moon at the selected spot. Walk with the arrow keys or W A S D, and use the compass to find the Sun, Earth and your way back.",
+        "failed": "Land Here only works near the Moon's south pole. Pick a spot there first (or ask me to find you a landing site), then ask me to land."
+      },
+      "simulate_journey": {
+        "done": "🚀 Here we go! The simulation flies from Earth to the landing site: launch, the coast to the Moon, orbit, and the descent.",
+        "failed": "I couldn't start the journey. Pick a landing site first, then ask me again."
+      }
+    },
+    "subtitle": "AI space guide",
+    "welcome": "Hi, I'm Luna ✨",
+    "how": "How Luna works",
+    "status": {
+      "ready": "Ready to help",
+      "online": "Online",
+      "basic": "Basic mode (the AI is unavailable)"
+    },
+    "noSiteYet": "You haven't picked a spot on the Moon yet. Ask me to find a landing site, or fly to the south pole and click a spot, and I'll check it."
   },
   "share": {
     "button": "Share",
@@ -1259,6 +1289,12 @@
       "descent": "The descent is an illustrative camera path, not a guidance simulation.",
       "provisional": "coarse for now: its own read is on the way",
       "fineCredit": "The ground within {{km}} km is NASA's 5 m shape-from-shading terrain of the {{region}} Artemis III region (Bertone et al., The Planetary Science Journal, doi:10.3847/PSJ/ae5b70; data: Zenodo, doi:10.5281/zenodo.17954508; PGDA product 104), used under CC BY 4.0."
-    }
+    },
+    "sliderHelp": "Drag the yellow slider, or step by hour or day, to move time forward from touchdown and watch the Sun and Earth shift across the sky over the days."
+  },
+  "hint": {
+    "title": "Need a hand? Ask Luna",
+    "text": "Your AI assistant is right here. Tap to chat or talk.",
+    "dismiss": "Hide this tip"
   }
 }

@@ -1,5 +1,9 @@
 import type { FitOverall } from '@siteline/physics';
 import type { PassingSite } from './physics.worker';
+import type { MoonView } from './store';
+
+/** Views where the Moon's selected spot is on screen. Anywhere else (the solar system, Earth, Mars) nothing is selected. */
+export const siteOnScreen = (view: MoonView): boolean => view === 'pole' || view === 'site' || view === 'globe';
 
 /**
  * The landing agent's own logic, kept out of the interface so it can be tested: which regions a request means, which

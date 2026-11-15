@@ -3,14 +3,31 @@ import { ARTEMIS_ZONE_LAT_DEG, LANDING_RADIUS_M, MAX_LANDING_SLOPE_DEG } from '@
 import type { TFunction } from 'i18next';
 import { parseIntent, summarize, type Target } from './copilot';
 import type { ToolCall, ToolResult } from './copilotAi';
+import { coverageAt, gridReachLatDeg, TERRAIN_EXTENT, touchdownFromQuery } from './land';
 import { findLander, MISSIONS } from './landers';
-import { coordinate, type FoundSite, landingDate, pickRegions, rankFound, searchRegions } from './landingAgent';
+import {
+  coordinate,
+  type FoundSite,
+  landingDate,
+  pickRegions,
+  rankFound,
+  searchRegions,
+  siteOnScreen,
+} from './landingAgent';
 import { physics, queryFor, URLS } from './physics';
 import type { PassingSite, StayResponse } from './physics.worker';
 import { REGIONS } from './regions';
 import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS, type RobotId } from './robots';
 import { isSpaceBody, spaceFacts } from './spaceFacts';
 import { FIRST_UTC_MS, LAST_UTC_MS, LAYERS, type Layer, MAX_PINS, type MoonView, useApp } from './store';
+
+/** Stops a tool about "this site" when the visitor is not looking at the Moon, so it can't judge a spot nobody chose. */
+function needSite(view: MoonView): void {
+  if (!siteOnScreen(view))
+    throw new Error(
+      `no site is selected: the visitor is in the ${view} view, not on the Moon. Ask where they want to land, or use find_landing_sites or check_site.`,
+    );
+}
 
 /**
  * Every tool Luna's agent can use, in one place. Each runs in the browser with the functions the screen itself
@@ -215,6 +232,7 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
     }
 
     case 'analyze_site': {
+      needSite(app.view);
       const query = queryFor({ latDeg: app.latDeg, lonDeg: app.lonDeg }, app.landingUtc, app.slipDays);
       const r = await physics.stay(query, URLS, 6000);
       return { call: shown, ...siteFacts(r, query) };
@@ -243,6 +261,7 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
     case 'robot_fit': {
       const robot = robotOf(a.robot);
       if (!robot) throw new Error('robot is required');
+      needSite(app.view);
       const radiusM = radiusOf(a.landingRadiusM);
       // The card shows the same robot, so what the copilot says can be checked on screen.
       app.set({ robot: robot.id, landingRadiusM: radiusM });
@@ -413,6 +432,80 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
       if (pins.length === 0) throw new Error('give one to four sites');
       app.set({ pins, view: 'pole' });
       return { call: shown, data: { pinned: pins, compareOpen: true } };
+    }
+
+    case 'land_here': {
+      // The selected site unless a spot is named; the date on screen unless one is given.
+      const latDeg = a.latDeg === undefined || a.latDeg === null ? app.latDeg : coordinate(a.latDeg, 'latDeg', -90, 90);
+      const lonDeg =
+        a.lonDeg === undefined || a.lonDeg === null ? app.lonDeg : coordinate(a.lonDeg, 'lonDeg', -180, 180);
+      const coverage = coverageAt(latDeg, lonDeg);
+      if (coverage === 'none') {
+        const reach = Math.abs(Math.round(gridReachLatDeg(TERRAIN_EXTENT.coarse.halfM)));
+        throw new Error(
+          `Land Here needs NASA's south-pole terrain, which reaches about ${reach} degrees south; pick a spot nearer the pole (find_landing_sites or select_site first)`,
+        );
+      }
+      if (a.landingUtc !== undefined && a.landingUtc !== null && a.landingUtc !== '')
+        app.set({ landingUtc: landingDate(a.landingUtc, currentLanding(), FIRST_UTC_MS, LAST_UTC_MS), live: false });
+      // Select the spot first, so the report behind the landing is this spot's.
+      useApp.getState().focusSite(latDeg, lonDeg);
+      const s = useApp.getState();
+      const query = queryFor({ latDeg, lonDeg }, s.landingUtc, s.slipDays);
+      const name = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 60) : undefined;
+      s.setJourney(null);
+      s.setLanding({ latDeg, lonDeg, touchdownUtcMs: touchdownFromQuery(query), source: { kind: 'report' }, name });
+      return {
+        call: shown,
+        data: {
+          landing: { latDeg: round4(latDeg), lonDeg: round4(lonDeg) },
+          touchdownUtc: query.landingUtc,
+          terrain: coverage === 'fine' ? 'NASA close-up terrain (fine detail)' : 'NASA LOLA terrain (coarser detail)',
+          whatHappens:
+            'The camera descends to the spot and the visitor stands there at real scale, as an astronaut. They walk with the arrow keys or W A S D (or the on-screen pad on a phone); the compass shows the Sun, the Earth and the way back to touchdown; the time slider steps the light and shadows. It is an interactive reconstruction from NASA terrain, not a photograph.',
+        },
+      };
+    }
+
+    case 'simulate_journey': {
+      const body = a.body === 'Mars' || a.body === 'mars' ? 'Mars' : 'Moon';
+      let latDeg: number;
+      let lonDeg: number;
+      let name = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 60) : undefined;
+      if (a.latDeg !== undefined && a.latDeg !== null && a.lonDeg !== undefined && a.lonDeg !== null) {
+        latDeg = coordinate(a.latDeg, 'latDeg', -90, 90);
+        lonDeg = coordinate(a.lonDeg, 'lonDeg', -180, 180);
+      } else if (body === 'Moon') {
+        latDeg = app.latDeg;
+        lonDeg = app.lonDeg;
+      } else {
+        // Mars needs a place: the open Mars lander's, if there is one.
+        const m = app.missionId ? findLander(app.missionId) : undefined;
+        if (!m || m.body !== 'Mars' || m.latDeg === undefined || m.lonDeg === undefined)
+          throw new Error('give latDeg and lonDeg for a Mars landing, or open a Mars mission (show_mission) first');
+        latDeg = m.latDeg;
+        lonDeg = m.lonDeg;
+        name ??= m.name;
+      }
+      app.setLanding(null);
+      app.setJourney({ body, latDeg, lonDeg, name });
+      return {
+        call: shown,
+        data: {
+          journey: { body, latDeg: round4(latDeg), lonDeg: round4(lonDeg), name: name ?? null },
+          whatHappens:
+            body === 'Moon'
+              ? 'A simplified, illustrative flight plays from Earth to the landing site: launch, the coast to the Moon, lunar orbit, then the descent, worked out from the real positions on the date shown.'
+              : 'A simplified, illustrative flight from Earth to Mars plays, worked out from the real positions of the planets.',
+        },
+      };
+    }
+
+    case 'close_view': {
+      const what = a.what === 'journey' || a.what === 'land_here' ? a.what : 'all';
+      if (what !== 'journey') app.setLanding(null);
+      if (what !== 'land_here') app.setJourney(null);
+      return { call: shown, data: { closed: what } };
     }
 
     case 'show_layer': {

@@ -181,6 +181,8 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     };
   }, []);
 
+  // The suit's breathing runs while you walk (below), so the occasional breath is not played here as well.
+
   // Load the terrain around the point; a retry asks again, and closing or a newer load cancels this one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is what asks again.
   useEffect(() => {
@@ -416,21 +418,21 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   // While you walk: breathing in the helmet, quicker while Shift is held, and V for the third-person view.
   useEffect(() => {
     if (!exploring) return;
-    sound.breath.start(false);
+    sound.breathing.start(false);
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (e.ctrlKey || e.metaKey || e.altKey || el?.closest?.('input, textarea, select, [contenteditable="true"]'))
         return;
       if (e.type === 'keydown' && e.code === 'KeyV' && !e.repeat) setThirdPerson((v) => !v);
       // Any key restarts the breathing if sound was switched on after landing; Shift sets its pace.
-      sound.breath.start(e.shiftKey && e.type === 'keydown');
+      sound.breathing.start(e.shiftKey && e.type === 'keydown');
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKey);
-      sound.breath.stop();
+      sound.breathing.stop();
     };
   }, [exploring]);
 
@@ -813,6 +815,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 {t('land.backToTouchdown')}
               </button>
             </div>
+            <p className="text-xs text-quiet">{t('land.sliderHelp')}</p>
             {sharpening && sharpening.done < sharpening.total && (
               <p
                 role="status"

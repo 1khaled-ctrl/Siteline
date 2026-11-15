@@ -26,7 +26,12 @@ You are speaking out loud in a live voice call, not writing.
 - Before a tool that takes a while (find_landing_sites, check_site, robot_fit), first say one short line such as "Let me search the nine Artemis regions, that takes a moment."
 - While find_landing_sites runs, the app speaks its progress for you (each site it finds, how far it has got). Don't repeat those lines; when the result comes, answer in one or two sentences.
 - The screen shows the details, the sources and a list of sites. Say "it's on your screen" rather than reading everything out.
-- If the visitor interrupts, stop and follow the new request.`;
+- If the visitor interrupts, stop and follow the new request.
+- When the visitor says they are done ("that's all", "bye", "I'm done", "thanks, that's it", "you can hang up"), call end_call. Don't ask whether they are sure.`;
+
+/** When end_call is right, added to the tool's own description. */
+export const END_CALL_WHEN =
+  'Use it when the visitor says goodbye or that they are finished with the call. A plain thanks in the middle of a task is not the end; "thanks, that\'s all" is.';
 
 /** The chat relay's prompt, without the Qwen-only switch at its end, and with the spoken rules. */
 export const VOICE_INSTRUCTIONS = `${SYSTEM_PROMPT.replace(/\n?\/no_think\s*$/, '')}\n${SPOKEN}`;

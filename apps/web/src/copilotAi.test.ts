@@ -4,6 +4,7 @@ import {
   type ChatMessage,
   numbersIn,
   plainReply,
+  promisesAction,
   type Relay,
   type ToolCall,
   unverifiedNumbers,
@@ -13,6 +14,16 @@ import {
 describe('numbersIn', () => {
   it('reads numbers as written, with thousands commas and decimals', () => {
     expect(numbersIn('Earth is in view 55.9% of 2,054 hours in 2028.')).toEqual(['55.9', '2,054', '2028']);
+  });
+});
+
+describe('promisesAction', () => {
+  it('spots a reply that says it is about to act, and not one that reports or asks', () => {
+    expect(promisesAction("I'll find a landing site for astronauts. Let me search for suitable locations.")).toBe(true);
+    expect(promisesAction('Let me take you down to the surface.')).toBe(true);
+    expect(promisesAction('One moment while I check that site.')).toBe(true);
+    expect(promisesAction("I've flown us to the south pole. Want to check a spot?")).toBe(false);
+    expect(promisesAction('Nobile Rim 1 is the best spot: full sunlight and Earth in view.')).toBe(false);
   });
 });
 
@@ -93,6 +104,17 @@ describe('askAi', () => {
     expect(out).toMatchObject({ ok: true, unverified: ['42'] });
     // The second request told the model which number came from no tool.
     expect(sent[1].at(-1)).toMatchObject({ role: 'user', content: expect.stringContaining('42') });
+  });
+
+  it('sends a promise to act back once, so the model calls the tool instead of only saying it will', async () => {
+    const { relay, sent } = scripted([
+      { text: "I'll find a site for astronauts. Let me search.", toolCalls: [] },
+      { text: '', toolCalls: [{ id: 'c1', name: 'analyze_site', arguments: {} }] },
+      { text: 'Done: the selected site fails on Earth in view.', toolCalls: [] },
+    ]);
+    const out = await askAi('Find me a site', {}, [], tool, relay);
+    expect(out).toMatchObject({ ok: true, calls: ['analyze_site()'] });
+    expect(sent[1].at(-1)).toMatchObject({ role: 'user', content: expect.stringContaining('called no tool') });
   });
 
   it("accepts SiteLine's own facts in an introduction, and still flags a made-up one", async () => {

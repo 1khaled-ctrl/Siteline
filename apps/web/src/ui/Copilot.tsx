@@ -16,6 +16,7 @@ import {
 import { askAi, type ChatMessage, plainReply, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
 import { findLander } from '../landers';
+import { siteOnScreen } from '../landingAgent';
 import type { LiveSession, LiveState } from '../liveVoice';
 import { physics, queryFor, URLS } from '../physics';
 import { sound } from '../sound';
@@ -62,7 +63,7 @@ const READINGS: Reading[] = ['zone', 'sun', 'earth', 'height', 'longTerm', 'slop
 const CONFIDENCE_LEVELS: Confidence[] = ['high', 'firstPass', 'flatHorizon', 'notMeasured'];
 
 const callText = (intent: Intent) =>
-  intent.tool === 'help' || intent.tool === 'find_landing_sites'
+  !('input' in intent)
     ? ''
     : `${intent.tool}(${Object.entries(intent.input)
         .map(([k, v]) => `${k}: "${v}"`)
@@ -100,6 +101,8 @@ export function Copilot() {
   /** Set once the server says it has no live voice, so the mic goes straight to the browser's speech from then on. */
   const noLiveVoice = useRef(false);
   const [liveUnavailable, setLiveUnavailable] = useState(false);
+  /** The visitor is speaking in the live call right now (LiveKit's voice activity, ahead of the transcript). */
+  const [youSpeaking, setYouSpeaking] = useState(false);
   /** Each transcript segment's message, so a growing segment updates its message instead of adding one. */
   const segments = useRef(new Map<string, number>());
   /** The steps message for the agent's current piece of work in the call, with the cards and tools it used. */
@@ -314,7 +317,8 @@ export function Copilot() {
     const query = queryFor({ latDeg: s.latDeg, lonDeg: s.lonDeg }, s.landingUtc, s.slipDays);
     return {
       view: s.view,
-      selectedSite: { latDeg: s.latDeg, lonDeg: s.lonDeg },
+      // Off the Moon nothing is selected, though the store keeps a default spot: Luna must not judge it.
+      selectedSite: siteOnScreen(s.view) ? { latDeg: s.latDeg, lonDeg: s.lonDeg } : null,
       landingUtc: query.landingUtc,
       slipDays: s.slipDays,
       stayDays: query.stayDays,
@@ -450,6 +454,18 @@ export function Copilot() {
       useApp.getState().selectMission(intent.input.id);
       return say({ from: 'siteline', call, text: t('copilot.mission', { name: m?.name ?? intent.input.id }) }, spoken);
     }
+    if (intent.tool === 'land_here' || intent.tool === 'simulate_journey') {
+      // The same tool Luna uses; a spot Land Here cannot reach gets the tool's own reason.
+      const working = add({ from: 'siteline', text: '', steps: [], working: true });
+      const ok = await stepper(
+        working,
+        [],
+      )({ id: 'go', name: intent.tool, arguments: {} })
+        .then(() => true)
+        .catch(() => false);
+      const reply = t(`copilot.go.${intent.tool}.${ok ? 'done' : 'failed'}`);
+      return finish(working, { text: reply }, spoken);
+    }
     if (intent.tool === 'find_landing_sites') {
       // The same search the agent runs, without the model: the steps, the pins and the card, with a plain sentence.
       const working = add({ from: 'siteline', text: '', steps: [], working: true });
@@ -478,7 +494,11 @@ export function Copilot() {
     }
     if (intent.tool !== 'analyze_site') return;
     // analyze_site: the same check, on the same inputs, that the site report shows.
-    const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
+    const { latDeg, lonDeg, landingUtc, slipDays, view } = useApp.getState();
+    if (!siteOnScreen(view)) {
+      say({ from: 'siteline', text: t('copilot.noSiteYet') }, spoken);
+      return;
+    }
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
     try {
       const s = summarize(await physics.stay(query, URLS), { latDeg, lonDeg }, query.landingUtc);
@@ -636,7 +656,9 @@ export function Copilot() {
           return { data: out.data };
         },
         appState,
+        speaking: setYouSpeaking,
         ended: () => {
+          setYouSpeaking(false);
           settleLive();
           live.current = null;
           segments.current.clear();
@@ -658,242 +680,359 @@ export function Copilot() {
   if (!open) return null;
 
   const running = log.some((m) => m.working);
+  // One word for where Luna is: in a call, listening through the browser, working, or ready.
+  const status: { key: string; tone: 'live' | 'busy' | 'ok' | 'quiet' } = liveState
+    ? { key: `copilot.live.state.${liveState}`, tone: 'live' }
+    : listening
+      ? { key: 'copilot.agent.listening', tone: 'live' }
+      : running || busy
+        ? { key: 'copilot.agent.working', tone: 'busy' }
+        : mode === 'ai'
+          ? { key: 'copilot.status.online', tone: 'ok' }
+          : mode === 'basic'
+            ? { key: 'copilot.status.basic', tone: 'quiet' }
+            : { key: 'copilot.status.ready', tone: 'ok' };
+  const dot = { live: 'bg-sun', busy: 'bg-sun animate-pulse', ok: 'bg-pass', quiet: 'bg-quiet' }[status.tone];
+  // The browser's own speech is only a fallback: its mic shows where live voice is not set up.
+  const browserMic = voice && liveUnavailable && !liveState;
+  const last = log.at(-1);
 
   return (
     <section
       aria-label={t('copilot.title')}
       data-avoid
-      className="fixed inset-x-3 bottom-3 z-30 flex h-[min(560px,78dvh)] flex-col gap-2 rounded-xl border border-line bg-panel p-3 shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(600px,calc(100%-80px))] lg:w-110"
+      className="fixed inset-x-0 bottom-0 z-[60] flex h-[88dvh] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,0.55)] lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-24 lg:z-30 lg:h-[min(640px,calc(100%-112px))] lg:w-110 lg:rounded-2xl lg:border-b lg:shadow-2xl"
       data-testid="copilot"
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className={`size-7 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)] ${
-              busy || listening || (liveState !== null && liveState !== 'listening') ? 'animate-pulse' : ''
-            }`}
-          />
-          <h2 className="min-w-0 text-lg">
-            {t('copilot.title')}{' '}
-            <span
-              className={`ms-1 rounded-pill border px-2 py-0.5 align-middle font-sans text-[11px] font-normal ${
-                liveState ? 'border-sun/60 text-sun-ink' : 'border-line text-quiet'
-              }`}
-            >
-              {liveState
-                ? t(`copilot.live.state.${liveState}`)
-                : listening
-                  ? t('copilot.agent.listening')
-                  : running
-                    ? t('copilot.agent.working')
-                    : t(`copilot.badge.${mode}`)}
-            </span>
+      <span aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
+      <header className="flex items-center gap-3 border-b border-line bg-linear-to-b from-sun/10 to-transparent px-4 py-3">
+        <span
+          aria-hidden="true"
+          className={`size-9 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)] shadow-[0_0_16px_rgba(244,182,63,0.45)] ${
+            busy || listening || (liveState !== null && liveState !== 'listening') ? 'animate-pulse' : ''
+          }`}
+        />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg leading-tight">
+            {t('copilot.title')}
+            <span className="ms-2 align-middle font-sans text-xs font-normal text-quiet">{t('copilot.subtitle')}</span>
           </h2>
+          <p className="flex items-center gap-1.5 text-xs text-quiet" aria-live="polite">
+            <span aria-hidden="true" className={`size-1.5 rounded-full ${dot}`} />
+            {t(status.key)}
+          </p>
         </div>
-        <div className="flex shrink-0 gap-1.5">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="min-h-8 rounded-md border border-line bg-panel-raised px-2.5 text-[12.5px] hover:border-line-hover"
-          >
-            {t('copilot.close')}
-          </button>
-        </div>
-      </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label={t('copilot.close')}
+          title={t('copilot.close')}
+          className="grid size-9 shrink-0 place-items-center rounded-full text-quiet hover:bg-panel-raised hover:text-ink"
+        >
+          <CloseIcon />
+        </button>
+      </header>
 
-      {!liveUnavailable &&
-        (liveState ? (
-          <div
-            className="flex items-center gap-3 rounded-lg border border-sun/60 bg-sun/10 px-3 py-2"
-            data-testid="live-banner"
-          >
-            <span className="relative grid size-9 shrink-0 place-items-center rounded-full bg-sun text-panel">
-              <MicIcon />
-              {liveState !== 'connecting' && (
-                <span className="absolute inset-0 animate-ping rounded-full bg-sun/30 motion-reduce:hidden" />
-              )}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">{t(`copilot.live.state.${liveState}`)}</span>
-              <span className="block text-xs text-quiet">{t('copilot.live.onHint')}</span>
-            </span>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3">
+        {!liveUnavailable &&
+          (liveState ? (
+            <div
+              className="flex items-center gap-3 rounded-xl border border-sun/60 bg-sun/10 px-3 py-2.5"
+              data-testid="live-banner"
+            >
+              <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel">
+                <MicIcon />
+                {liveState !== 'connecting' && !muted && (
+                  <span className="absolute inset-0 animate-ping rounded-full bg-sun/30 motion-reduce:hidden" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold">{t(`copilot.live.state.${liveState}`)}</span>
+                <span className="block text-xs text-quiet">
+                  {muted ? t('copilot.live.mutedHint') : t('copilot.live.onHint')}
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={liveState === 'connecting'}
+                onClick={toggleMic}
+                aria-pressed={muted}
+                title={muted ? t('copilot.live.unmuteTip') : t('copilot.live.muteTip')}
+                className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap disabled:opacity-60 ${
+                  muted ? 'border-sun bg-sun text-panel' : 'border-line-hover bg-panel-raised hover:border-sun'
+                }`}
+              >
+                {muted ? t('copilot.live.unmuteShort') : t('copilot.live.muteShort')}
+              </button>
+              <button
+                type="button"
+                disabled={liveState === 'connecting'}
+                onClick={() => void live.current?.stop()}
+                className="min-h-9 shrink-0 rounded-full border border-fail/60 bg-fail/10 px-3 text-xs font-medium hover:border-fail disabled:opacity-60"
+              >
+                {t('copilot.live.end')}
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              disabled={liveState === 'connecting'}
-              onClick={() => void live.current?.stop()}
-              className="min-h-9 shrink-0 rounded-md border border-fail/60 bg-fail/10 px-3 text-xs font-medium hover:border-fail disabled:opacity-60"
+              onClick={() => void startCall()}
+              className="group flex w-full items-center gap-3 rounded-xl border border-sun/70 bg-linear-to-r from-sun/25 to-sun/5 px-3 py-2.5 text-start transition hover:border-sun hover:from-sun/35 focus-visible:outline-2 focus-visible:outline-sun"
+              data-testid="live-banner"
             >
-              {t('copilot.live.end')}
+              <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel shadow-[0_0_18px_rgba(244,182,63,0.55)]">
+                <MicIcon />
+                <span className="absolute inset-0 animate-ping rounded-full bg-sun/40 [animation-duration:2.2s] motion-reduce:hidden" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-ink">{t('copilot.live.ctaTitle')}</span>
+                <span className="hidden text-xs text-quiet sm:block">{t('copilot.live.ctaText')}</span>
+                <span className="block text-xs text-quiet sm:hidden">{t('copilot.live.ctaTextShort')}</span>
+              </span>
+              <span className="shrink-0 rounded-full bg-sun px-3 py-1.5 text-xs font-semibold text-panel group-hover:brightness-110">
+                {t('copilot.live.start')}
+              </span>
             </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void startCall()}
-            className="group flex w-full items-center gap-3 rounded-lg border border-sun/70 bg-gradient-to-r from-sun/25 to-sun/5 px-3 py-2.5 text-start transition hover:border-sun hover:from-sun/35 focus-visible:outline-2 focus-visible:outline-sun"
-            data-testid="live-banner"
-          >
-            <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel shadow-[0_0_18px_rgba(244,182,63,0.55)]">
-              <MicIcon />
-              <span className="absolute inset-0 animate-ping rounded-full bg-sun/40 [animation-duration:2.2s] motion-reduce:hidden" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-ink">{t('copilot.live.ctaTitle')}</span>
-              <span className="block text-xs text-quiet">{t('copilot.live.ctaText')}</span>
-            </span>
-            <span className="shrink-0 rounded-md bg-sun px-3 py-1.5 text-xs font-semibold text-panel group-hover:brightness-110">
-              {t('copilot.live.start')}
-            </span>
-          </button>
-        ))}
+          ))}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pe-1" aria-live="polite">
-        {log.length === 0 && (
-          <div className="flex flex-col gap-2 text-sm text-quiet">
-            <p>{t('copilot.intro')}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {EXAMPLES.map((k) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => void send(t(`copilot.${k}`))}
-                  className={`min-h-8 rounded-pill border bg-panel-raised px-3 text-[12.5px] text-ink hover:border-line-hover ${
-                    k === 'example8' ? 'border-sun/60' : 'border-line'
-                  }`}
-                >
-                  {t(`copilot.${k}`)}
-                </button>
-              ))}
+        <div className="-me-2 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pe-2 pb-1" aria-live="polite">
+          {log.length === 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="flex gap-2.5">
+                <Avatar />
+                <div className="rounded-2xl rounded-ss-sm border border-line bg-panel-raised px-3 py-2 text-sm">
+                  <p className="font-medium">{t('copilot.welcome')}</p>
+                  <p className="mt-1 text-quiet">{t('copilot.intro')}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5 ps-10">
+                {EXAMPLES.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => void send(t(`copilot.${k}`))}
+                    className={`min-h-8 rounded-full border px-3 text-[12.5px] text-ink transition hover:border-sun hover:bg-sun/10 ${
+                      k === 'example8' ? 'border-sun/60 bg-sun/10' : 'border-line bg-panel-raised'
+                    }`}
+                  >
+                    {t(`copilot.${k}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-        {log.map((m) =>
-          m.from === 'you' ? (
-            <p key={m.id} className="max-w-[85%] self-end rounded-lg bg-accent/15 px-3 py-1.5 text-sm">
-              {m.text}
-            </p>
-          ) : (
-            <div
-              key={m.id}
-              className="flex max-w-[94%] flex-col gap-1.5 self-start rounded-lg border border-line bg-panel-raised px-3 py-2 text-sm"
+          )}
+          {log.map((m) =>
+            m.from === 'you' ? (
+              <p
+                key={m.id}
+                className="max-w-[85%] self-end rounded-2xl rounded-se-sm bg-accent/20 px-3 py-2 text-sm text-ink"
+              >
+                {m.text}
+              </p>
+            ) : (
+              <div key={m.id} className="flex max-w-[96%] gap-2.5 self-start">
+                <Avatar />
+                <div className="flex min-w-0 flex-col gap-2 rounded-2xl rounded-ss-sm border border-line bg-panel-raised px-3 py-2 text-sm">
+                  {m.call && (
+                    <p className="whitespace-pre-line font-mono text-[11px] text-quiet" dir="ltr">
+                      {m.call.startsWith('↳') ? m.call : `↳ ${m.call}`}
+                    </p>
+                  )}
+                  {m.steps && m.steps.length > 0 && <Steps steps={m.steps} />}
+                  {m.working && !m.steps?.some((s) => s.status === 'running') && (
+                    <Typing label={t('copilot.agent.thinking')} />
+                  )}
+                  {m.text && <p className="whitespace-pre-line leading-relaxed">{m.text}</p>}
+                  {m.card && <Sites card={m.card} onFly={(s) => m.card && flyTo(m.card, s)} />}
+                  {m.unverified && (
+                    <p className="text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
+                  )}
+                  {m.sources && m.sources.length > 0 && (
+                    <p className="flex flex-wrap items-center gap-1 text-[11px] text-quiet">
+                      <span>{t('report.sources')}:</span>
+                      {m.sources.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className="rounded-full border border-line px-1.5 py-px hover:border-line-hover hover:text-ink"
+                          onClick={() => useApp.getState().setSources(id)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ),
+          )}
+          {/* The visitor's voice is heard: shown at once, before speech-to-text sends the words. */}
+          {youSpeaking && last?.from !== 'you' && (
+            <p
+              className="flex items-center gap-2 self-end rounded-2xl rounded-se-sm bg-accent/20 px-3 py-2 text-sm text-quiet"
+              data-testid="you-speaking"
             >
-              {m.call && (
-                <p className="whitespace-pre-line font-mono text-[11.5px] text-quiet" dir="ltr">
-                  {m.call.startsWith('↳') ? m.call : `↳ ${m.call}`}
-                </p>
-              )}
-              {m.steps && m.steps.length > 0 && <Steps steps={m.steps} />}
-              {m.working && !m.steps?.some((s) => s.status === 'running') && (
-                <p className="flex items-center gap-2 text-quiet">
-                  <Spinner /> {t('copilot.agent.thinking')}
-                </p>
-              )}
-              {m.text && <p className="whitespace-pre-line">{m.text}</p>}
-              {m.card && <Sites card={m.card} onFly={(s) => m.card && flyTo(m.card, s)} />}
-              {m.unverified && (
-                <p className="text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
-              )}
-              {m.sources && m.sources.length > 0 && (
-                <p className="text-xs text-quiet">
-                  {t('report.sources')}:{' '}
-                  {m.sources.map((id, i) => (
-                    <span key={id}>
-                      {i > 0 && ', '}
-                      <button
-                        type="button"
-                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                        onClick={() => useApp.getState().setSources(id)}
-                      >
-                        {id}
-                      </button>
-                    </span>
-                  ))}
-                </p>
-              )}
+              <VoiceBars /> {t('copilot.live.hearing')}
+            </p>
+          )}
+          {busy && !running && (
+            <div className="flex gap-2.5 self-start">
+              <Avatar />
+              <Typing label={t('copilot.thinking')} />
             </div>
-          ),
-        )}
-        {busy && !running && (
-          <p className="flex items-center gap-2 self-start text-sm text-quiet">
-            <Spinner /> {t('copilot.thinking')}
-          </p>
-        )}
-        <div ref={end} />
+          )}
+          <div ref={end} />
+        </div>
       </div>
 
-      <form onSubmit={submit} className="flex gap-1.5">
-        <label htmlFor="copilot-input" className="sr-only">
-          {t('copilot.inputLabel')}
-        </label>
-        {(voice || liveState || !noLiveVoice.current) && (
-          <button
-            type="button"
-            onClick={toggleMic}
-            disabled={busy || liveState === 'connecting'}
-            aria-pressed={liveState ? !muted : listening}
-            aria-label={
-              liveState
-                ? t(muted ? 'copilot.live.unmute' : 'copilot.live.mute')
-                : listening
-                  ? t('copilot.agent.micStop')
-                  : t('copilot.agent.mic')
-            }
-            title={
-              liveState
-                ? t(muted ? 'copilot.live.unmute' : 'copilot.live.mute')
-                : listening
-                  ? t('copilot.agent.micStop')
-                  : t('copilot.agent.mic')
-            }
-            className={`grid min-h-9 min-w-9 place-items-center rounded-md border text-sm disabled:opacity-50 ${
-              (liveState && !muted) || listening
-                ? 'border-sun bg-sun/25 text-sun-ink'
-                : liveState && muted
-                  ? 'border-fail/60 text-fail line-through'
+      <div className="flex flex-col gap-1.5 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <form onSubmit={submit} className="flex items-center gap-2">
+          <label htmlFor="copilot-input" className="sr-only">
+            {t('copilot.inputLabel')}
+          </label>
+          {browserMic && (
+            <button
+              type="button"
+              onClick={toggleMic}
+              disabled={busy}
+              aria-pressed={listening}
+              aria-label={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
+              title={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
+              className={`grid size-10 shrink-0 place-items-center rounded-full border disabled:opacity-50 ${
+                listening
+                  ? 'animate-pulse border-sun bg-sun/25 text-sun-ink'
                   : 'border-line bg-panel-raised hover:border-line-hover'
-            } ${listening ? 'animate-pulse' : ''}`}
-          >
-            <MicIcon />
-          </button>
+              }`}
+            >
+              <MicIcon />
+            </button>
+          )}
+          <div className="flex min-w-0 flex-1 items-center rounded-full border border-line bg-panel-sunk ps-4 pe-1 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/30">
+            <input
+              id="copilot-input"
+              ref={input}
+              value={text}
+              autoComplete="off"
+              placeholder={
+                listening
+                  ? t('copilot.agent.listening')
+                  : liveState
+                    ? t('copilot.live.typePlaceholder')
+                    : t('copilot.placeholder')
+              }
+              onChange={(e) => setText(e.currentTarget.value)}
+              className="luna-input min-h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-quiet"
+            />
+            <button
+              type="submit"
+              disabled={busy || !text.trim()}
+              aria-label={t('copilot.send')}
+              title={t('copilot.send')}
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-sun text-panel transition hover:brightness-110 disabled:bg-panel-raised disabled:text-quiet"
+            >
+              <SendIcon />
+            </button>
+          </div>
+        </form>
+        {voiceError && <p className="text-[11.5px] text-warn">{voiceError}</p>}
+        {speakReplies && canSpeak() && (
+          <p className="flex items-center justify-between gap-2 text-[11.5px] text-quiet">
+            <span>{t('copilot.agent.speaking')}</span>
+            <button
+              type="button"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              onClick={() => {
+                stopSpeaking();
+                setSpeakReplies(false);
+              }}
+            >
+              {t('copilot.agent.mute')}
+            </button>
+          </p>
         )}
-        <input
-          id="copilot-input"
-          ref={input}
-          value={text}
-          autoComplete="off"
-          placeholder={listening ? t('copilot.agent.listening') : t('copilot.placeholder')}
-          onChange={(e) => setText(e.currentTarget.value)}
-          className="min-h-9 min-w-0 flex-1 rounded-md border border-line bg-panel-sunk px-2.5 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={busy || !text.trim()}
-          className="min-h-9 rounded-md border border-sun/60 bg-sun/15 px-3 text-sm text-sun-ink hover:border-sun disabled:opacity-50"
-        >
-          {t('copilot.send')}
-        </button>
-      </form>
-      {voiceError && <p className="text-[11.5px] text-warn">{voiceError}</p>}
-      {speakReplies && canSpeak() && (
-        <p className="flex items-center justify-between gap-2 text-[11.5px] text-quiet">
-          <span>{t('copilot.agent.speaking')}</span>
-          <button
-            type="button"
-            className="underline decoration-dotted underline-offset-2 hover:text-ink"
-            onClick={() => {
-              stopSpeaking();
-              setSpeakReplies(false);
-            }}
-          >
-            {t('copilot.agent.mute')}
-          </button>
-        </p>
-      )}
-      <p className="text-[11.5px] text-quiet">
-        {t(liveState ? 'copilot.live.note' : mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}
-      </p>
+        <details className="text-[11px] text-quiet">
+          <summary className="cursor-pointer select-none hover:text-ink">{t('copilot.how')}</summary>
+          <p className="mt-1">
+            {t(liveState ? 'copilot.live.note' : mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}
+          </p>
+        </details>
+      </div>
     </section>
+  );
+}
+
+/** Luna's face beside her messages: the same golden orb as the header. */
+function Avatar() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-0.5 size-7 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)]"
+    />
+  );
+}
+
+/** Three dots that say Luna is on it. */
+function Typing({ label }: { label: string }) {
+  return (
+    <span className="flex items-center gap-2 text-sm text-quiet">
+      <span aria-hidden="true" className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-1.5 animate-bounce rounded-full bg-sun/80 motion-reduce:animate-none"
+            style={{ animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      {label}
+    </span>
+  );
+}
+
+/** A small level meter for a voice being heard. */
+function VoiceBars() {
+  return (
+    <span aria-hidden="true" className="flex h-3.5 items-end gap-0.5">
+      {[0.6, 1, 0.75, 0.9].map((h, i) => (
+        <span
+          key={h}
+          className="w-0.5 animate-pulse rounded-full bg-sun motion-reduce:animate-none"
+          style={{ height: `${h * 100}%`, animationDelay: `${i * 0.12}s` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      aria-hidden="true"
+    >
+      <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
