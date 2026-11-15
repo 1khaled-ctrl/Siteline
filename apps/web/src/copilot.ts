@@ -30,7 +30,7 @@ export type Intent =
   | { tool: 'help' };
 
 /** Small talk the matcher answers itself, at once and in a friendly way. `unknown` is anything it could not place. */
-export type ChatKind = 'greet' | 'howAreYou' | 'thanks' | 'bye' | 'about' | 'unknown';
+export type ChatKind = 'greet' | 'howAreYou' | 'thanks' | 'bye' | 'about' | 'intro' | 'unknown';
 export type SpaceBodyName =
   | 'sun'
   | 'mercury'
@@ -141,6 +141,13 @@ const CHAT: [ChatKind, RegExp][] = [
   ],
 ];
 
+/**
+ * A request to introduce SiteLine itself ("can you introduce the website to everyone?", "give us a tour", "what am I
+ * looking at?"), read from a message of any length: an introduction asked for in a long sentence is still one.
+ */
+const INTRO =
+  / (introduce|introduction|intro|present|presentation|tour|walk me through|walk us through|overview|demo|explain (the|this) (site|website|app|project|tool|page)|tell (me|us) about (the|this|your) (site|website|app|project|tool|page)|what is (the|this) (site|website|app|project|tool|page)|what does (the|this) (site|website|app|project|tool) do|what am i looking at|what can i do here|what is siteline|what s siteline|about siteline) /;
+
 /** Picks one tool for a message; small talk and anything unplaced get a friendly reply of their own. */
 export function parseIntent(text: string, missions: readonly MissionName[]): Intent {
   const s = normal(text);
@@ -171,6 +178,8 @@ export function parseIntent(text: string, missions: readonly MissionName[]): Int
   const moving = MOVE.test(s);
   // "Fly to Mars", or a bare "Mars"; but "is Earth in view?" is a question about the site.
   if (target && (moving || s.trim().split(' ').length <= 2)) return { tool: 'fly_to', input: { target } };
+
+  if (INTRO.test(s)) return { tool: 'chat', input: { kind: 'intro' } };
 
   // Small talk before site questions: "hey, good job" is thanks, not "is it good?".
   const chat = words <= 7 ? CHAT.find(([, re]) => re.test(s))?.[0] : undefined;

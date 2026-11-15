@@ -38,6 +38,13 @@ describe('parseIntent', () => {
     expect(kind('what can you do')).toBe('about');
     expect(kind('bye')).toBe('bye');
     expect(kind('asdf qwerty')).toBe('unknown');
+    // An introduction, however it is asked, and at any length.
+    expect(kind('can you introduce the website?')).toBe('intro');
+    expect(kind('Luna, could you please introduce the website to everyone here today')).toBe('intro');
+    expect(kind('give us a tour')).toBe('intro');
+    expect(kind('what is this website?')).toBe('intro');
+    expect(kind('what am I looking at')).toBe('intro');
+    expect(kind('explain the app')).toBe('intro');
   });
 
   it('reads a planet as a visit, and a facts question about any body as space facts', () => {

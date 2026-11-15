@@ -326,7 +326,8 @@
       "thanks": "You're welcome! Anything else you'd like to explore?",
       "bye": "Bye for now! Come back any time. 🚀",
       "about": "I'm Luna, SiteLine's guide. I can fly you anywhere in the solar system, tell you how far a planet is and how long it takes to get there, find a Moon landing site that passes all four checks for your date and robot, and explain why a spot passes or fails. Try \"Show me Saturn\", \"How far is Mars?\" or \"Find me a landing site for a rover in March 2028\".",
-      "unknown": "Sorry, I didn't quite get that. I can show you a planet (\"Show me Jupiter\"), give distances and travel times (\"How far is Mars?\"), or find a place to land on the Moon (\"Find me a landing site\")."
+      "intro": "Welcome to SiteLine! It's a 3D guide to landing on the Moon, made for NASA Space Apps 2026. You fly from the solar system down to the Moon's south pole, click a spot, and SiteLine tells you whether it works for your stay: is the Sun up for power, is Earth in view for radio, is the ground flat enough, where the ice might be, and what breaks if the launch slips. You can also find sites that pass, compare them side by side, check if a rover or lander fits, and land to walk the spot as an astronaut. Want me to find a landing site, or fly you somewhere first?",
+      "unknown": "I'm not sure I can answer that one in basic mode, but here's what I can do: give you a tour of SiteLine (\"Introduce the website\"), show you a planet (\"Show me Jupiter\"), give distances and travel times (\"How far is Mars?\"), or find a place to land on the Moon (\"Find me a landing site\")."
     },
     "space": {
       "head": "🪐 {{name}}, on the date shown:",
