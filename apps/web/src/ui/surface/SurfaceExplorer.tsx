@@ -133,6 +133,8 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [inspectOn, setInspectOn] = useState(false);
   const [bodyOn, setBodyOn] = useState(true);
   const [thirdPerson, setThirdPerson] = useState(false);
+  /** The less used options fold behind "More", so the view stays clear. */
+  const [moreOpen, setMoreOpen] = useState(false);
   /** The "How to move" card: open the first time you walk, until you close it; reopened from the view's options. */
   const [howToOpen, setHowToOpen] = useState(() => {
     try {
@@ -866,32 +868,6 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 <div className="glass flex flex-wrap items-center gap-1.5 px-2 py-1.5">
                   <button
                     type="button"
-                    className={button}
-                    onClick={() => viewRef.current?.resetPosition()}
-                    data-testid="surface-reset"
-                  >
-                    {t('land.reset')}
-                  </button>
-                  <button type="button" className={button} onClick={() => viewRef.current?.startDescent()}>
-                    {t('land.replay')}
-                  </button>
-                  <button type="button" className={chip} aria-pressed={labelsOn} onClick={() => setLabelsOn((v) => !v)}>
-                    {t('land.labels')}
-                  </button>
-                  <button type="button" className={chip} aria-pressed={markerOn} onClick={() => setMarkerOn((v) => !v)}>
-                    {t('land.marker')}
-                  </button>
-                  <button
-                    type="button"
-                    className={chip}
-                    aria-pressed={bodyOn}
-                    onClick={() => setBodyOn((v) => !v)}
-                    data-testid="surface-body"
-                  >
-                    {t('land.body')}
-                  </button>
-                  <button
-                    type="button"
                     className={chip}
                     aria-pressed={thirdPerson}
                     onClick={() => setThirdPerson((v) => !v)}
@@ -909,24 +885,73 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                   </button>
                   <button
                     type="button"
-                    className={chip}
-                    aria-pressed={inspectOn}
-                    onClick={() => setInspectOn((v) => !v)}
-                    data-testid="surface-inspect"
+                    className={button}
+                    onClick={() => viewRef.current?.resetPosition()}
+                    data-testid="surface-reset"
                   >
-                    {t('land.inspect')}
+                    {t('land.reset')}
                   </button>
                   <button
-                    ref={aboutButtonRef}
                     type="button"
-                    className={chip}
-                    aria-pressed={infoOpen}
-                    aria-expanded={infoOpen}
-                    onClick={() => setInfoOpen((v) => !v)}
-                    data-testid="surface-about"
+                    className={button}
+                    aria-expanded={moreOpen}
+                    onClick={() => setMoreOpen((v) => !v)}
+                    data-testid="surface-more"
                   >
-                    {t('land.about')}
+                    {t(moreOpen ? 'land.less' : 'land.more')}
                   </button>
+                  {moreOpen && (
+                    <>
+                      <button type="button" className={button} onClick={() => viewRef.current?.startDescent()}>
+                        {t('land.replay')}
+                      </button>
+                      <button
+                        type="button"
+                        className={chip}
+                        aria-pressed={labelsOn}
+                        onClick={() => setLabelsOn((v) => !v)}
+                      >
+                        {t('land.labels')}
+                      </button>
+                      <button
+                        type="button"
+                        className={chip}
+                        aria-pressed={markerOn}
+                        onClick={() => setMarkerOn((v) => !v)}
+                      >
+                        {t('land.marker')}
+                      </button>
+                      <button
+                        type="button"
+                        className={chip}
+                        aria-pressed={bodyOn}
+                        onClick={() => setBodyOn((v) => !v)}
+                        data-testid="surface-body"
+                      >
+                        {t('land.body')}
+                      </button>
+                      <button
+                        type="button"
+                        className={chip}
+                        aria-pressed={inspectOn}
+                        onClick={() => setInspectOn((v) => !v)}
+                        data-testid="surface-inspect"
+                      >
+                        {t('land.inspect')}
+                      </button>
+                      <button
+                        ref={aboutButtonRef}
+                        type="button"
+                        className={chip}
+                        aria-pressed={infoOpen}
+                        aria-expanded={infoOpen}
+                        onClick={() => setInfoOpen((v) => !v)}
+                        data-testid="surface-about"
+                      >
+                        {t('land.about')}
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
