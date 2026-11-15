@@ -80,7 +80,13 @@ export default defineAgent({
     const session = new voice.AgentSession({
       stt: MODELS.stt,
       llm: new inference.LLM({ model: MODELS.llm, strictToolSchema: false }),
-      tts: new inference.TTS({ model: MODELS.tts, fallback: MODELS.ttsFallback }),
+      tts: new inference.TTS({
+        model: MODELS.tts,
+        voice: MODELS.ttsVoice,
+        // Start speaking as soon as a phrase is ready, not after Cartesia's default wait for more text.
+        modelOptions: { max_buffer_delay_ms: 200 },
+        fallback: MODELS.ttsFallback,
+      }),
       turnHandling: { turnDetection: 'stt' },
       // Search, maybe search again on another date, select, check the robot: room for the whole plan in one turn.
       maxToolSteps: 6,

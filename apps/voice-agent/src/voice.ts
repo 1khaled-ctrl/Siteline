@@ -13,6 +13,8 @@ export const MODELS = {
   stt: process.env.SITELINE_STT ?? 'deepgram/flux-general-en',
   llm: process.env.SITELINE_LLM ?? 'openai/gpt-4.1-mini',
   tts: process.env.SITELINE_TTS ?? 'cartesia/sonic-3',
+  /** The Cartesia voice SiteLine speaks with (chosen by the team). */
+  ttsVoice: process.env.SITELINE_TTS_VOICE ?? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
   /** Used by LiveKit's gateway when the main voice fails, so the agent isn't left silent. */
   ttsFallback: process.env.SITELINE_TTS_FALLBACK ?? 'deepgram/aura-2',
 };
