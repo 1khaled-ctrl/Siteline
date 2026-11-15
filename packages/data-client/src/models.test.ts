@@ -119,7 +119,7 @@ describe('parseModels refuses', () => {
     expect(() => parseModels(big, MISSIONS)).toThrow(/over the 5242880-byte limit/);
     expect(() =>
       parseModels(
-        withFirst((m) => (m.bytes = 10)),
+        withFirst((m) => (m.sha256 = null)),
         MISSIONS,
       ),
     ).toThrow(/bytes and sha256 come together/);

@@ -23,12 +23,12 @@
       "logoCheck": "All five textures of the hand-built file looked at by the Data session on 2026-11-15: solar cells, wiring, foil, instrument close-ups and two colour ramps, no logo or insignia. The owner's own visual check is separate.",
       "note": "NASA's page for this model describes IBEX and names IBEX as its mission, although the model is titled Lunar Reconnaissance Orbiter. Which spacecraft it shows is being checked.",
       "key": "models/v1/lro_b.json",
-      "bytes": null,
-      "sha256": null,
+      "bytes": 473571,
+      "sha256": "e3738d51e2cbe5c55a129bf3b324bcede422cd8d0aa006a98c7eb7e69749f896",
       "source": {
         "path": "3D Models/Lunar Reconnaissance Orbiter (B)/Lunar Reconnaissance Orbiter (B).glb",
-        "bytes": null,
-        "gitBlob": null
+        "bytes": 2902744,
+        "gitBlob": "d17e0a781d1bd599faca618d2efb01209f77a912"
       },
       "optimize": {
         "textureSize": 1024
@@ -47,12 +47,12 @@
       "logoCheck": "The built file has no picture textures, only one 128 x 4 colour palette, looked at by the Data session on 2026-11-15.",
       "note": null,
       "key": "models/v1/lro_a.json",
-      "bytes": null,
-      "sha256": null,
+      "bytes": 5081675,
+      "sha256": "da3c625d0df30fec1e9a811b24b54b3a3ef6ce7ef711ed857896b2f4f27fb79d",
       "source": {
         "path": "3D Models/Lunar Reconnaissance Orbiter (A)/Lunar Reconnaissance Orbiter (A).glb",
-        "bytes": null,
-        "gitBlob": null
+        "bytes": 654500,
+        "gitBlob": "1f39b1d63fcaa1dbd9a2098ff4eb1d927558dca2"
       },
       "optimize": {
         "textureSize": 1024
@@ -71,12 +71,12 @@
       "logoCheck": "The built file has no picture textures, only one 128 x 4 colour palette, looked at by the Data session on 2026-11-15.",
       "note": null,
       "key": "models/v1/ladee.json",
-      "bytes": null,
-      "sha256": null,
+      "bytes": 2631619,
+      "sha256": "c8f7f5ab74b37f4da912864f465c753ba6b99be1e0aa1bf87e9284b67d06cee5",
       "source": {
         "path": "3D Models/Lunar Atmosphere and Dust Environment Explorer (LADEE)/Lunar Atmosphere and Dust Environment Explorer (LADEE).glb",
-        "bytes": null,
-        "gitBlob": null
+        "bytes": 235468,
+        "gitBlob": "0694fa918e9d4183550f16fb42fad74c9a3f6b18"
       },
       "optimize": {
         "textureSize": 1024
@@ -95,12 +95,12 @@
       "logoCheck": "The built file has no picture textures, only two 128 x 4 palettes (colour, metal and roughness), looked at by the Data session on 2026-11-15.",
       "note": "NASA's page says laser communications were demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission. The model shows a box-shaped spacecraft with two cross-shaped solar wings, which is not LADEE, and the page does not say what it depicts, so its status is being checked.",
       "key": "models/v1/llcd.json",
-      "bytes": null,
-      "sha256": null,
+      "bytes": 4884755,
+      "sha256": "b46c2e78af568132fa13cfb420cc1929f230a9e4085b1932b413153882be286d",
       "source": {
         "path": "3D Models/Lunar Laser Communications Demonstration (LLCD)/Lunar Laser Communications Demonstration (LLCD).glb",
-        "bytes": null,
-        "gitBlob": null
+        "bytes": 1048648,
+        "gitBlob": "4a509a996beebcdd737b45b45acab1a7ec2dcf14"
       },
       "optimize": {
         "textureSize": 512,
@@ -120,12 +120,12 @@
       "logoCheck": "The one texture of the hand-built file looked at by the Data session on 2026-11-15, with a zoomed look at its small labels: panels, grilles and fittings, no logo or insignia. The owner's own visual check is separate.",
       "note": "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested. This part is the floor, inner walls and stairs; the outer shell is part 1, which is not published because its texture shows the NASA insignia.",
       "key": "models/v1/hdu_part_2.json",
-      "bytes": null,
-      "sha256": null,
+      "bytes": 236675,
+      "sha256": "f3c944bae04e6089833efb55416edb1dd72fa176f3a88cf2a89d0f6710c77125",
       "source": {
         "path": "3D Models/Habitat Demonstration Unit/Habitat Demonstration Unit (part 2).glb",
-        "bytes": null,
-        "gitBlob": null
+        "bytes": 710988,
+        "gitBlob": "a5c41e1e661482955380450d240d7ed2418df0b7"
       },
       "optimize": {
         "textureSize": 1024
