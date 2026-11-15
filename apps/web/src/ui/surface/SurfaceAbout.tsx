@@ -193,12 +193,15 @@ export function SurfaceAbout({ target, rings, walkIndex, fineRegion, shadowM, ea
 
         {section(
           t('land.info.eyeTitle'),
-          <p>
-            {t('land.info.eye', {
-              eye: formatNumber(EYE_HEIGHT_M, 1),
-              observer: formatNumber(DEFAULT_STAY.observerHeightM, 0),
-            })}
-          </p>,
+          <>
+            <p>
+              {t('land.info.eye', {
+                eye: formatNumber(EYE_HEIGHT_M, 1),
+                observer: formatNumber(DEFAULT_STAY.observerHeightM, 0),
+              })}
+            </p>
+            <p data-testid="surface-info-body">{t('land.info.body')}</p>
+          </>,
         )}
 
         {section(

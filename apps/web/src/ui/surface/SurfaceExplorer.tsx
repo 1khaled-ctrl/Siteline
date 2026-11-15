@@ -127,6 +127,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [labelsOn, setLabelsOn] = useState(true);
   const [markerOn, setMarkerOn] = useState(true);
   const [inspectOn, setInspectOn] = useState(false);
+  const [bodyOn, setBodyOn] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
   /** True when most of the walkable ground around the eye is in shadow at this moment. */
   const [darkHere, setDarkHere] = useState(false);
@@ -388,6 +389,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   }, [exploring]);
   useEffect(() => viewRef.current?.setTouchdownMarker(markerOn), [markerOn]);
   useEffect(() => viewRef.current?.setInspectionLight(inspectOn), [inspectOn]);
+  useEffect(() => viewRef.current?.setBodyShown(bodyOn), [bodyOn]);
 
   const shiftClock = (hours: number) =>
     setOffsetMs((ms) => Math.min(OFFSET_MAX_H, Math.max(OFFSET_MIN_H, Math.round(ms / HOUR_MS) + hours)) * HOUR_MS);
@@ -817,6 +819,15 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                   </button>
                   <button type="button" className={chip} aria-pressed={markerOn} onClick={() => setMarkerOn((v) => !v)}>
                     {t('land.marker')}
+                  </button>
+                  <button
+                    type="button"
+                    className={chip}
+                    aria-pressed={bodyOn}
+                    onClick={() => setBodyOn((v) => !v)}
+                    data-testid="surface-body"
+                  >
+                    {t('land.body')}
                   </button>
                   <button
                     type="button"
