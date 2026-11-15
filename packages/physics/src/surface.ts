@@ -462,10 +462,61 @@ export function sweepDiscVisibility(
   radiusDeg: number,
   shareFar = 8,
 ): Float32Array {
-  const result = new Float32Array(out.size * out.size);
   const { elevDeg, azDeg } = localElevAz(dir);
-  if (Math.hypot(dir[0], dir[1]) < 1e-9) return result.fill(elevDeg > 0 ? 1 : 0);
-  // Toward the disc on the ground (de, dn), and across the lines (pe, pn), a quarter turn clockwise.
+  if (Math.hypot(dir[0], dir[1]) < 1e-9) return new Float32Array(out.size * out.size).fill(elevDeg > 0 ? 1 : 0);
+  const swept = sweepProfiles(grids, out, azDeg, shareFar, [(tan) => discFraction(elevDeg, toDeg(tan), radiusDeg)]);
+  return readBack(swept, swept.along[0], out);
+}
+
+/** The skyline every point of `out` has in one azimuth: its elevation, and how far off the ground that sets it is. */
+export interface HorizonSweep {
+  /** Elevation of the skyline, radians; −π/2 where nothing rises beyond the point. */
+  elevRad: Float32Array;
+  /** Distance along the ground to the point of terrain that sets the skyline, metres; 0 where there is none. */
+  distM: Float32Array;
+}
+
+/**
+ * The skyline toward azimuth `azDeg` from every point of `out`, over the nested grids, by the same sweep as
+ * `sweepDiscVisibility`: the skyline's elevation and the distance to the terrain that sets it. What a point sees of
+ * the terrain around it, for light scattered off that terrain.
+ */
+export function sweepHorizon(grids: readonly LocalGrid[], out: PointGrid, azDeg: number, shareFar = 8): HorizonSweep {
+  const swept = sweepProfiles(grids, out, azDeg, shareFar, [
+    (tan) => (tan === Number.NEGATIVE_INFINITY ? -Math.PI / 2 : Math.atan(tan)),
+    (_tan, distM) => distM,
+  ]);
+  return { elevRad: readBack(swept, swept.along[0], out), distM: readBack(swept, swept.along[1], out) };
+}
+
+/** Values found along the sweep's lines, and where those lines lie over `out`. */
+interface Swept {
+  along: Float32Array[];
+  lines: number;
+  points: number;
+  uMax: number;
+  tMax: number;
+  de: number;
+  dn: number;
+  pe: number;
+  pn: number;
+  step: number;
+  halfM: number;
+}
+
+/**
+ * The sweep itself: lines parallel to azimuth `azDeg`, `out.spacingM` apart, each walked from the far end on that side
+ * toward the other with the upper convex hull of the profile already passed. For every point it hands each channel the
+ * skyline's tangent and the distance to the hull point that sets it (0 with none), and keeps what the channel returns.
+ */
+function sweepProfiles(
+  grids: readonly LocalGrid[],
+  out: PointGrid,
+  azDeg: number,
+  shareFar: number,
+  channels: readonly ((tan: number, distM: number) => number)[],
+): Swept {
+  // Along the azimuth on the ground (de, dn), and across the lines (pe, pn), a quarter turn clockwise.
   const de = Math.sin(azDeg * DEG);
   const dn = Math.cos(azDeg * DEG);
   const pe = dn;
@@ -476,10 +527,9 @@ export function sweepDiscVisibility(
   const tMax = H * (Math.abs(de) + Math.abs(dn));
   const lines = Math.ceil((2 * uMax) / step) + 1;
   const points = Math.ceil((2 * tMax) / step) + 1;
-  const along = new Float32Array(lines * points);
+  const along = channels.map(() => new Float32Array(lines * points));
   const last = grids[grids.length - 1];
   const outer = last.halfM;
-
   const heightAt = (e: number, n: number): { h: number; spacing: number } => {
     for (const g of grids) {
       const edge = g.halfM * (1 + 1e-9);
@@ -559,16 +609,25 @@ export function sweepDiscVisibility(
       const { h } = heightAt(u * pe + t * de, u * pn + t * dn);
       const i = j * points + k;
       if (!Number.isFinite(h)) {
-        along[i] = Number.NaN;
+        for (const a of along) a[i] = Number.NaN;
         continue;
       }
       const tan = skyline(t, h);
-      along[i] = discFraction(elevDeg, toDeg(tan), radiusDeg);
+      const distM = top >= 0 ? hullT[top] - t : 0;
+      channels.forEach((channel, c) => {
+        along[c][i] = channel(tan, distM);
+      });
       push(t, h);
     }
   }
 
-  // Back onto `out`'s nodes, bilinearly between the lines and the points along them.
+  return { along, lines, points, uMax, tMax, de, dn, pe, pn, step, halfM: H };
+}
+
+/** One channel of a sweep read back onto `out`'s nodes, bilinearly between the lines and the points along them. */
+function readBack(s: Swept, along: Float32Array, out: PointGrid): Float32Array {
+  const result = new Float32Array(out.size * out.size);
+  const { lines, points, uMax, tMax, de, dn, pe, pn, step, halfM: H } = s;
   for (let r = 0; r < out.size; r++) {
     const north = H - r * step;
     for (let c = 0; c < out.size; c++) {

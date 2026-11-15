@@ -1,5 +1,6 @@
 import { DEFAULT_STAY } from '@siteline/contracts';
-import { EYE_HEIGHT_M } from '@siteline/physics';
+import { MAX_SHADOW_EXPOSURE } from '@siteline/engine/surface';
+import { EARTH_GEOMETRIC_ALBEDO, EYE_HEIGHT_M, MOON_BOND_ALBEDO } from '@siteline/physics';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../../format';
@@ -18,6 +19,8 @@ interface Props {
   fineRegion?: string;
   /** How finely the shadows were worked out on the walkable ground, metres. */
   shadowM: number;
+  /** Earthshine at the moment shown, as a share of direct sunlight, once worked out. */
+  earthshine?: number;
   onClose: () => void;
 }
 
@@ -25,7 +28,7 @@ interface Props {
  * About this view: what the surface view is drawn from and what it assumes, in short sections with the terrain's rings
  * as a table. Every number in it comes from the scene the worker built or from the physics package.
  */
-export function SurfaceAbout({ target, rings, walkIndex, fineRegion, shadowM, onClose }: Props) {
+export function SurfaceAbout({ target, rings, walkIndex, fineRegion, shadowM, earthshine, onClose }: Props) {
   const { t } = useTranslation();
   const metres = (m: number) => t('land.info.metres', { m: formatNumber(m, m < 10 ? 1 : 0) });
   // The rings, in runs that share a dataset: each run is listed under its dataset's id.
@@ -172,6 +175,17 @@ export function SurfaceAbout({ target, rings, walkIndex, fineRegion, shadowM, on
           t('land.info.lightTitle'),
           <>
             <p>{t('land.info.shadows', { shadow: formatNumber(shadowM, shadowM < 10 ? 1 : 0) })}</p>
+            <p data-testid="surface-info-shadow-light">
+              {t('land.info.shadowLight', {
+                albedo: formatNumber(MOON_BOND_ALBEDO, 2),
+                earthAlbedo: formatNumber(EARTH_GEOMETRIC_ALBEDO, 3),
+                max: formatNumber(MAX_SHADOW_EXPOSURE, 0),
+              })}{' '}
+              {earthshine !== undefined &&
+                (earthshine > 0
+                  ? t('land.info.earthshineNow', { n: formatNumber(Math.round(1 / earthshine / 100) * 100, 0) })
+                  : t('land.info.earthshineNone'))}
+            </p>
             <p>{t('land.info.material')}</p>
             <p>{t('land.info.earthLook')}</p>
           </>,

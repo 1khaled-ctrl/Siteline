@@ -50,6 +50,11 @@ export interface SurfaceLighting {
   /** The share of the Sun's disc each node of each ring sees above the terrain, ring by ring; omit to keep the last. */
   sunlit?: readonly Float32Array[];
   /**
+   * The light reaching each node besides the Sun's (scattered off sunlit terrain, and earthshine), as a share of direct
+   * sunlight on a surface square to the Sun, ring by ring; omit to keep the last.
+   */
+  ambient?: readonly Float32Array[];
+  /**
    * The same over the walkable square at a finer spacing than its mesh, as bytes 0 to 255 laid out like a grid (row 0
    * north): where it reaches, the ground's shadows are read from it, so their edges are as sharp as its cells.
    */
@@ -149,6 +154,11 @@ export function exposureFor(sunElevDeg: number): number {
 /** How bright level ground a few metres ahead is shown, before tone mapping; and the most the picture is brightened. */
 export const LEVEL_GROUND_SHOWN = 0.35;
 const MAX_EXPOSURE = 6;
+/** How much longer the picture may be exposed for a shadow, and the ground around the eye it is exposed for, metres. */
+export const MAX_SHADOW_EXPOSURE = 4000;
+const SHADOW_EXPOSURE_RADIUS_M = 150;
+/** Exposed for a shadow, its light is shown at a quarter of the brightness sunlit level ground is shown at. */
+const SHADOW_SHOWN = 0.25;
 
 /** The compass points on the horizon, a quarter turn apart clockwise from north. */
 const COMPASS_KEYS = ['north', 'east', 'south', 'west'] as const;
@@ -166,12 +176,15 @@ const TERRAIN_VERTEX = /* glsl */ `
 #include <common>
 #include <logdepthbuf_pars_vertex>
 attribute float sunlit;
+attribute float ambient;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSunlit;
+varying float vAmbient;
 void main() {
   vNormal = normal;
   vSunlit = sunlit;
+  vAmbient = ambient;
   vec4 world = modelMatrix * vec4(position, 1.0);
   vWorld = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * world;
@@ -201,6 +214,7 @@ uniform float useShadowMap;
 varying vec3 vNormal;
 varying vec3 vWorld;
 varying float vSunlit;
+varying float vAmbient;
 
 float hash12(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -236,7 +250,8 @@ void main() {
     lit = texture2D(shadowMap, uv).r;
   }
   vec3 base = albedo * grain;
-  vec3 colour = base * sunPower * ls * lit;
+  // The light in the shadows, scattered off sunlit terrain and from the Earth, taken as falling on a Lambert surface.
+  vec3 colour = base * sunPower * (ls * lit + vAmbient);
   if (inspect > 0.5) {
     float lamp = mu / (1.0 + dist * dist / 900.0);
     colour += base * vec3(0.5, 0.66, 1.0) * lamp;
@@ -275,11 +290,12 @@ void main() {
 `;
 
 /** A ring's geometry: its nodes, normals, the share of the Sun each node sees, and its triangles. */
-function ringGeometry(d: SurfaceMeshData, sunlit: Float32Array): THREE.BufferGeometry {
+function ringGeometry(d: SurfaceMeshData, sunlit: Float32Array, ambient: Float32Array): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(d.positions, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(d.normals, 3));
   geometry.setAttribute('sunlit', new THREE.BufferAttribute(sunlit, 1));
+  geometry.setAttribute('ambient', new THREE.BufferAttribute(ambient, 1));
   geometry.setIndex(new THREE.BufferAttribute(d.indices, 1));
   geometry.computeBoundingSphere();
   return geometry;
@@ -346,6 +362,10 @@ export class SurfaceView {
   private sunDir: V3 = [0, 0, 1];
   private earthDir: V3 = [0, 1, 0];
   private sunRadiusDeg = 0.27;
+  /** The exposure for the Sun's height, and how much longer it is held when the eye stands in shadow (eased in). */
+  private exposure = 1;
+  private shadowExposure = 1;
+  private shadowExposureTarget = 1;
   private earthRadiusDeg = 0.95;
   private descent?: { plan: DescentPlan; startMs: number };
   private descentPoseNow?: Pose;
@@ -428,7 +448,7 @@ export class SurfaceView {
     this.camera.rotation.order = 'YXZ';
 
     for (const d of data) {
-      const geometry = ringGeometry(d, new Float32Array(d.size * d.size).fill(1));
+      const geometry = ringGeometry(d, new Float32Array(d.size * d.size).fill(1), new Float32Array(d.size * d.size));
       const material = new THREE.ShaderMaterial({
         vertexShader: TERRAIN_VERTEX,
         fragmentShader: TERRAIN_FRAGMENT,
@@ -527,11 +547,15 @@ export class SurfaceView {
     this.earthRadiusDeg = light.earthRadiusDeg;
     toThree(light.sunDir, this.uniforms.sunDir.value).normalize();
     const elevDeg = (Math.asin(Math.max(-1, Math.min(1, light.sunDir[2]))) * 180) / Math.PI;
-    this.uniforms.sunPower.value = SUN_POWER * exposureFor(elevDeg);
+    this.exposure = exposureFor(elevDeg);
+    this.applyExposure();
     if (light.shadowMap) this.setShadowMap(light.shadowMap);
-    if (light.sunlit) {
-      light.sunlit.forEach((values, i) => {
-        const attr = this.meshes[i]?.geometry.getAttribute('sunlit') as THREE.BufferAttribute | undefined;
+    for (const [name, rings] of [
+      ['sunlit', light.sunlit],
+      ['ambient', light.ambient],
+    ] as const) {
+      rings?.forEach((values, i) => {
+        const attr = this.meshes[i]?.geometry.getAttribute(name) as THREE.BufferAttribute | undefined;
         if (!attr || attr.array.length !== values.length) return;
         (attr.array as Float32Array).set(values);
         attr.needsUpdate = true;
@@ -549,9 +573,12 @@ export class SurfaceView {
     if (!mesh) return;
     const old = mesh.geometry;
     const sunlit = (old.getAttribute('sunlit').array as Float32Array).slice();
+    const ambient = (old.getAttribute('ambient').array as Float32Array).slice();
+    const n = d.size * d.size;
     mesh.geometry = ringGeometry(
       d,
-      sunlit.length === d.size * d.size ? sunlit : new Float32Array(d.size * d.size).fill(1),
+      sunlit.length === n ? sunlit : new Float32Array(n).fill(1),
+      ambient.length === n ? ambient : new Float32Array(n),
     );
     old.dispose();
     if (d.up) {
@@ -690,26 +717,35 @@ export class SurfaceView {
 
   /** The average share of the Sun the walkable ground gets within `radiusM` of a point: how dark it is around you. */
   sunlitAround(east: number, north: number, radiusM: number): number {
-    const mesh = this.meshes[this.opts.walkIndex ?? 0];
-    const g = this.walkGrid;
-    if (!mesh) return 1;
-    const lit = mesh.geometry.getAttribute('sunlit').array as Float32Array;
-    const c0 = Math.max(0, Math.floor((east - radiusM + g.halfM) / g.spacingM));
-    const c1 = Math.min(g.size - 1, Math.ceil((east + radiusM + g.halfM) / g.spacingM));
-    const r0 = Math.max(0, Math.floor((g.halfM - north - radiusM) / g.spacingM));
-    const r1 = Math.min(g.size - 1, Math.ceil((g.halfM - north + radiusM) / g.spacingM));
-    let sum = 0;
-    let n = 0;
-    for (let r = r0; r <= r1; r++) {
-      for (let c = c0; c <= c1; c++) {
-        const e = -g.halfM + c * g.spacingM;
-        const nn = g.halfM - r * g.spacingM;
-        if ((e - east) ** 2 + (nn - north) ** 2 > radiusM * radiusM || !Number.isFinite(g.up[r * g.size + c])) continue;
-        sum += lit[r * g.size + c];
-        n++;
-      }
+    return this.averageAround('sunlit', east, north, radiusM, 1);
+  }
+
+  /** The average light in the shadows (scattered and earthshine) on the walkable ground within `radiusM` of a point. */
+  ambientAround(east: number, north: number, radiusM: number): number {
+    return this.averageAround('ambient', east, north, radiusM, 0);
+  }
+
+  /**
+   * Exposes the picture for the shadow around (east, north), as a camera would, or back for the Sun: the light there is
+   * shown at a quarter of the brightness of sunlit level ground, up to `MAX_SHADOW_EXPOSURE` times longer. Says how much longer,
+   * and whether that was the limit (almost no light reaches the spot).
+   */
+  exposeForShadow(on: boolean, east = 0, north = 0): { factor: number; limited: boolean } {
+    let factor = 1;
+    let limited = false;
+    if (on) {
+      const light = this.ambientAround(east, north, SHADOW_EXPOSURE_RADIUS_M) * this.exposure;
+      const wanted = light > 0 ? (SHADOW_SHOWN * LEVEL_GROUND_SHOWN) / light : Number.POSITIVE_INFINITY;
+      factor = Math.min(MAX_SHADOW_EXPOSURE, Math.max(1, wanted));
+      limited = wanted > MAX_SHADOW_EXPOSURE;
     }
-    return n ? sum / n : 1;
+    this.shadowExposureTarget = factor;
+    if (this.reducedMotion) {
+      this.shadowExposure = factor;
+      this.applyExposure();
+    }
+    this.dirty = true;
+    return { factor, limited };
   }
 
   /** For checking: where the camera is against the ground under it, and how much of each ring the Sun reaches. */
@@ -774,6 +810,40 @@ export class SurfaceView {
   }
 
   // --- Internals ---
+
+  /** The average of a ring attribute over the walkable ground within `radiusM` of a point; `none` where there is none. */
+  private averageAround(
+    name: 'sunlit' | 'ambient',
+    east: number,
+    north: number,
+    radiusM: number,
+    none: number,
+  ): number {
+    const mesh = this.meshes[this.opts.walkIndex ?? 0];
+    const g = this.walkGrid;
+    if (!mesh) return none;
+    const values = mesh.geometry.getAttribute(name).array as Float32Array;
+    const c0 = Math.max(0, Math.floor((east - radiusM + g.halfM) / g.spacingM));
+    const c1 = Math.min(g.size - 1, Math.ceil((east + radiusM + g.halfM) / g.spacingM));
+    const r0 = Math.max(0, Math.floor((g.halfM - north - radiusM) / g.spacingM));
+    const r1 = Math.min(g.size - 1, Math.ceil((g.halfM - north + radiusM) / g.spacingM));
+    let sum = 0;
+    let n = 0;
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const e = -g.halfM + c * g.spacingM;
+        const nn = g.halfM - r * g.spacingM;
+        if ((e - east) ** 2 + (nn - north) ** 2 > radiusM * radiusM || !Number.isFinite(g.up[r * g.size + c])) continue;
+        sum += values[r * g.size + c];
+        n++;
+      }
+    }
+    return n ? sum / n : none;
+  }
+
+  private applyExposure(): void {
+    this.uniforms.sunPower.value = SUN_POWER * this.exposure * this.shadowExposure;
+  }
 
   private defaultHeading(): number {
     // Face the Earth if it is up, else the Sun, else north.
@@ -867,6 +937,15 @@ export class SurfaceView {
     if (!this.settled && !moving && now - this.movedAtMs > SETTLE_MS) {
       this.settled = true;
       this.opts.onSettled?.(this.pos.east, this.pos.north);
+    }
+    // The exposure eases toward the shadow's or the Sun's over about a second, as eyes and cameras adjust.
+    if (this.shadowExposure !== this.shadowExposureTarget) {
+      const ratio = this.shadowExposureTarget / this.shadowExposure;
+      const stepped = this.shadowExposure * ratio ** Math.min(1, dt * 2.5);
+      this.shadowExposure =
+        Math.abs(Math.log(stepped / this.shadowExposureTarget)) < 0.01 ? this.shadowExposureTarget : stepped;
+      this.applyExposure();
+      this.dirty = true;
     }
     if (moving) this.dirty = true;
     if (!this.dirty) return;
