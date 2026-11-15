@@ -295,6 +295,22 @@
       "micFailed": "The mic didn't catch that. Try again, or type your question.",
       "speaking": "Reading replies aloud.",
       "mute": "Stop reading aloud"
+    },
+    "live": {
+      "start": "Talk live",
+      "end": "End call",
+      "state": {
+        "connecting": "Connecting…",
+        "listening": "Live · listening",
+        "thinking": "Live · thinking",
+        "speaking": "Live · speaking"
+      },
+      "mute": "Mute your mic",
+      "unmute": "Unmute your mic",
+      "unavailable": "Live voice isn't set up on this server yet. The mic button still works with your browser's own speech.",
+      "busy": "Too many live calls just now. Try again in a minute.",
+      "failed": "The live call couldn't start: {{message}}",
+      "note": "Live call with Ask SiteLine, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks."
     }
   },
   "share": {

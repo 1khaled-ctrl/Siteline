@@ -1,0 +1,21 @@
+{
+  "name": "@siteline/voice-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/main.ts dev",
+    "start": "tsx src/main.ts start",
+    "download-files": "tsx src/main.ts download-files"
+  },
+  "dependencies": {
+    "@livekit/agents": "1.9.5",
+    "@livekit/rtc-node": "1.2.1",
+    "dotenv": "17.2.3",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "livekit-server-sdk": "2.19.2",
+    "tsx": "4.20.6"
+  }
+}

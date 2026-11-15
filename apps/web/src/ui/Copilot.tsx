@@ -6,6 +6,7 @@ import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, typ
 import { askAi, type ChatMessage, plainReply, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
 import { findLander } from '../landers';
+import type { LiveSession, LiveState } from '../liveVoice';
 import { physics, queryFor, URLS } from '../physics';
 import { sound } from '../sound';
 import { useStage } from '../stage';
@@ -79,12 +80,26 @@ export function Copilot() {
   const input = useRef<HTMLInputElement>(null);
   const stopListening = useRef<(() => void) | null>(null);
   const voice = canListen();
+  /** The live voice call (LiveKit), while one is on; its state; and whether the visitor's mic is muted in it. */
+  const [liveState, setLiveState] = useState<LiveState | null>(null);
+  const [muted, setMuted] = useState(false);
+  const live = useRef<LiveSession | null>(null);
+  /** Each transcript segment's message, so a growing segment updates its message instead of adding one. */
+  const segments = useRef(new Map<string, number>());
+  /** The steps message for the agent's current piece of work in the call, with the cards and tools it used. */
+  const liveWork = useRef<{
+    id: number;
+    cards: SitesCard[];
+    tools: string[];
+    run: (call: ToolCall) => Promise<ToolResult>;
+  } | null>(null);
 
   useEffect(() => {
     if (open) input.current?.focus();
     else {
       stopListening.current?.();
       stopSpeaking();
+      void live.current?.stop();
     }
   }, [open]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new message or step is what scrolls the log down.
@@ -363,6 +378,13 @@ export function Copilot() {
     const m = message.trim();
     if (!m || busy) return;
     setText('');
+    // In a live call, a typed message goes to the voice agent, which answers aloud and in the chat.
+    if (live.current) {
+      add({ from: 'you', text: m });
+      settleLive();
+      live.current.send(m).catch((e) => setVoiceError(t('copilot.live.failed', { message: String(e) })));
+      return;
+    }
     setSpeakReplies(spoken);
     stopSpeaking();
     add({ from: 'you', text: m });
@@ -381,6 +403,12 @@ export function Copilot() {
 
   const toggleMic = () => {
     setVoiceError(undefined);
+    if (live.current) {
+      const next = !muted;
+      setMuted(next);
+      void live.current.setMuted(next);
+      return;
+    }
     if (listening) {
       stopListening.current?.();
       return;
@@ -408,6 +436,81 @@ export function Copilot() {
     useApp.getState().focusSite(site.latDeg, site.lonDeg);
   };
 
+  /**
+   * Ends the call's current piece of work: its steps stop spinning, and a search the agent didn't follow with
+   * select_site still ends on its best site, as in the chat.
+   */
+  const settleLive = () => {
+    const work = liveWork.current;
+    if (!work) return;
+    liveWork.current = null;
+    const card = work.cards.at(-1);
+    const best = card?.sites[0];
+    if (card && best && !work.tools.includes('select_site')) flyTo(card, best);
+    update(work.id, () => ({ working: false, card }));
+  };
+
+  /** Ask SiteLine Live: a voice call with the LiveKit agent, whose tools run here, through the same steps as the chat. */
+  const startCall = async () => {
+    setVoiceError(undefined);
+    stopListening.current?.();
+    stopSpeaking();
+    setSpeakReplies(false);
+    setLiveState('connecting');
+    // LiveKit's client loads with the first call, not with the app.
+    const { fetchVoiceToken, startLive } = await import('../liveVoice');
+    const got = await fetchVoiceToken();
+    if ('error' in got) {
+      setLiveState(null);
+      setVoiceError(t(got.error === 'rate_limited' ? 'copilot.live.busy' : 'copilot.live.unavailable'));
+      return;
+    }
+    try {
+      live.current = await startLive(got.url, got.token, {
+        transcript: ({ id, from, text }) => {
+          const words = from === 'siteline' ? plainReply(text) : text.trim();
+          if (!words) return;
+          const key = `${from}:${id}`;
+          const known = segments.current.get(key);
+          if (known !== undefined) return update(known, () => ({ text: words }));
+          // The visitor speaking again closes the work of the turn before.
+          if (from === 'you') settleLive();
+          segments.current.set(key, add({ from, text: words }));
+        },
+        state: (state) => {
+          setLiveState(state);
+          if (state === 'listening') settleLive();
+        },
+        tool: async (call) => {
+          if (!liveWork.current) {
+            const cards: SitesCard[] = [];
+            const id = add({ from: 'siteline', text: '', steps: [], working: true });
+            liveWork.current = { id, cards, tools: [], run: stepper(id, cards) };
+          }
+          const work = liveWork.current;
+          work.tools.push(call.name);
+          const out = await work.run(call);
+          const sources = out.sources ?? [];
+          if (sources.length) update(work.id, (m) => ({ sources: [...new Set([...(m.sources ?? []), ...sources])] }));
+          return { data: out.data };
+        },
+        appState,
+        ended: () => {
+          settleLive();
+          live.current = null;
+          segments.current.clear();
+          setLiveState(null);
+          setMuted(false);
+        },
+      });
+      setMode('ai');
+    } catch (e) {
+      live.current = null;
+      setLiveState(null);
+      setVoiceError(t('copilot.live.failed', { message: e instanceof Error ? e.message : String(e) }));
+    }
+  };
+
   // The orb (Orb.tsx) opens it.
   if (!open) return null;
 
@@ -425,27 +528,47 @@ export function Copilot() {
           <span
             aria-hidden="true"
             className={`size-7 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)] ${
-              busy || listening ? 'animate-pulse' : ''
+              busy || listening || (liveState !== null && liveState !== 'listening') ? 'animate-pulse' : ''
             }`}
           />
           <h2 className="min-w-0 text-lg">
             {t('copilot.title')}{' '}
-            <span className="ms-1 rounded-pill border border-line px-2 py-0.5 align-middle font-sans text-[11px] font-normal text-quiet">
-              {listening
-                ? t('copilot.agent.listening')
-                : running
-                  ? t('copilot.agent.working')
-                  : t(`copilot.badge.${mode}`)}
+            <span
+              className={`ms-1 rounded-pill border px-2 py-0.5 align-middle font-sans text-[11px] font-normal ${
+                liveState ? 'border-sun/60 text-sun-ink' : 'border-line text-quiet'
+              }`}
+            >
+              {liveState
+                ? t(`copilot.live.state.${liveState}`)
+                : listening
+                  ? t('copilot.agent.listening')
+                  : running
+                    ? t('copilot.agent.working')
+                    : t(`copilot.badge.${mode}`)}
             </span>
           </h2>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="min-h-8 rounded-md border border-line bg-panel-raised px-2.5 text-[12.5px] hover:border-line-hover"
-        >
-          {t('copilot.close')}
-        </button>
+        <div className="flex shrink-0 gap-1.5">
+          <button
+            type="button"
+            disabled={liveState === 'connecting'}
+            onClick={() => (live.current ? void live.current.stop() : void startCall())}
+            className={`min-h-8 rounded-md border px-2.5 text-[12.5px] disabled:opacity-60 ${
+              liveState
+                ? 'border-fail/60 bg-fail/10 hover:border-fail'
+                : 'border-sun/60 bg-sun/15 text-sun-ink hover:border-sun'
+            }`}
+          >
+            {liveState ? t('copilot.live.end') : t('copilot.live.start')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="min-h-8 rounded-md border border-line bg-panel-raised px-2.5 text-[12.5px] hover:border-line-hover"
+          >
+            {t('copilot.close')}
+          </button>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pe-1" aria-live="polite">
@@ -526,19 +649,33 @@ export function Copilot() {
         <label htmlFor="copilot-input" className="sr-only">
           {t('copilot.inputLabel')}
         </label>
-        {voice && (
+        {(voice || liveState) && (
           <button
             type="button"
             onClick={toggleMic}
-            disabled={busy}
-            aria-pressed={listening}
-            aria-label={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
-            title={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
+            disabled={busy || liveState === 'connecting'}
+            aria-pressed={liveState ? !muted : listening}
+            aria-label={
+              liveState
+                ? t(muted ? 'copilot.live.unmute' : 'copilot.live.mute')
+                : listening
+                  ? t('copilot.agent.micStop')
+                  : t('copilot.agent.mic')
+            }
+            title={
+              liveState
+                ? t(muted ? 'copilot.live.unmute' : 'copilot.live.mute')
+                : listening
+                  ? t('copilot.agent.micStop')
+                  : t('copilot.agent.mic')
+            }
             className={`grid min-h-9 min-w-9 place-items-center rounded-md border text-sm disabled:opacity-50 ${
-              listening
-                ? 'animate-pulse border-sun bg-sun/25 text-sun-ink'
-                : 'border-line bg-panel-raised hover:border-line-hover'
-            }`}
+              (liveState && !muted) || listening
+                ? 'border-sun bg-sun/25 text-sun-ink'
+                : liveState && muted
+                  ? 'border-fail/60 text-fail line-through'
+                  : 'border-line bg-panel-raised hover:border-line-hover'
+            } ${listening ? 'animate-pulse' : ''}`}
           >
             <MicIcon />
           </button>
@@ -576,7 +713,9 @@ export function Copilot() {
           </button>
         </p>
       )}
-      <p className="text-[11.5px] text-quiet">{t(mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}</p>
+      <p className="text-[11.5px] text-quiet">
+        {t(liveState ? 'copilot.live.note' : mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}
+      </p>
     </section>
   );
 }

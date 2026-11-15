@@ -19,3 +19,6 @@ pipeline/out/
 
 # Wrangler's local state (corepack pnpm copilot)
 .wrangler/
+
+# Wrangler's local secrets for the Pages Functions (LiveKit keys for /api/voice-token)
+.dev.vars
