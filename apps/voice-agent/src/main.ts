@@ -7,11 +7,12 @@
  *   corepack pnpm --filter @siteline/voice-agent dev     (needs apps/voice-agent/.env.local, see CLAUDE.md)
  */
 import { fileURLToPath } from 'node:url';
-import { cli, defineAgent, inference, type JobContext, llm, ServerOptions, voice } from '@livekit/agents';
+import { beta, cli, defineAgent, inference, type JobContext, llm, ServerOptions, voice } from '@livekit/agents';
 import dotenv from 'dotenv';
 import { AGENT_NAME } from '../../copilot-worker/src/voiceToken';
 import {
   appStateNote,
+  END_CALL_WHEN,
   GOODBYE,
   GREETING,
   MAX_CALL_MS,
@@ -33,32 +34,37 @@ type ToolParameters = NonNullable<Parameters<typeof llm.tool>[0]['parameters']>;
 
 /** The relay's tools, each one forwarded to the browser. A tool that fails there comes back as an error to read. */
 function browserTools(callBrowser: CallBrowser) {
-  return Object.fromEntries(
-    VOICE_TOOLS.map((t) => [
-      t.name,
-      llm.tool({
-        description: t.description,
-        parameters: t.parameters as unknown as ToolParameters,
-        execute: async (args: unknown) => {
-          try {
-            const raw = await callBrowser(
-              RPC.tool,
-              JSON.stringify({ name: t.name, arguments: args ?? {} }),
-              timeoutFor(t.name),
-            );
-            return toolReply(raw);
-          } catch (e) {
-            return JSON.stringify({ error: e instanceof Error ? e.message : String(e) });
-          }
-        },
-      }),
-    ]),
+  return VOICE_TOOLS.map((t) =>
+    llm.tool({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters as unknown as ToolParameters,
+      execute: async (args: unknown) => {
+        try {
+          const raw = await callBrowser(
+            RPC.tool,
+            JSON.stringify({ name: t.name, arguments: args ?? {} }),
+            timeoutFor(t.name),
+          );
+          return toolReply(raw);
+        } catch (e) {
+          return JSON.stringify({ error: e instanceof Error ? e.message : String(e) });
+        }
+      },
+    }),
   );
 }
 
+/** Hangs up once the visitor says they are done: Luna says a short goodbye, it plays out, then she leaves the room. */
+const endCall = beta.createEndCallTool({
+  extraDescription: END_CALL_WHEN,
+  endInstructions: 'Say one short, warm goodbye, such as "Happy exploring, bye for now!", and nothing else.',
+  ignoreOnEnter: true,
+});
+
 class SiteLineAgent extends voice.Agent {
   constructor(private readonly callBrowser: CallBrowser) {
-    super({ instructions: VOICE_INSTRUCTIONS, tools: browserTools(callBrowser) });
+    super({ instructions: VOICE_INSTRUCTIONS, tools: [...browserTools(callBrowser), endCall] });
   }
 
   /** Before each spoken reply: what the visitor's screen shows now (view, site, date, robot, pins). */

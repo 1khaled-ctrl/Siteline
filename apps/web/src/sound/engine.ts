@@ -54,6 +54,7 @@ export const played = {
   drone: 0,
   glint: 0,
   reveal: [] as Reveal[],
+  breath: 0,
 };
 
 /** Builds the output on the context the gesture started, and loads the two short sounds. */
@@ -241,6 +242,44 @@ function stopDroneAt(at: number): void {
     },
     Math.max(0, (at - now()) * 1000) + 300,
   );
+}
+
+// The suit's breath ---------------------------------------------------------------------------------------------------
+
+/**
+ * One slow, deep breath inside a helmet, for the surface view now and then: air drawn in through a rising band of
+ * noise, a short hold, then a longer, lower exhale, with a narrow ring on top for the visor. Kept far under everything.
+ */
+export function breath(): void {
+  played.breath++;
+  const t0 = now() + 0.05;
+  const inEnd = t0 + 1.7;
+  const outStart = inEnd + 0.35;
+  const end = outStart + 2.4;
+  const level = new Volume(SILENT_DB).connect(master);
+  const low = new Filter({ type: 'lowpass', frequency: 1400, rolloff: -24 }).connect(level);
+  const band = new Filter({ type: 'bandpass', frequency: 380, Q: 1.1 }).connect(low);
+  const ring = new Gain(0.35).connect(low);
+  const visor = new Filter({ type: 'bandpass', frequency: 1150, Q: 9 }).connect(ring);
+  const noise = new Noise('pink');
+  noise.connect(band);
+  noise.connect(visor);
+  // In: quieter and brighter, rising.
+  level.volume.setValueAtTime(SILENT_DB, t0);
+  level.volume.linearRampToValueAtTime(-34, t0 + 0.6);
+  level.volume.linearRampToValueAtTime(-31, inEnd - 0.15);
+  level.volume.linearRampToValueAtTime(SILENT_DB, inEnd + 0.1);
+  band.frequency.setValueAtTime(380, t0);
+  band.frequency.exponentialRampToValueAtTime(820, inEnd);
+  // Out: a little fuller and lower, falling away.
+  level.volume.setValueAtTime(SILENT_DB, outStart);
+  level.volume.linearRampToValueAtTime(-29, outStart + 0.35);
+  level.volume.linearRampToValueAtTime(-38, end - 0.6);
+  level.volume.linearRampToValueAtTime(SILENT_DB, end);
+  band.frequency.setValueAtTime(560, outStart);
+  band.frequency.exponentialRampToValueAtTime(230, end);
+  noise.start(t0).stop(end + 0.05);
+  disposeAt([noise, band, visor, ring, low, level], end + 0.1);
 }
 
 // Howler's fixed sounds -----------------------------------------------------------------------------------------------

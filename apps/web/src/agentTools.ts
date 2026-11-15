@@ -5,13 +5,29 @@ import { parseIntent, summarize, type Target } from './copilot';
 import type { ToolCall, ToolResult } from './copilotAi';
 import { coverageAt, gridReachLatDeg, TERRAIN_EXTENT, touchdownFromQuery } from './land';
 import { findLander, MISSIONS } from './landers';
-import { coordinate, type FoundSite, landingDate, pickRegions, rankFound, searchRegions } from './landingAgent';
+import {
+  coordinate,
+  type FoundSite,
+  landingDate,
+  pickRegions,
+  rankFound,
+  searchRegions,
+  siteOnScreen,
+} from './landingAgent';
 import { physics, queryFor, URLS } from './physics';
 import type { PassingSite, StayResponse } from './physics.worker';
 import { REGIONS } from './regions';
 import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS, type RobotId } from './robots';
 import { isSpaceBody, spaceFacts } from './spaceFacts';
 import { FIRST_UTC_MS, LAST_UTC_MS, LAYERS, type Layer, MAX_PINS, type MoonView, useApp } from './store';
+
+/** Stops a tool about "this site" when the visitor is not looking at the Moon, so it can't judge a spot nobody chose. */
+function needSite(view: MoonView): void {
+  if (!siteOnScreen(view))
+    throw new Error(
+      `no site is selected: the visitor is in the ${view} view, not on the Moon. Ask where they want to land, or use find_landing_sites or check_site.`,
+    );
+}
 
 /**
  * Every tool Luna's agent can use, in one place. Each runs in the browser with the functions the screen itself
@@ -216,6 +232,7 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
     }
 
     case 'analyze_site': {
+      needSite(app.view);
       const query = queryFor({ latDeg: app.latDeg, lonDeg: app.lonDeg }, app.landingUtc, app.slipDays);
       const r = await physics.stay(query, URLS, 6000);
       return { call: shown, ...siteFacts(r, query) };
@@ -244,6 +261,7 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
     case 'robot_fit': {
       const robot = robotOf(a.robot);
       if (!robot) throw new Error('robot is required');
+      needSite(app.view);
       const radiusM = radiusOf(a.landingRadiusM);
       // The card shows the same robot, so what the copilot says can be checked on screen.
       app.set({ robot: robot.id, landingRadiusM: radiusM });

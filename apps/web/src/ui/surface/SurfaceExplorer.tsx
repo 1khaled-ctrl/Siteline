@@ -31,6 +31,10 @@ import { Spinner } from '../ViewStatus';
 import { type RingInfo, SurfaceAbout } from './SurfaceAbout';
 import { type CompassHandle, EarthIcon, SunIcon, SurfaceCompass } from './SurfaceCompass';
 
+/** How often the suit's breath comes, at random between these. */
+const BREATH_MIN_MS = 25_000;
+const BREATH_MAX_MS = 45_000;
+
 type Phase =
   | { kind: 'loading'; progress?: SurfaceProgress; lighting?: boolean }
   | { kind: 'ready' }
@@ -166,6 +170,22 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
       if (playing) useApp.getState().setPlay({ playing: true });
       if (opener?.isConnected) opener.focus();
     };
+  }, []);
+
+  // Now and then, a slow breath inside the suit: every half a minute or so, quiet, and only with sound on.
+  useEffect(() => {
+    let timer = 0;
+    const next = () => {
+      timer = window.setTimeout(
+        () => {
+          if (document.visibilityState === 'visible') sound.breath();
+          next();
+        },
+        BREATH_MIN_MS + Math.random() * (BREATH_MAX_MS - BREATH_MIN_MS),
+      );
+    };
+    next();
+    return () => window.clearTimeout(timer);
   }, []);
 
   // Load the terrain around the point; a retry asks again, and closing or a newer load cancels this one.
@@ -770,6 +790,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 {t('land.backToTouchdown')}
               </button>
             </div>
+            <p className="text-xs text-quiet">{t('land.sliderHelp')}</p>
             {sharpening && sharpening.done < sharpening.total && (
               <p
                 role="status"

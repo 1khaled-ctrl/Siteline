@@ -133,6 +133,10 @@ export async function startLive(url: string, token: string, h: LiveHandlers): Pr
     const state = changed[AGENT_STATE];
     if (participant.isAgent && (state === 'listening' || state === 'thinking' || state === 'speaking')) h.state(state);
   });
+  // Luna hangs up when the visitor says they are done (or the call runs out of time): her leaving ends the call here too.
+  room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+    if (participant.isAgent) void room.disconnect();
+  });
   room.on(RoomEvent.Disconnected, (reason) => {
     for (const el of audio.splice(0)) el.remove();
     h.ended(reason === undefined ? undefined : String(reason));

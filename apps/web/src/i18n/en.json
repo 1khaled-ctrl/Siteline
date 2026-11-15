@@ -324,13 +324,15 @@
       "note": "Live call with Luna, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks.",
       "ctaTitle": "Talk to Luna live 🎙️",
       "ctaText": "Your voice assistant: just ask out loud, and she answers and moves the screen for you.",
-      "onHint": "Just talk. Luna answers out loud and flies the view for you.",
-      "mutedHint": "Your mic is muted. Unmute to talk, or type below.",
-      "muteShort": "Mute",
-      "unmuteShort": "Unmute",
+      "onHint": "Just talk. Somewhere noisy? Mute your mic so background sound won't cut Luna off.",
+      "mutedHint": "Mic muted: Luna can finish without interruption. Unmute to talk, or type below.",
+      "muteShort": "Mute mic",
+      "unmuteShort": "Unmute mic",
       "hearing": "Listening…",
       "typePlaceholder": "Or type to Luna…",
-      "ctaTextShort": "Tap and just talk. She answers out loud."
+      "ctaTextShort": "Tap and just talk. She answers out loud.",
+      "muteTip": "Turn your microphone off, so noise around you doesn't interrupt Luna",
+      "unmuteTip": "Turn your microphone back on to talk to Luna"
     },
     "chat": {
       "greet": "Hi! I'm Luna 👋 I can fly you to any planet, tell you how far away it is and how long the trip takes, or find a safe place to land on the Moon. What would you like to do?",
@@ -375,7 +377,8 @@
       "ready": "Ready to help",
       "online": "Online",
       "basic": "Basic mode (the AI is unavailable)"
-    }
+    },
+    "noSiteYet": "You haven't picked a spot on the Moon yet. Ask me to find a landing site, or fly to the south pole and click a spot, and I'll check it."
   },
   "share": {
     "button": "Share",
@@ -1240,7 +1243,8 @@
       "descent": "The descent is an illustrative camera path, not a guidance simulation.",
       "provisional": "coarse for now: its own read is on the way",
       "fineCredit": "The ground within {{km}} km is NASA's 5 m shape-from-shading terrain of the {{region}} Artemis III region (Bertone et al., The Planetary Science Journal, doi:10.3847/PSJ/ae5b70; data: Zenodo, doi:10.5281/zenodo.17954508; PGDA product 104), used under CC BY 4.0."
-    }
+    },
+    "sliderHelp": "Drag the yellow slider, or step by hour or day, to move time forward from touchdown and watch the Sun and Earth shift across the sky over the days."
   },
   "hint": {
     "title": "Need a hand? Ask Luna",

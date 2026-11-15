@@ -16,6 +16,7 @@ import {
 import { askAi, type ChatMessage, plainReply, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
 import { findLander } from '../landers';
+import { siteOnScreen } from '../landingAgent';
 import type { LiveSession, LiveState } from '../liveVoice';
 import { physics, queryFor, URLS } from '../physics';
 import { sound } from '../sound';
@@ -316,7 +317,8 @@ export function Copilot() {
     const query = queryFor({ latDeg: s.latDeg, lonDeg: s.lonDeg }, s.landingUtc, s.slipDays);
     return {
       view: s.view,
-      selectedSite: { latDeg: s.latDeg, lonDeg: s.lonDeg },
+      // Off the Moon nothing is selected, though the store keeps a default spot: Luna must not judge it.
+      selectedSite: siteOnScreen(s.view) ? { latDeg: s.latDeg, lonDeg: s.lonDeg } : null,
       landingUtc: query.landingUtc,
       slipDays: s.slipDays,
       stayDays: query.stayDays,
@@ -492,7 +494,11 @@ export function Copilot() {
     }
     if (intent.tool !== 'analyze_site') return;
     // analyze_site: the same check, on the same inputs, that the site report shows.
-    const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
+    const { latDeg, lonDeg, landingUtc, slipDays, view } = useApp.getState();
+    if (!siteOnScreen(view)) {
+      say({ from: 'siteline', text: t('copilot.noSiteYet') }, spoken);
+      return;
+    }
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
     try {
       const s = summarize(await physics.stay(query, URLS), { latDeg, lonDeg }, query.landingUtc);
@@ -751,7 +757,8 @@ export function Copilot() {
                 disabled={liveState === 'connecting'}
                 onClick={toggleMic}
                 aria-pressed={muted}
-                className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium disabled:opacity-60 ${
+                title={muted ? t('copilot.live.unmuteTip') : t('copilot.live.muteTip')}
+                className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap disabled:opacity-60 ${
                   muted ? 'border-sun bg-sun text-panel' : 'border-line-hover bg-panel-raised hover:border-sun'
                 }`}
               >

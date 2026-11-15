@@ -102,6 +102,8 @@ export const sound = {
   tick: () => use((e) => e.tick()),
   /** A small chime when the copilot answers. */
   chime: () => use((e) => e.chime()),
+  /** One slow breath inside a helmet, now and then while standing on the surface. */
+  breath: () => use((e) => e.breath()),
   /** The opening's hum, built from its load progress (0 to 1), swelling into the reveal. */
   drone: {
     start: (progress: number) => use((e) => e.droneStart(progress)),
