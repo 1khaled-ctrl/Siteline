@@ -12,8 +12,11 @@ import dotenv from 'dotenv';
 import { AGENT_NAME } from '../../copilot-worker/src/voiceToken';
 import {
   appStateNote,
+  GOODBYE,
   GREETING,
+  MAX_CALL_MS,
   MAX_SAY_CHARS,
+  MIN_SAY_GAP_MS,
   MODELS,
   RPC,
   timeoutFor,
@@ -93,12 +96,25 @@ export default defineAgent({
     });
     await session.start({ agent: new SiteLineAgent(callBrowser), room: ctx.room });
     // Progress the browser reports while a tool runs (a site found, how far a search has got), spoken as it comes.
+    let lastSayMs = 0;
     ctx.room.localParticipant?.registerRpcMethod(RPC.say, async (data) => {
       if (data.callerIdentity !== visitor.identity) return 'not allowed';
+      const now = Date.now();
+      if (now - lastSayMs < MIN_SAY_GAP_MS) return 'skipped';
+      lastSayMs = now;
       const sentence = data.payload.trim().slice(0, MAX_SAY_CHARS);
       if (sentence) session.say(sentence, { addToChatCtx: false });
       return 'ok';
     });
+    // Every call has an end: after MAX_CALL_MS Luna says goodbye and leaves, which closes the room.
+    const limit = setTimeout(async () => {
+      await session
+        .say(GOODBYE, { allowInterruptions: false })
+        .waitForPlayout()
+        .catch(() => undefined);
+      ctx.shutdown('call time limit');
+    }, MAX_CALL_MS);
+    ctx.addShutdownCallback(async () => clearTimeout(limit));
     // A fixed greeting goes straight to speech, without waiting on the model.
     session.say(GREETING);
   },

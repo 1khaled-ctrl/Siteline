@@ -12,7 +12,7 @@ export const RPC = { tool: 'siteline.tool', state: 'siteline.state', say: 'sitel
 export const MODELS = {
   stt: process.env.SITELINE_STT ?? 'deepgram/flux-general-en',
   llm: process.env.SITELINE_LLM ?? 'openai/gpt-4.1-mini',
-  tts: process.env.SITELINE_TTS ?? 'cartesia/sonic-3',
+  tts: process.env.SITELINE_TTS ?? 'cartesia/sonic-3.6',
   /** The Cartesia voice SiteLine speaks with (chosen by the team). */
   ttsVoice: process.env.SITELINE_TTS_VOICE ?? 'db6b0ed5-d5d3-463d-ae85-518a07d3c2b4',
   /** Used by LiveKit's gateway when the main voice fails, so the agent isn't left silent. */
@@ -52,6 +52,13 @@ export function toolReply(raw: string): string {
     return JSON.stringify({ error: 'the browser sent back something unreadable' });
   }
 }
+
+/** The longest call: a forgotten tab or a script cannot keep a room (and its LiveKit minutes) going for hours. */
+export const MAX_CALL_MS = 15 * 60_000;
+/** Spoken progress lines closer together than this are skipped: a page cannot make Luna talk over herself. */
+export const MIN_SAY_GAP_MS = 2_000;
+export const GOODBYE =
+  "We've been talking for a while, so I'll end the call here. Tap Talk live any time to start again!";
 
 /** Progress lines longer than this are cut: they are meant to be a short spoken sentence. */
 export const MAX_SAY_CHARS = 200;

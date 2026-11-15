@@ -131,10 +131,7 @@ const CHAT: [ChatKind, RegExp][] = [
   ['howAreYou', / (how are you|how r u|how are u|hows it going|how is it going|whats up|wassup|sup) /],
   ['thanks', / (thanks|thank you|thx|ty|cheers|appreciate it|great job|good job|awesome|cool|nice) /],
   ['bye', / (bye|goodbye|see you|see ya|good night|later) /],
-  [
-    'about',
-    / (who are you|what are you|what can you do|what do you do|help|what is siteline|what is this|how does this work|your name) /,
-  ],
+  ['about', / (who are you|what are you|what can you do|what do you do|help|your name) /],
   [
     'greet',
     / (h+e+l+o+|h+e+y+|hi+|hiya|yo|hola|salam|salaam|marhaba|ahlan|good (morning|afternoon|evening)|greetings) /,
@@ -146,7 +143,7 @@ const CHAT: [ChatKind, RegExp][] = [
  * looking at?"), read from a message of any length: an introduction asked for in a long sentence is still one.
  */
 const INTRO =
-  / (introduce|introduction|intro|present|presentation|tour|walk me through|walk us through|overview|demo|explain (the|this) (site|website|app|project|tool|page)|tell (me|us) about (the|this|your) (site|website|app|project|tool|page)|what is (the|this) (site|website|app|project|tool|page)|what does (the|this) (site|website|app|project|tool) do|what am i looking at|what can i do here|what is siteline|what s siteline|about siteline) /;
+  / (introduce|introduction|intro|present|presentation|tour|walk me through|walk us through|overview|demo|explain (the|this) (site|website|app|project|tool|page)|tell (me|us) about (the|this|your) (site|website|app|project|tool|page)|what is (the|this) (site|website|app|project|tool|page)|what does (the|this) (site|website|app|project|tool) do|what am i looking at|what can i do here|what is siteline|what s siteline|about siteline|how does (this|it|siteline) work|show (me|us) around) /;
 
 /** Picks one tool for a message; small talk and anything unplaced get a friendly reply of their own. */
 export function parseIntent(text: string, missions: readonly MissionName[]): Intent {

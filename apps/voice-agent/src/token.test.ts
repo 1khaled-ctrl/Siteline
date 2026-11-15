@@ -22,5 +22,9 @@ describe('the /api/voice-token JWT, read by LiveKit', () => {
     expect(claims.sub).toBe('visitor-v9');
     expect(claims.video).toMatchObject({ room: 'siteline-v9', roomJoin: true, canPublish: true, canSubscribe: true });
     expect(claims.roomConfig?.agents?.[0]?.agentName).toBe(AGENT_NAME);
+    // LiveKit reads the hardening the way it is meant: two people at most, the microphone only.
+    expect(claims.roomConfig?.maxParticipants).toBe(2);
+    expect(claims.video?.canPublishSources).toEqual(['microphone']);
+    expect(claims.video?.canUpdateOwnMetadata).toBe(false);
   });
 });

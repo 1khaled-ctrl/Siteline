@@ -93,6 +93,40 @@ export function speakable(text: string): string {
 }
 
 /** Reads `text` aloud. A new answer cuts off what was being said; `queue` waits its turn (progress lines). */
+export interface VoiceInfo {
+  name: string;
+  lang: string;
+  localService?: boolean;
+}
+
+/**
+ * The most natural voice a device offers for the language, best first: the neural "Natural" and "Online" voices (Edge,
+ * Windows), Google's and Apple's own, a female voice where the name says so (Luna is a she), then any voice in the
+ * language. Undefined lets the browser choose.
+ */
+export function bestVoice<V extends VoiceInfo>(voices: readonly V[], locale: string): V | undefined {
+  const base = locale.slice(0, 2).toLowerCase();
+  const score = (v: V) => {
+    if (!v.lang.toLowerCase().startsWith(base)) return -1;
+    let n = 0;
+    if (/natural|neural|online/i.test(v.name)) n += 8;
+    if (/google|samantha|siri|premium|enhanced/i.test(v.name)) n += 4;
+    if (/aria|jenny|ava|emma|sonia|libby|michelle|zira|female|samantha|karen|moira|tessa|serena/i.test(v.name)) n += 2;
+    if (v.lang.toLowerCase() === locale.toLowerCase()) n += 1;
+    return n;
+  };
+  let best: V | undefined;
+  let bestScore = -1;
+  for (const v of voices) {
+    const sc = score(v);
+    if (sc > bestScore) {
+      best = v;
+      bestScore = sc;
+    }
+  }
+  return bestScore >= 0 ? best : undefined;
+}
+
 export function speak(text: string, language: string, { queue = false }: { queue?: boolean } = {}): void {
   if (!canSpeak()) return;
   const words = speakable(text);
@@ -100,9 +134,14 @@ export function speak(text: string, language: string, { queue = false }: { queue
   if (!queue) window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(words);
   u.lang = localeOf(language);
-  u.rate = 1.04;
+  const voice = bestVoice(window.speechSynthesis.getVoices(), u.lang);
+  if (voice) u.voice = voice;
+  u.rate = 1.02;
   window.speechSynthesis.speak(u);
 }
+
+// Voices load after the page in some browsers: ask early, so the first reply already has the good one.
+if (canSpeak()) window.speechSynthesis.getVoices();
 
 export function stopSpeaking(): void {
   if (canSpeak()) window.speechSynthesis.cancel();

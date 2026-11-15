@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AGENT_NAME, signJwt, visitorClaims, voiceToken } from './voiceToken';
+import { AGENT_NAME, signJwt, tokenAllowed, visitorClaims, voiceToken } from './voiceToken';
 
 const env = {
   LIVEKIT_URL: 'wss://example.livekit.cloud',
@@ -41,10 +41,26 @@ describe('visitorClaims', () => {
       room: 'siteline-abc',
       roomJoin: true,
       canPublish: true,
+      canPublishSources: ['microphone'],
       canSubscribe: true,
       canPublishData: true,
+      canUpdateOwnMetadata: false,
     });
-    expect(c.roomConfig.agents).toEqual([{ agentName: AGENT_NAME }]);
+    expect(c.roomConfig).toEqual({
+      agents: [{ agentName: AGENT_NAME }],
+      maxParticipants: 2,
+      emptyTimeout: 60,
+      departureTimeout: 20,
+    });
+  });
+});
+
+describe('tokenAllowed', () => {
+  it('gives one visitor five calls in ten minutes, then refuses until the window moves on', () => {
+    const got = Array.from({ length: 6 }, (_, i) => tokenAllowed('ip-a', 1_000 + i));
+    expect(got).toEqual([true, true, true, true, true, false]);
+    expect(tokenAllowed('ip-b', 1_000)).toBe(true);
+    expect(tokenAllowed('ip-a', 1_000 + 10 * 60_000 + 10)).toBe(true);
   });
 });
 

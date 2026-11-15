@@ -50,6 +50,27 @@ export const fetchRelay: Relay = async (messages) => {
   return res.json();
 };
 
+/**
+ * What a visitor typed or said, as it goes to the model: without anything shaped like the app's own tags (the screen
+ * state, the number check), so a message cannot pose as either, and cut to a question's length.
+ */
+export function visitorText(text: string): string {
+  return text
+    .replace(/<\/?\s*app_state\s*>/gi, '')
+    .replace(/\[\s*check\s*\]/gi, '')
+    .slice(0, 2_000)
+    .trim();
+}
+
+/**
+ * Numbers about SiteLine itself that Luna's instructions give her for introducing the site (README, "What it does"):
+ * a reply may use them though no tool returns them. Anything else still has to come from a tool.
+ */
+export const APP_FACTS =
+  'SiteLine, a 3D app for NASA Space Apps 2026; dates 2026 to 2035; 46 landers; 2,054 Mars names; 4 checks; 9 Artemis regions; ' +
+  '4 pinned sites; slope under 10 degrees across 100 m; 1.7 m eye height; 50 and 100 m landing circles; 30 m, 10 m and 5 m terrain; ' +
+  'horizons out to 300 km';
+
 /** Every number in a text, as written: "55.9", "2,054", "2028". */
 export const numbersIn = (text: string): string[] => text.match(/\d[\d,]*(?:\.\d+)?/g) ?? [];
 
@@ -99,12 +120,17 @@ export async function askAi(
   relay: Relay = fetchRelay,
 ): Promise<AiOutcome> {
   const state = JSON.stringify(appState);
-  const start: ChatMessage = { role: 'user', content: `<app_state>${state}</app_state>\n${question}` };
+  const start: ChatMessage = { role: 'user', content: `<app_state>${state}</app_state>\n${visitorText(question)}` };
   let messages: ChatMessage[] = [...(history.length > MAX_HISTORY ? [] : history), start];
   const calls: string[] = [];
   const sources = new Set<string>();
   // Numbers a tool gave earlier in the chat count too: "is it cold there?" may answer from the last turn's facts.
-  const seen: string[] = [state, question, ...history.filter((m) => m.role === 'tool').map((m) => m.content)];
+  const seen: string[] = [
+    APP_FACTS,
+    state,
+    question,
+    ...history.filter((m) => m.role === 'tool').map((m) => m.content),
+  ];
   let corrected = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let reply: Awaited<ReturnType<Relay>>;

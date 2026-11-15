@@ -47,6 +47,27 @@ describe('parseIntent', () => {
     expect(kind('explain the app')).toBe('intro');
   });
 
+  it('reads a request to introduce SiteLine as an introduction, however it is put', () => {
+    const kind = (text: string) => {
+      const i = ask(text);
+      return i.tool === 'chat' ? i.input.kind : i.tool;
+    };
+    for (const q of [
+      'can you introduce the website?',
+      'introduce yourself and the site',
+      'give me a tour',
+      'what is this website?',
+      'what does this app do',
+      'tell me about siteline',
+      'how does this work?',
+      'can you please introduce the website to me',
+    ])
+      expect(kind(q), q).toBe('intro');
+    // Still the search, a site check and small talk.
+    expect(ask('Find me a landing site')).toEqual({ tool: 'find_landing_sites' });
+    expect(kind('who are you')).toBe('about');
+  });
+
   it('reads a planet as a visit, and a facts question about any body as space facts', () => {
     expect(ask('show me Saturn')).toEqual({ tool: 'space', input: { body: 'saturn', show: true, facts: true } });
     expect(ask('How far is Jupiter?')).toEqual({ tool: 'space', input: { body: 'jupiter', show: true, facts: true } });

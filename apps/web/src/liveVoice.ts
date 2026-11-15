@@ -1,5 +1,5 @@
 import { ConnectionState, type RemoteTrack, Room, RoomEvent, type RpcInvocationData, Track } from 'livekit-client';
-import type { ToolCall } from './copilotAi';
+import { type ToolCall, visitorText } from './copilotAi';
 
 /**
  * Luna Live in the browser: a LiveKit room with the SiteLine voice agent (apps/voice-agent). The visitor's mic
@@ -141,9 +141,12 @@ export async function startLive(url: string, token: string, h: LiveHandlers): Pr
   return {
     send: async (text) => {
       if (room.state !== ConnectionState.Connected) throw new Error('not connected');
-      await room.localParticipant.sendText(`<app_state>${JSON.stringify(h.appState())}</app_state>\n${text}`, {
-        topic: 'lk.chat',
-      });
+      await room.localParticipant.sendText(
+        `<app_state>${JSON.stringify(h.appState())}</app_state>\n${visitorText(text)}`,
+        {
+          topic: 'lk.chat',
+        },
+      );
     },
     say: async (sentence) => {
       const agent = [...room.remoteParticipants.values()].find((p) => p.isAgent);

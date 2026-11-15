@@ -19,6 +19,24 @@ export interface VoiceEnv {
 export const AGENT_NAME = 'siteline';
 /** Long enough to join; LiveKit keeps a joined visitor connected after the token expires. */
 const TOKEN_TTL_S = 10 * 60;
+/**
+ * Calls cost LiveKit minutes, so tokens are rationed per visitor far more tightly than chat messages: a few calls in ten
+ * minutes is plenty for a person, and a script asking for more is refused. Per isolate, like the relay's limit.
+ */
+const TOKEN_LIMIT = { tokens: 5, windowMs: 10 * 60_000 };
+/** The visitor and Luna, nobody else; the room closes soon after both have left. */
+const ROOM = { maxParticipants: 2, emptyTimeoutS: 60, departureTimeoutS: 20 };
+
+const issued = new Map<string, number[]>();
+/** True when this visitor may have another token now; counts it. */
+export function tokenAllowed(visitor: string, nowMs: number): boolean {
+  const recent = (issued.get(visitor) ?? []).filter((t) => nowMs - t < TOKEN_LIMIT.windowMs);
+  const ok = recent.length < TOKEN_LIMIT.tokens;
+  if (ok) recent.push(nowMs);
+  issued.set(visitor, recent);
+  if (issued.size > 5000) issued.clear();
+  return ok;
+}
 
 const encoder = new TextEncoder();
 
@@ -51,10 +69,18 @@ export function visitorClaims(apiKey: string, visitorId: string, nowS: number) {
       room: `siteline-${visitorId}`,
       roomJoin: true,
       canPublish: true,
+      // The microphone only: no camera or screen share, whatever a modified page asks for.
+      canPublishSources: ['microphone'],
       canSubscribe: true,
       canPublishData: true,
+      canUpdateOwnMetadata: false,
     },
-    roomConfig: { agents: [{ agentName: AGENT_NAME }] },
+    roomConfig: {
+      agents: [{ agentName: AGENT_NAME }],
+      maxParticipants: ROOM.maxParticipants,
+      emptyTimeout: ROOM.emptyTimeoutS,
+      departureTimeout: ROOM.departureTimeoutS,
+    },
   };
 }
 
@@ -78,8 +104,8 @@ export async function voiceToken(
   if (!allowedOrigin(request)) return json({ error: 'origin' }, 403);
   const { LIVEKIT_URL: url, LIVEKIT_API_KEY: apiKey, LIVEKIT_API_SECRET: secret } = env;
   if (!url || !apiKey || !secret) return json({ error: 'no_voice' }, 503);
-  const visitor = `voice:${request.headers.get('CF-Connecting-IP') ?? 'local'}`;
-  if (!underLimit(visitor, nowMs)) return json({ error: 'rate_limited' }, 429);
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
+  if (!underLimit(`voice:${ip}`, nowMs) || !tokenAllowed(ip, nowMs)) return json({ error: 'rate_limited' }, 429);
   const claims = visitorClaims(apiKey, visitorId, Math.floor(nowMs / 1000));
   return json({ url, token: await signJwt(claims, secret), room: claims.video.room, identity: claims.sub });
 }
