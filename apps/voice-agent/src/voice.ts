@@ -58,7 +58,7 @@ export const MAX_SAY_CHARS = 200;
 
 /** What the agent says as the call opens. */
 export const GREETING =
-  "Hi, I'm Luna! Ask me anything about space. I can fly you to any planet, tell you how far it is, or find a safe place to land on the Moon.";
+  "Hi, I'm Luna, SiteLine's guide! I can give you a quick tour, fly you to any planet, or find a safe place to land on the Moon. What would you like?";
 
 /** The app's state for one turn, as a note after the cached prompt (never inside it). */
 export const appStateNote = (state: string) => `<app_state>${state}</app_state>`;
