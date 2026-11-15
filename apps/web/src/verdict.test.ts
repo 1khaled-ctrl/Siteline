@@ -8,7 +8,9 @@ import {
   checksOf,
   firstProblem,
   ICE_LEVELS,
+  ICE_OUTLINE,
   ICE_SOURCES,
+  iceDetectedLineOf,
   iceLineOf,
   rankSites,
   shareLink,
@@ -186,17 +188,53 @@ describe('iceLineOf', () => {
   });
 });
 
+describe('iceDetectedLineOf', () => {
+  it('gives the distance to the nearest ice-bearing region, and says when the site is within its outline', () => {
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 3.2, inside: false })).toEqual({
+      distanceKm: 3.2,
+      withinOutline: false,
+      level: 'detectedNearby',
+      id: 'lemelin-2021-ice-psrs',
+    });
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 0, inside: true })?.withinOutline).toBe(true);
+  });
+
+  it('gives nothing without a region, rather than a made-up distance', () => {
+    expect(iceDetectedLineOf(undefined)).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: Number.NaN, inside: false })).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: -1, inside: false })).toBeUndefined();
+  });
+});
+
 describe('ice evidence wording', () => {
-  it('names three levels, weakest first, and the line only ever shows the first', () => {
-    expect(ICE_LEVELS).toEqual(['canLast', 'consistent', 'detected']);
+  it('names four levels, weakest first, and each reading only ever shows its own', () => {
+    expect(ICE_LEVELS).toEqual(['canLast', 'consistent', 'detectedNearby', 'detected']);
     for (const km of [0, 0.4, 12, 80]) {
       expect(iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult)?.level).toBe(
         'canLast',
       );
+      expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: km, inside: km === 0 })?.level).toBe(
+        'detectedNearby',
+      );
     }
-    // Every level has its words, and the note names all three.
+    // Every level has its words, and the note names the three kinds of evidence.
     for (const level of ICE_LEVELS) expect(en.report.iceLevels[level]).toBeTruthy();
     expect(en.report.iceEvidence).toMatch(/can last.*consistent with ice.*detected/s);
+  });
+
+  it('says what the detected-nearby distance is measured to, with its caveats, and takes its 280 m from the data', () => {
+    expect(en.report.iceDetectedKm).toBe(
+      '{{km}} km to a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)',
+    );
+    expect(en.report.iceDetectedNote).toContain(
+      'Distance to the outline of a shadowed region, which extends {{m}} m beyond the shadow itself',
+    );
+    expect(en.report.iceDetectedNote).toContain('patchy and low in abundance');
+    expect(en.report.iceDetectedNote).toContain('not a guarantee of ice at this site');
+    // The figure is the paper's one M3 pixel, filled in from ICE_OUTLINE, never typed into the words.
+    expect(ICE_OUTLINE).toEqual({ beyondShadowM: 280, source: ICE_SOURCES.detectedNearby });
+    expect(en.report.iceDetectedNote).not.toContain('280');
+    expect(en.sources.methods.ice).not.toContain('280');
   });
 
   it("shows NASA's two figures for a cold trap as NASA prints them, which agree to within its rounding", () => {

@@ -10,6 +10,7 @@ export * from './maps';
 export * from './marsSun';
 export * from './mission';
 export * from './planets';
+export * from './polarRegions';
 export * from './slope';
 export * from './stay';
 export * from './surface';

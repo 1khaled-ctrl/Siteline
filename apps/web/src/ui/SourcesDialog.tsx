@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { CREDITS, FONTS_NOTE, LIBRARIES_NOTE, type Span, spans } from '../credits';
 import { formatNumber } from '../format';
 import { useApp } from '../store';
+import { ICE_OUTLINE } from '../verdict';
 import { Checks } from './Checks';
 
 /** What the sound section explains, in order: the cues, the opening and the controls. */
@@ -19,6 +20,7 @@ const METHODS: { key: string; ids: string[] }[] = [
   { key: 'slope', ids: ['lola-spole-10m'] },
   { key: 'zone', ids: [] },
   { key: 'longTerm', ids: ['pgda-69-illumination', 'landfall-polar-maps'] },
+  { key: 'ice', ids: ['pgda-69-illumination', 'lemelin-2021-ice-psrs'] },
   { key: 'planets', ids: ['spice-de440s'] },
   { key: 'facts', ids: ['body-facts', 'spice-gm-de440'] },
 ];
@@ -108,6 +110,7 @@ function SourcesBody() {
     rule: t(`sources.earthRule.${DEFAULT_STAY.earthRule}`),
     deg: formatNumber(MAX_LANDING_SLOPE_DEG, 0),
     lat: formatNumber(ARTEMIS_ZONE_LAT_DEG, 0).replace('-', '−'),
+    beyond: formatNumber(ICE_OUTLINE.beyondShadowM, 0),
   };
 
   return (

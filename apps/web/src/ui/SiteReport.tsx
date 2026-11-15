@@ -7,7 +7,16 @@ import { touchdownFromQuery } from '../land';
 import { DAY_MS, useStay } from '../physics';
 import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
-import { type Check, COLD_TRAP, checksOf, ICE_SOURCES, iceLineOf, verdictOf } from '../verdict';
+import {
+  type Check,
+  COLD_TRAP,
+  checksOf,
+  ICE_OUTLINE,
+  ICE_SOURCES,
+  iceDetectedLineOf,
+  iceLineOf,
+  verdictOf,
+} from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
@@ -102,7 +111,8 @@ function useVerdictSound(query: StayQuery | undefined, result: StayResult | unde
 
 export function SiteReport() {
   const { t } = useTranslation();
-  const { query, result, terrain, terrainError, longTerm, slope, slopePending, error, loading, retry } = useStay();
+  const { query, result, terrain, terrainError, longTerm, slope, slopePending, iceDetected, error, loading, retry } =
+    useStay();
   useVerdictSound(query, result, slopePending);
   const pins = useApp((s) => s.pins);
   const pinned = query ? pins.some((p) => samePin(p, query.site)) : false;
@@ -119,6 +129,7 @@ export function SiteReport() {
   const c = checksOf(result);
   const verdict = verdictOf(c);
   const ice = iceLineOf(result);
+  const detected = iceDetectedLineOf(iceDetected);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -195,23 +206,53 @@ export function SiteReport() {
             </li>
           ))}
         </ul>
-        {ice && (
+        {(ice || detected) && (
           // The fifth line: information beside the four checks, never one of them, so it has no tick or cross.
           <div className="mt-2 border-t border-line/70 pt-2 text-[12.5px]" data-testid="ice-line">
-            <p>
-              <span aria-hidden="true">◇ </span>
-              {t('report.ice')}:{' '}
-              <strong className="font-semibold">
-                {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
-              </strong>{' '}
-              <span
-                className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
-                data-testid="ice-level"
-              >
-                {t('report.iceLevel', { level: t(`report.iceLevels.${ice.level}`) })}
-              </span>{' '}
-              <ConfidenceBadge level={confidenceOf('longTerm', sure)} terrainM={sure.terrainM} />
-            </p>
+            {ice && (
+              <p>
+                <span aria-hidden="true">◇ </span>
+                {t('report.ice')}:{' '}
+                <strong className="font-semibold">
+                  {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
+                </strong>{' '}
+                <span
+                  className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
+                  data-testid="ice-level"
+                >
+                  {t('report.iceLevel', { level: t(`report.iceLevels.${ice.level}`) })}
+                </span>{' '}
+                <ConfidenceBadge level={confidenceOf('longTerm', sure)} terrainM={sure.terrainM} />
+              </p>
+            )}
+            {detected && (
+              <>
+                <p className={ice ? 'mt-1' : undefined} data-testid="ice-detected">
+                  <span aria-hidden="true">◇ </span>
+                  {t('report.iceDetected')}:{' '}
+                  <strong className="font-semibold">
+                    <Trans
+                      i18nKey={detected.withinOutline ? 'report.iceDetectedWithin' : 'report.iceDetectedKm'}
+                      values={{ km: formatNumber(detected.distanceKm, 1) }}
+                      components={{ link: <SourceLink href={ICE_SOURCES.detectedNearby} /> }}
+                    />
+                  </strong>{' '}
+                  <span
+                    className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
+                    data-testid="ice-detected-level"
+                  >
+                    {t('report.iceLevel', { level: t(`report.iceLevels.${detected.level}`) })}
+                  </span>
+                </p>
+                <p className="mt-1 text-quiet">
+                  <Trans
+                    i18nKey="report.iceDetectedNote"
+                    values={{ m: formatNumber(ICE_OUTLINE.beyondShadowM, 0) }}
+                    components={{ m3: <SourceLink href={ICE_SOURCES.m3} /> }}
+                  />
+                </p>
+              </>
+            )}
             <p className="mt-1 text-quiet">
               <Trans
                 i18nKey="report.iceEvidence"
@@ -336,18 +377,20 @@ export function SiteReport() {
       <p className="text-xs text-quiet">
         {t('report.sources')}:{' '}
         {/* Each dataset once: the long-term maps can be among the check's own sources (the cold trap) too. */}
-        {[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : [])])].map((id, i) => (
-          <Fragment key={id}>
-            {i > 0 && ', '}
-            <button
-              type="button"
-              className="underline decoration-dotted underline-offset-2 hover:text-ink"
-              onClick={() => useApp.getState().setSources(id)}
-            >
-              {id}
-            </button>
-          </Fragment>
-        ))}
+        {[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : []), ...(detected ? [detected.id] : [])])].map(
+          (id, i) => (
+            <Fragment key={id}>
+              {i > 0 && ', '}
+              <button
+                type="button"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                onClick={() => useApp.getState().setSources(id)}
+              >
+                {id}
+              </button>
+            </Fragment>
+          ),
+        )}
       </p>
     </section>
   );
