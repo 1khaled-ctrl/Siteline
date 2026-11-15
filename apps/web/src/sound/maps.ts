@@ -110,3 +110,20 @@ export const VERDICT_NOTES: Record<Verdict, readonly Note[]> = {
   undecided: [{ note: 'E5', at: 0, seconds: 0.3, velocity: 0.38 }],
   fail: [{ note: 'E3', at: 0, seconds: 0.28, velocity: 0.6 }],
 };
+
+/**
+ * One breath inside the helmet: in, a short hold, out, then a rest. Calm while standing or walking (about 15 breaths a
+ * minute, a resting adult's pace); quicker and louder while travelling fast. An impression for the picture, not a
+ * physiological model.
+ */
+export function breathShape(fast: boolean): {
+  inS: number;
+  holdS: number;
+  outS: number;
+  periodS: number;
+  peakDb: number;
+} {
+  return fast
+    ? { inS: 0.7, holdS: 0.1, outS: 0.9, periodS: 2, peakDb: -24 }
+    : { inS: 1.4, holdS: 0.25, outS: 1.9, periodS: 4, peakDb: -30 };
+}

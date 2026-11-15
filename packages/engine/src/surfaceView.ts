@@ -130,6 +130,10 @@ const SKY_M = 800_000;
 /** Walking pace, and the much faster pace Shift gives for getting across the patch (not a walking speed). */
 export const WALK_M_PER_S = 1.4;
 export const FAST_M_PER_S = 12;
+/** The third-person camera: how far behind the body, how far above its eye, and how much it looks down. */
+const THIRD_PERSON_BACK_M = 4.5;
+const THIRD_PERSON_UP_M = 1.3;
+const THIRD_PERSON_TILT_RAD = 0.18;
 const TURN_RAD_PER_S = (70 * Math.PI) / 180;
 const LOOK_RAD_PER_PX = 0.0024;
 const DRAG_RAD_PER_PX = 0.0045;
@@ -394,6 +398,8 @@ export class SurfaceView {
   /** The astronaut you walk as, once loaded, and how far into its stride it is. */
   private body?: AstronautBody;
   private bodyShown = true;
+  /** Seen from behind and above your body rather than from its eye. */
+  private thirdPerson = false;
   private gaitPhase = 0;
   private gaitAmount = 0;
   /** This frame's step along the ground, metres (negative walking backwards), and its speed. */
@@ -716,6 +722,12 @@ export class SurfaceView {
   }
 
   /** Show or hide your own body (the suit, arms and boots you see looking down). */
+  /** Puts the camera behind and above your body (true), or back at your eye (false). The readings stay your eye's. */
+  setThirdPerson(on: boolean): void {
+    this.thirdPerson = on;
+    this.dirty = true;
+  }
+
   setBodyShown(shown: boolean): void {
     this.bodyShown = shown;
     this.dirty = true;
@@ -1063,7 +1075,7 @@ export class SurfaceView {
   private placeBody(ground: number): void {
     const body = this.body;
     if (!body) return;
-    const shown = this.mode === 'explore' && this.bodyShown;
+    const shown = this.mode === 'explore' && (this.bodyShown || this.thirdPerson);
     body.root.visible = shown;
     if (!shown) return;
     body.place(this.pos.east, this.pos.north, ground, this.heading);
@@ -1109,8 +1121,20 @@ export class SurfaceView {
     } else {
       // The ground you see is the finest ring's, which can lie inside the one you walk on (the 5 m inside the 10 m).
       const ground = this.groundAt(this.pos.east, this.pos.north);
-      cam.position.set(this.pos.east, (Number.isFinite(ground) ? ground : 0) + this.eyeM, -this.pos.north);
-      cam.rotation.set(this.pitch, -this.heading, 0, 'YXZ');
+      const eyeUp = (Number.isFinite(ground) ? ground : 0) + this.eyeM;
+      if (this.thirdPerson && this.mode === 'explore') {
+        // Behind and above the body, looking the way it faces, a little down; never under the ground behind it.
+        const [de, dn] = walkStep(this.heading, -1, 0, THIRD_PERSON_BACK_M);
+        const east = this.pos.east + de;
+        const north = this.pos.north + dn;
+        const behind = this.groundAt(east, north);
+        const up = Math.max(eyeUp + THIRD_PERSON_UP_M, (Number.isFinite(behind) ? behind : eyeUp) + 1);
+        cam.position.set(east, up, -north);
+        cam.rotation.set(clampPitch(this.pitch - THIRD_PERSON_TILT_RAD), -this.heading, 0, 'YXZ');
+      } else {
+        cam.position.set(this.pos.east, eyeUp, -this.pos.north);
+        cam.rotation.set(this.pitch, -this.heading, 0, 'YXZ');
+      }
     }
     cam.updateMatrixWorld();
     if (this.body) {
