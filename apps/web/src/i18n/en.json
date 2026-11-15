@@ -525,8 +525,15 @@
     "ice": "Ice nearby (where it can last)",
     "iceKm": "{{km}} km to the nearest permanent shadow",
     "iceAtSite": "this spot is in permanent shadow",
-    "iceProxy": "A proxy: permanent shadow means ice can last there, not that ice has been found. It is shown, not checked: no distance here counts as near enough.",
-    "iceUses": "Ice can become drinking water, oxygen and rocket propellant (<link>The Planetary Society</link>)."
+    "iceUses": "Ice can become drinking water, oxygen and rocket propellant (<link>The Planetary Society</link>).",
+    "iceLevel": "Evidence: {{level}}",
+    "iceLevels": {
+      "canLast": "can last",
+      "consistent": "consistent with ice",
+      "detected": "detected"
+    },
+    "iceEvidence": "Ice evidence comes at three levels: <b>can last</b> (permanent shadow, shown here), <b>consistent with ice</b> (brighter laser reflectance in the coldest ground, <fisher>Fisher et al. 2017</fisher>) and <b>detected</b> (measured directly, as by the LCROSS impact at Cabeus, <lcross>Colaprete et al. 2010</lcross>, and as patchy surface ice in M3 spectra, <m3>Li et al. 2018</m3>). This line shows only the first: ice can last there, not that ice is there. It is shown, not checked: no distance counts as near enough, and it never changes Pass or Fail.",
+    "iceColdTrap": "<nasa>NASA</nasa> describes cold traps as permanently dark ground below {{c}} °C ({{f}} °F), where water ice can last for millions or billions of years. SiteLine maps the shadow, not its temperature."
   },
   "robot": {
     "heading": "Fit for a robot",
@@ -905,7 +912,7 @@
     "place": "The place you picked",
     "fold": "Fold this card away",
     "unfold": "Open this card",
-    "ice": "Ice nearby"
+    "ice": "Ice nearby (can last)"
   },
   "sheet": {
     "open": "Show the panel",

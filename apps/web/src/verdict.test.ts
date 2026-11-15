@@ -1,6 +1,19 @@
 import type { Reason, StayResult } from '@siteline/contracts';
 import { describe, expect, it } from 'vitest';
-import { bestOf, cardFileName, checksOf, firstProblem, iceLineOf, rankSites, shareLink, verdictOf } from './verdict';
+import en from './i18n/en.json';
+import {
+  bestOf,
+  COLD_TRAP,
+  cardFileName,
+  checksOf,
+  firstProblem,
+  ICE_LEVELS,
+  ICE_SOURCES,
+  iceLineOf,
+  rankSites,
+  shareLink,
+  verdictOf,
+} from './verdict';
 
 function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
   return {
@@ -155,8 +168,8 @@ describe('iceLineOf', () => {
   const stay = (iceDistanceKm?: number) => ({ reasons: [], slope100mDeg: 1, iceDistanceKm }) as unknown as StayResult;
 
   it('gives the distance to the nearest permanent shadow, and says when the site itself is in one', () => {
-    expect(iceLineOf(stay(2.4))).toEqual({ distanceKm: 2.4, atSite: false });
-    expect(iceLineOf(stay(0))).toEqual({ distanceKm: 0, atSite: true });
+    expect(iceLineOf(stay(2.4))).toEqual({ distanceKm: 2.4, atSite: false, level: 'canLast' });
+    expect(iceLineOf(stay(0))).toEqual({ distanceKm: 0, atSite: true, level: 'canLast' });
   });
 
   it('gives nothing where the maps carry no distance, rather than a made-up one', () => {
@@ -170,5 +183,50 @@ describe('iceLineOf', () => {
     const far = stay(40);
     expect(verdictOf(checksOf(near))).toBe(verdictOf(checksOf(far)));
     expect(Object.keys(checksOf(near))).not.toContain('ice');
+  });
+});
+
+describe('ice evidence wording', () => {
+  it('names three levels, weakest first, and the line only ever shows the first', () => {
+    expect(ICE_LEVELS).toEqual(['canLast', 'consistent', 'detected']);
+    for (const km of [0, 0.4, 12, 80]) {
+      expect(iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult)?.level).toBe(
+        'canLast',
+      );
+    }
+    // Every level has its words, and the note names all three.
+    for (const level of ICE_LEVELS) expect(en.report.iceLevels[level]).toBeTruthy();
+    expect(en.report.iceEvidence).toMatch(/can last.*consistent with ice.*detected/s);
+  });
+
+  it("shows NASA's two figures for a cold trap as NASA prints them, which agree to within its rounding", () => {
+    expect(COLD_TRAP).toMatchObject({ belowF: -260, belowC: -163 });
+    // −260 °F is −162.2 °C: NASA rounds both, so they agree to about a degree, and neither is worked out here.
+    expect(Math.abs(((COLD_TRAP.belowF - 32) * 5) / 9 - COLD_TRAP.belowC)).toBeLessThan(1);
+    expect(COLD_TRAP.source).toBe(ICE_SOURCES.coldTraps);
+  });
+
+  it('links every source by https, and names no URL twice', () => {
+    const urls = Object.values(ICE_SOURCES);
+    for (const url of urls) expect(url).toMatch(/^https:\/\//);
+    expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it('never says ice is at a place, that it was found at the Artemis sites, or that it lies in large fields', () => {
+    const strings: string[] = [];
+    const walk = (v: unknown) => {
+      if (typeof v === 'string') strings.push(v);
+      else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
+    };
+    walk(en);
+    const overstated =
+      /\bice is here\b|found ice|ice (was|has been) found at the artemis|ice fields?\b|large (ice|deposits)/i;
+    // The pattern itself catches what it guards against, so an empty list means something.
+    for (const bad of ['Ice is here.', 'NASA found ice at the Artemis sites.', 'Large ice fields at the pole.']) {
+      expect(overstated.test(bad), bad).toBe(true);
+    }
+    expect(overstated.test('Ice can last there, not that ice is there.')).toBe(false);
+    expect(strings.length).toBeGreaterThan(100);
+    expect(strings.filter((x) => overstated.test(x))).toEqual([]);
   });
 });

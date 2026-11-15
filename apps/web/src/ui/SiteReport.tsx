@@ -7,7 +7,7 @@ import { touchdownFromQuery } from '../land';
 import { DAY_MS, useStay } from '../physics';
 import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
-import { type Check, checksOf, ICE_USES_URL, iceLineOf, verdictOf } from '../verdict';
+import { type Check, COLD_TRAP, checksOf, ICE_SOURCES, iceLineOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
@@ -204,16 +204,37 @@ export function SiteReport() {
               <strong className="font-semibold">
                 {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
               </strong>{' '}
+              <span
+                className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
+                data-testid="ice-level"
+              >
+                {t('report.iceLevel', { level: t(`report.iceLevels.${ice.level}`) })}
+              </span>{' '}
               <ConfidenceBadge level={confidenceOf('longTerm', sure)} terrainM={sure.terrainM} />
             </p>
-            <p className="mt-1 text-quiet">{t('report.iceProxy')}</p>
             <p className="mt-1 text-quiet">
               <Trans
-                i18nKey="report.iceUses"
+                i18nKey="report.iceEvidence"
                 components={{
-                  link: <SourceLink href={ICE_USES_URL} />,
+                  b: <strong className="font-semibold text-ink" />,
+                  fisher: <SourceLink href={ICE_SOURCES.consistent} />,
+                  lcross: <SourceLink href={ICE_SOURCES.lcross} />,
+                  m3: <SourceLink href={ICE_SOURCES.m3} />,
                 }}
               />
+            </p>
+            <p className="mt-1 text-quiet">
+              <Trans
+                i18nKey="report.iceColdTrap"
+                values={{
+                  c: formatNumber(COLD_TRAP.belowC, 0).replace('-', '−'),
+                  f: formatNumber(COLD_TRAP.belowF, 0).replace('-', '−'),
+                }}
+                components={{ nasa: <SourceLink href={COLD_TRAP.source} /> }}
+              />
+            </p>
+            <p className="mt-1 text-quiet">
+              <Trans i18nKey="report.iceUses" components={{ link: <SourceLink href={ICE_SOURCES.uses} /> }} />
             </p>
           </div>
         )}

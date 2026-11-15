@@ -21,15 +21,48 @@ export function checksOf(r: StayResult): Record<CheckKey, Check> {
   };
 }
 
+/**
+ * How strong the evidence for ice at a place is, weakest first: ice can last there (permanent shadow), the ground is
+ * consistent with ice (brighter LOLA reflectance in the coldest places, Fisher et al. 2017), or ice was detected there
+ * by a direct measurement (LCROSS at Cabeus, Colaprete et al. 2010; M3, Li et al. 2018). A level is shown for a place
+ * only where we hold a sourced map or point for it; today that is only the first.
+ */
+export const ICE_LEVELS = ['canLast', 'consistent', 'detected'] as const;
+export type IceLevel = (typeof ICE_LEVELS)[number];
+
 /** The stay's fifth line: how far it is to the nearest permanent shadow, where ice can last. */
 export interface IceLine {
   distanceKm: number;
   /** The site itself is in permanent shadow, by the map the distance comes from. */
   atSite: boolean;
+  /**
+   * The only level this line can show: the distance is to permanent shadow, so ice can last there. A stronger level
+   * needs its own sourced data first, so the type allows nothing else.
+   */
+  level: Extract<IceLevel, 'canLast'>;
 }
 
-/** The Planetary Society's guide, for what ice near a site could be used for. */
-export const ICE_USES_URL = 'https://www.planetary.org/articles/water-on-the-moon-guide';
+/** The pages the ice line's words come from, each opened and read before it was linked (2026-11-15). */
+export const ICE_SOURCES = {
+  /** The Planetary Society's guide, for what ice near a site could be used for. */
+  uses: 'https://www.planetary.org/articles/water-on-the-moon-guide',
+  /** NASA's article on LRO's frost evidence (31 May 2017), for what a cold trap is. */
+  coldTraps: 'https://www.nasa.gov/missions/nasa-orbiter-finds-new-evidence-of-frost-on-moons-surface/',
+  /** Fisher et al. 2017, Icarus 292, 74-85, on PubMed Central: reflectance consistent with ice. */
+  consistent: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC7197374/',
+  /** Colaprete et al. 2010, Science 330, 463-468: water detected in the LCROSS plume at Cabeus. */
+  lcross: 'https://doi.org/10.1126/science.1186986',
+  /** Li et al. 2018, PNAS 115, 8907-8912: patchy surface ice seen by M3. */
+  m3: 'https://doi.org/10.1073/pnas.1802345115',
+} as const;
+
+/**
+ * NASA's description of a lunar cold trap, as its page prints it: permanently dark ground "where temperatures remain
+ * below minus 260 degrees Fahrenheit (minus 163 degrees Celsius)", where "water ice can persist for millions or billions
+ * of years". Both figures are NASA's own, shown as printed; neither is worked out from the other. SiteLine maps
+ * permanent shadow, not its temperature, so this describes cold traps in general, never the shadow nearest a site.
+ */
+export const COLD_TRAP = { belowF: -260, belowC: -163, source: ICE_SOURCES.coldTraps } as const;
 
 /**
  * The ice line, from the stay's `iceDistanceKm` (the nearest permanent shadow on NASA's long-term maps): a proxy, since
@@ -40,7 +73,7 @@ export const ICE_USES_URL = 'https://www.planetary.org/articles/water-on-the-moo
 export function iceLineOf(r: StayResult): IceLine | undefined {
   const km = r.iceDistanceKm;
   if (km === undefined || !Number.isFinite(km) || km < 0) return undefined;
-  return { distanceKm: km, atSite: km === 0 };
+  return { distanceKm: km, atSite: km === 0, level: 'canLast' };
 }
 
 /** Any failed check fails the site; otherwise any unknown one leaves it undecided. */
