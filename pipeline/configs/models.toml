@@ -1,0 +1,162 @@
+# NASA 3D models for the lander cards: what to build, from where, how, and what to say about each one.
+#
+# Read by siteline_pipeline.models (see pipeline/README.md, "NASA 3D models"). Adding or updating a model is a change to
+# this file and one row in CREDITS.md, then a run on the pipeline VM: no code changes.
+#
+# Every model is a [models.<id>] table. The id is lower-case letters, digits and single underscores, and becomes the
+# file name in the bucket: models/v<version>/<id>.json. Fields:
+#
+#   folder         the model's folder in the mirror, under "3D Models/"
+#   file           the .glb file in that folder (models that exist only as .blend, .3ds or .lwo cannot be used)
+#   textureSize    largest texture side in pixels after optimizing (default below)
+#   simplifyError  optional: how far meshoptimizer may move the surface, as a fraction of the model's size. Without it
+#                  the tool's own default (0.0001) applies. 0.005 shrinks dense models a lot
+#   version        optional, default 1. A published file is never replaced: to change a published model, raise this,
+#                  and the new build goes to models/v<version+1>/<id>.json
+#   name           the name the card shows
+#   sourceUrl      NASA's page for the model on science.nasa.gov, read before the model is labelled
+#   credit         the model's credit line, exactly as the "Source" field of that page gives it
+#   status         "flew", "prototype", "concept" or "being checked". Anything but "being checked" needs:
+#   statusSource   the NASA page that says so, and
+#   statusNote     what that page says, in short. A model with no such page is "being checked", and the card says so
+#   mission        the id of its mission in data/missions.json, or "none". Never a mission made up for a model
+#   logoChecked    true only once every texture of the built file has been looked at and none shows the NASA insignia,
+#                  the NASA logotype or another organisation's logo (NASA's guidelines: those are not public domain)
+#   logoCheck      what was looked at, by whom and when
+#   rejected       optional: why the model must not be published. It is still built (so a run can be compared with an
+#                  earlier one) but never written to data/models.json or uploaded
+#   note           optional: anything a reader of the card should know
+
+datasetId = "nasa-3d-resources"
+repo = "nasa/NASA-3D-Resources"
+# The mirror's master on 2026-11-15, the commit the first builds (by hand, on the VM) read. NASA publishes no
+# checksums: the build reads each file's size and git blob hash from GitHub's listing of this commit and checks the
+# download against them.
+commit = "11ebb4ee043715aefbba6aeec8a61746fad67fa7"
+rawBase = "https://raw.githubusercontent.com/nasa/NASA-3D-Resources"
+# The optimizer, through npx. NASA's .glb files are Draco-compressed and the app's loader has no Draco decoder, so each
+# file is rewritten with quantised geometry (no decoder needed) and WebP textures.
+tool = "@gltf-transform/cli@4.5.1"
+# Where a person uploads the files from the VM: its rclone remote reaches only this bucket, which is public at
+# publicBase. The app already reads terrain from that address.
+remote = "r2:siteline-terrain"
+publicBase = "https://pub-950982926f534224a9e16061b39f6217.r2.dev"
+# 5 MiB, a loading-time target for phones. A file over it fails the build.
+limitBytes = 5242880
+licence = """The mirror's README says "These assets are free and without copyright" and points to NASA's media usage \
+guidelines, which say NASA content, including material "used in the rendition of 3-dimensional models, such as texture \
+maps and polygon data in any format", is generally not subject to copyright in the United States, and ask that NASA be \
+acknowledged as the source. The same guidelines say the NASA Insignia, Logotype and identifiers are not in the public \
+domain and their use is protected by law, so no model whose textures show one is published. The mirror's meta.json \
+names the NASA Open Source Agreement Version 1.3 for the repository."""
+citation = "NASA 3D Resources, National Aeronautics and Space Administration; each model credited as its NASA page credits it."
+
+[defaults]
+textureSize = 1024
+
+[models.lro_b]
+folder = "Lunar Reconnaissance Orbiter (B)"
+file = "Lunar Reconnaissance Orbiter (B).glb"
+name = "Lunar Reconnaissance Orbiter (B)"
+sourceUrl = "https://science.nasa.gov/3d-resources/lunar-reconnaissance-orbiter-b/"
+credit = "NASA/Brian E. Kumanchik; NASA/Christian A. Lopez"
+status = "being checked"
+mission = "none"
+logoChecked = true
+logoCheck = "All five textures of the hand-built file looked at by the Data session on 2026-11-15: solar cells, wiring, foil, instrument close-ups and two colour ramps, no logo or insignia. The owner's own visual check is separate."
+note = "NASA's page for this model describes IBEX and names IBEX as its mission, although the model is titled Lunar Reconnaissance Orbiter. Which spacecraft it shows is being checked."
+
+[models.lro_a]
+folder = "Lunar Reconnaissance Orbiter (A)"
+file = "Lunar Reconnaissance Orbiter (A).glb"
+name = "Lunar Reconnaissance Orbiter (A)"
+sourceUrl = "https://science.nasa.gov/3d-resources/lunar-reconnaissance-orbiter-a/"
+credit = "NASA/Christopher R. Meaney"
+status = "flew"
+statusSource = "https://science.nasa.gov/mission/lro/"
+statusNote = "NASA's mission page gives its launch as June 18, 2009 and says it has studied the Moon from up close since 2009."
+mission = "none"
+logoChecked = true
+logoCheck = "The built file has no picture textures, only one 128 x 4 colour palette, looked at by the Data session on 2026-11-15."
+
+[models.ladee]
+folder = "Lunar Atmosphere and Dust Environment Explorer (LADEE)"
+file = "Lunar Atmosphere and Dust Environment Explorer (LADEE).glb"
+name = "Lunar Atmosphere and Dust Environment Explorer (LADEE)"
+sourceUrl = "https://science.nasa.gov/3d-resources/lunar-atmosphere-and-dust-environment-explorer-ladee/"
+credit = "NASA/Christopher R. Meaney"
+status = "flew"
+statusSource = "https://science.nasa.gov/mission/ladee/"
+statusNote = "NASA's mission page says it launched on Sept. 6, 2013 and that the mission ended on April 18, 2014, when it impacted the Moon as planned."
+mission = "none"
+logoChecked = true
+logoCheck = "The built file has no picture textures, only one 128 x 4 colour palette, looked at by the Data session on 2026-11-15."
+
+[models.llcd]
+folder = "Lunar Laser Communications Demonstration (LLCD)"
+file = "Lunar Laser Communications Demonstration (LLCD).glb"
+textureSize = 512
+simplifyError = 0.005
+name = "Lunar Laser Communications Demonstration (LLCD)"
+sourceUrl = "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/"
+credit = "NASA/Christopher R. Meaney"
+status = "flew"
+statusSource = "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/"
+statusNote = "NASA's page says the technology was demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission."
+mission = "none"
+logoChecked = true
+logoCheck = "The built file has no picture textures, only two 128 x 4 palettes (colour, metal and roughness), looked at by the Data session on 2026-11-15."
+
+[models.hdu_part_2]
+folder = "Habitat Demonstration Unit"
+file = "Habitat Demonstration Unit (part 2).glb"
+name = "Habitat Demonstration Unit (part 2)"
+sourceUrl = "https://science.nasa.gov/3d-resources/habitat-demonstration-unit/"
+credit = "NASA/LaRC/Advanced Concepts Lab"
+status = "being checked"
+mission = "none"
+logoChecked = true
+logoCheck = "The one texture of the hand-built file looked at by the Data session on 2026-11-15, with a zoomed look at its small labels: panels, grilles and fittings, no logo or insignia. The owner's own visual check is separate."
+note = "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested."
+
+[models.hdu_part_1]
+folder = "Habitat Demonstration Unit"
+file = "Habitat Demonstration Unit (part 1).glb"
+name = "Habitat Demonstration Unit (part 1)"
+sourceUrl = "https://science.nasa.gov/3d-resources/habitat-demonstration-unit/"
+credit = "NASA/LaRC/Advanced Concepts Lab"
+status = "being checked"
+mission = "none"
+logoChecked = false
+logoCheck = "Its texture, looked at by the Data session on 2026-11-15, shows the NASA insignia twice on the hull."
+rejected = "Its texture shows the NASA insignia, which is not in the public domain."
+
+[models.insight_arm_deployed]
+folder = "InSight Cruise Lander"
+file = "InSight Cruise Lander (arm deployed).glb"
+textureSize = 512
+simplifyError = 0.005
+name = "InSight lander (arm deployed)"
+sourceUrl = "https://science.nasa.gov/3d-resources/insight-cruise-lander/"
+credit = "NASA/Brian E. Kumanchik"
+status = "flew"
+statusSource = "https://science.nasa.gov/mission/insight/"
+statusNote = "NASA's mission page gives its landing on Mars as Nov. 26, 2018 and the end of the mission as Dec. 15, 2022."
+mission = "insight"
+logoChecked = false
+logoCheck = "Its texture InSIGHT_tex_02, looked at by the Data session on 2026-11-15, carries a plate with the NASA insignia and the DLR and CNES logos."
+rejected = "Its texture shows the NASA insignia and the DLR and CNES logos."
+
+[models.rassor]
+folder = "Regolith Advanced Surface Systems Operations Robot (RASSOR)"
+file = "Regolith Advanced Surface Systems Operations Robot (RASSOR).glb"
+textureSize = 512
+simplifyError = 0.005
+name = "Regolith Advanced Surface Systems Operations Robot (RASSOR)"
+sourceUrl = "https://science.nasa.gov/3d-resources/regolith-advanced-surface-systems-operations-robot-rassor/"
+credit = "NASA/Dewey L. Smith; NASA/Jason M. Schuler"
+status = "being checked"
+mission = "none"
+logoChecked = true
+logoCheck = "The file has no textures at all (one plain material), checked by the Data session on 2026-11-15."
+note = "NASA's page describes a robotic excavator for precursor landing missions. Neither it nor NASA's technology page for RASSOR (KSC-TOPS-7) says what was built or flown. It has not been to the Moon."
