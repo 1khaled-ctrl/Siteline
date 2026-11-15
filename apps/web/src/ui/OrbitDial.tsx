@@ -2,7 +2,7 @@ import { type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } f
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
 import { sound } from '../sound';
-import { openFacts, useStage } from '../stage';
+import { backToSystem, closerLook, useStage } from '../stage';
 import { samePin, useApp } from '../store';
 import { FLYABLE, type Flyable, WORLDS, type World, worldColour } from './WorldsList';
 
@@ -34,6 +34,7 @@ export function OrbitDial() {
   const latDeg = useApp((s) => s.latDeg);
   const lonDeg = useApp((s) => s.lonDeg);
   const world = useStage((s) => s.dialWorld);
+  const close = useStage((s) => s.solarCloseUp);
   const sheetOpen = useStage((s) => s.sheetOpen);
   const opened = useBoot((s) => s.opened);
   const [sitesMode, setSitesMode] = useState(false);
@@ -66,10 +67,13 @@ export function OrbitDial() {
     }
   }
 
-  /** A tap on the middle: fly to the picked world, open or close another planet's facts, or go back to the landing time. */
+  /**
+   * A tap on the middle: fly to the picked world, take a closer look at another planet (or come back from it), or go
+   * back to the landing time.
+   */
   function press() {
     if (mode === 'worlds' && FLYABLE.has(world)) useApp.getState().commandSolar(world as Flyable);
-    else if (mode === 'worlds' && world !== 'sun') openFacts(world);
+    else if (mode === 'worlds' && world !== 'sun') void (close === world ? backToSystem() : closerLook(world));
     else if (mode === 'time') useApp.getState().setPlay({ playing: false, playOffsetH: 0 });
   }
 
@@ -186,7 +190,11 @@ export function OrbitDial() {
             {mode === 'worlds'
               ? FLYABLE.has(world)
                 ? t('dial.tapFly')
-                : t('dial.turn')
+                : world === 'sun'
+                  ? t('dial.turn')
+                  : close === world
+                    ? t('dial.tapBack')
+                    : t('dial.tapLook')
               : mode === 'time'
                 ? t('dial.tapReset')
                 : t('dial.turn')}

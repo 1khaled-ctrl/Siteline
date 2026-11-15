@@ -403,9 +403,7 @@
     "landers": "Landers",
     "landersCount": "{{past}} that have gone, {{toCome}} still to come, in our <list>mission list</list>",
     "landersNone": "No landings in our <list>mission list</list>",
-    "close": "Close the facts card",
-    "open": "Facts",
-    "openFor": "Facts for {{name}}"
+    "close": "Close the facts card"
   },
   "compare": {
     "heading_one": "{{count}} pinned site",
@@ -659,8 +657,11 @@
     "neptune": "Neptune"
   },
   "solar": {
-    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there.",
-    "flying": "Flying there…"
+    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there. Click any other planet for its facts and a closer look.",
+    "flying": "Flying there…",
+    "back": "Back to the solar system",
+    "backShort": "Back",
+    "closeHint": "Beside {{name}}. Drag to turn, scroll to zoom. There is no landing view here: SiteLine has no surface data for {{name}}."
   },
   "globe": {
     "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
@@ -897,6 +898,8 @@
   },
   "callout": {
     "fly": "Fly there",
+    "closer": "Take a closer look",
+    "closerTo": "Take a closer look at {{name}}",
     "sourceDe440": "Positions: NASA JPL DE440",
     "site": "Landing site",
     "fullReport": "Full report",
@@ -929,6 +932,8 @@
     "site": "Site {{n}} of {{of}}",
     "turn": "Turn",
     "tapFly": "Tap to fly",
+    "tapLook": "Tap to look",
+    "tapBack": "Tap: back",
     "tapReset": "Tap: landing",
     "modeTime": "Time",
     "modeSites": "Pinned sites"
