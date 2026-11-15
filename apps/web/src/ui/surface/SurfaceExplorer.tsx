@@ -132,8 +132,6 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [darkHere, setDarkHere] = useState(false);
   /** In shadow, the picture is exposed for it; `faint` when even the longest exposure finds almost no light. */
   const [shadowLight, setShadowLight] = useState<'exposed' | 'faint' | null>(null);
-  const inspectOnRef = useRef(false);
-  inspectOnRef.current = inspectOn;
   // On a narrow screen the view's options fold away behind one button, to keep the horizon in view.
   const [toolsOpen, setToolsOpen] = useState(!narrow);
 
@@ -222,13 +220,13 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   };
 
   /**
-   * Whether the ground around (east, north) is mostly in shadow; if so (and the inspection light is off), the picture is
-   * exposed for the shadow's own light.
+   * Whether the ground around (east, north) is mostly in shadow; if so, the picture is exposed for the shadow's own light
+   * (the inspection light, if on, is added at its own brightness on top).
    */
   const judgeShadow = useCallback((view: SurfaceView, east: number, north: number) => {
     const dark = view.sunlitAround(east, north, DARK_RADIUS_M) < DARK_SHARE;
     setDarkHere(dark);
-    const exposed = view.exposeForShadow(dark && !inspectOnRef.current, east, north);
+    const exposed = view.exposeForShadow(dark, east, north);
     setShadowLight(dark ? (exposed.limited ? 'faint' : 'exposed') : null);
   }, []);
 
@@ -389,14 +387,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     return () => observer.disconnect();
   }, [exploring]);
   useEffect(() => viewRef.current?.setTouchdownMarker(markerOn), [markerOn]);
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    view.setInspectionLight(inspectOn);
-    // The lamp lights the shadow itself: no need to expose for it while it is on.
-    const { east, north } = view.position();
-    judgeShadow(view, east, north);
-  }, [inspectOn, judgeShadow]);
+  useEffect(() => viewRef.current?.setInspectionLight(inspectOn), [inspectOn]);
 
   const shiftClock = (hours: number) =>
     setOffsetMs((ms) => Math.min(OFFSET_MAX_H, Math.max(OFFSET_MIN_H, Math.round(ms / HOUR_MS) + hours)) * HOUR_MS);
@@ -637,9 +628,12 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 data-testid="surface-dark"
               >
                 <p className={`min-w-0 flex-1 basis-44 ${inspectOn ? 'text-accent' : 'text-quiet'}`}>
-                  {inspectOn
-                    ? t('land.inspectOn')
-                    : `${t('land.darkHere')} ${t(shadowLight === 'faint' ? 'land.darkFaint' : 'land.darkExposed')}`}
+                  {[
+                    inspectOn ? t('land.inspectOn') : t('land.darkHere'),
+                    darkHere && t(shadowLight === 'faint' ? 'land.darkFaint' : 'land.darkExposed'),
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                 </p>
                 <button
                   type="button"

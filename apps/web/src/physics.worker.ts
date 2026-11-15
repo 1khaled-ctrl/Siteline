@@ -71,6 +71,7 @@ import * as Comlink from 'comlink';
 import type { GeoTIFFImage, RemoteSourceOptions } from 'geotiff';
 import fineRegions from './a3clrRegions.json';
 import { type DayStrip, dayStrip } from './dayStrip';
+import { cacheStorageStore, cachingFetch } from './terrainCache';
 import { checksOf, verdictOf } from './verdict';
 
 const EPHEMERIS_SOURCES = ['spice-de440s', 'spice-moon-pa', 'spice-moon-fk', 'spice-naif0012'];
@@ -1087,7 +1088,15 @@ async function loadFineRegion(
   onBytes: (bytes: number) => void,
 ): Promise<TerrainLevel> {
   const url = `${fineRegions.baseUrl}/${region.archive}`;
-  const packed = await fetchRange(url, region.dataOffset, region.compressedBytes, signal, onBytes);
+  // A region downloaded on an earlier visit is kept whole (once it has passed its check), and read back from there.
+  const keptKey = `${url}#member:${region.dataOffset}:${region.compressedBytes}`;
+  const kept = await terrainStore.get(keptKey);
+  const fromKept = kept?.length === region.compressedBytes;
+  if (fromKept) onBytes(region.compressedBytes);
+  const packed: Uint8Array<ArrayBuffer> =
+    fromKept && kept
+      ? new Uint8Array(kept)
+      : await fetchRange(url, region.dataOffset, region.compressedBytes, signal, onBytes);
   let bytes: Uint8Array;
   if (region.method === 0) bytes = packed;
   else if (region.method === 8) {
@@ -1097,6 +1106,7 @@ async function loadFineRegion(
   throwIfCancelled(signal);
   if (bytes.length !== region.bytes || crc32(bytes) !== region.crc32)
     throw new Error(`${region.archive}: the 5 m terrain failed its check`);
+  if (!fromKept) void terrainStore.put(keptKey, packed);
   const { fromArrayBuffer } = await import('geotiff');
   const image = await (await fromArrayBuffer(bytes.buffer as ArrayBuffer)).getImage();
   return levelOf(image, image);
@@ -1748,4 +1758,11 @@ async function passingSites(
 }
 
 export type PhysicsApi = typeof api;
+
+/**
+ * The terrain files' byte ranges, kept in the browser between visits (terrainCache.ts): every GeoTIFF read in this
+ * worker goes through it, and so does the 5 m terrain, kept whole. The cache's name changes if what is kept ever does.
+ */
+const terrainStore = cacheStorageStore('siteline-terrain-v1');
+self.fetch = cachingFetch(self.fetch.bind(self), terrainStore, (url) => /\.tiff?($|\?)/i.test(url));
 Comlink.expose(api);
