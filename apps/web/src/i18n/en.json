@@ -1226,7 +1226,7 @@
     "fineOffer": "Finer ground: NASA's 5 m terrain ({{mb}} MB)",
     "fineOfferNote": "This point is in {{region}}, one of NASA's Artemis III candidate regions, mapped at 5 m by shape-from-shading. The model is downloaded once for this visit.",
     "lookMouse": "Look with the mouse",
-    "lookHint": "Drag to look around. W A S D or the arrow keys walk, Q and E turn, Shift travels fast ({{fast}} m/s, not a walking pace), V switches to third person.",
+    "lookHint": "Drag to look around. W A S D or the arrow keys walk, Q and E turn, V switches to third person.",
     "lockedHint": "The mouse is captured for looking. Press Esc to release it.",
     "touchHint": "Drag to look around; hold an arrow to walk.",
     "walk": {
@@ -1290,7 +1290,9 @@
       "provisional": "coarse for now: its own read is on the way",
       "fineCredit": "The ground within {{km}} km is NASA's 5 m shape-from-shading terrain of the {{region}} Artemis III region (Bertone et al., The Planetary Science Journal, doi:10.3847/PSJ/ae5b70; data: Zenodo, doi:10.5281/zenodo.17954508; PGDA product 104), used under CC BY 4.0."
     },
-    "sliderHelp": "Drag the yellow slider, or step by hour or day, to move time forward from touchdown and watch the Sun and Earth shift across the sky over the days."
+    "sliderHelp": "Drag the yellow slider, or step by hour or day, to move time forward from touchdown and watch the Sun and Earth shift across the sky over the days.",
+    "sprintHint": "Hold to sprint at {{fast}} m/s instead of walking pace.",
+    "sprintKey": "⇧ Shift"
   },
   "hint": {
     "title": "Ask Luna for help",

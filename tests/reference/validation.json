@@ -50,14 +50,14 @@
   "worstDeg": 0.005730358682082035,
   "toleranceDeg": 0.03,
   "reference": "SPICE spkpos SUN from EARTH in ITRF93, geometric; precession and obliquity of date, no nutation",
-  "recordedUtc": "2026-11-15T21:20:04.057Z"
+  "recordedUtc": "2026-11-15T21:47:21.130Z"
  },
  "marsSun": {
   "cases": 40,
   "worstDeg": 0.0000065976355361199995,
   "toleranceDeg": 0.001,
   "reference": "SPICE spkpos SUN from MARS BARYCENTER in IAU_MARS (pck00011.tpc), geometric, 2026 to 2036",
-  "recordedUtc": "2026-11-15T21:20:04.340Z"
+  "recordedUtc": "2026-11-15T21:47:20.847Z"
  },
  "sunlight30m": {
   "terrain": "LOLA LDEM_75S_30MPP_ADJ at 30 m per pixel near the site, about 1 km beyond it",
