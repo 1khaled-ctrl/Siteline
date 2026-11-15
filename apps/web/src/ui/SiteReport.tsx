@@ -160,6 +160,17 @@ export function SiteReport() {
         <span className="text-sm text-quiet">{t('report.landing', { date: formatUtc(query.landingUtc) })}</span>
       </div>
 
+      {/* The two ways into the site, first so nobody misses them: fly the whole trip, or stand on the ground. */}
+      <div className="grid grid-cols-2 items-start gap-2">
+        <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
+        <LandHereButton
+          latDeg={query.site.latDeg}
+          lonDeg={query.site.lonDeg}
+          touchdownUtcMs={touchdownFromQuery(query)}
+          source={{ kind: 'report' }}
+        />
+      </div>
+
       <div className={`rounded-lg border p-3 ${VERDICT_BOX[verdict]}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className={`font-display text-lg font-semibold ${verdictStyle.color}`} aria-live="polite">
@@ -339,16 +350,6 @@ export function SiteReport() {
         fromMs={Date.parse(query.landingUtc)}
         toMs={Date.parse(query.landingUtc) + query.stayDays * DAY_MS}
       />
-
-      <div className="flex flex-col gap-2">
-        <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
-        <LandHereButton
-          latDeg={query.site.latDeg}
-          lonDeg={query.site.lonDeg}
-          touchdownUtcMs={touchdownFromQuery(query)}
-          source={{ kind: 'report' }}
-        />
-      </div>
 
       {result.reasons.length > 0 && (
         <ul className="list-disc space-y-1 ps-5 text-sm">
