@@ -1,5 +1,7 @@
 import { clampMove, EYE_HEIGHT_M, gridUpAt, type LocalGrid, type MoveBlock, northTurnDeg } from '@siteline/physics';
 import * as THREE from 'three';
+import { AstronautBody } from './astronaut';
+import { advancePhase, easeAmount, gaitPose, strideFor } from './astronautGait';
 import {
   clampPitch,
   DEFAULT_DESCENT,
@@ -389,6 +391,18 @@ export class SurfaceView {
   private dirty = true;
   private running = false;
   private disposed = false;
+  /** The astronaut you walk as, once loaded, and how far into its stride it is. */
+  private body?: AstronautBody;
+  private bodyShown = true;
+  private gaitPhase = 0;
+  private gaitAmount = 0;
+  /** This frame's step along the ground, metres (negative walking backwards), and its speed. */
+  private stepM = 0;
+  private stepSpeed = 0;
+  /** The suit's light: the Sun where you stand, the scattered light and earthshine there, and the inspection lamp. */
+  private readonly bodySun = new THREE.DirectionalLight(0xffffff, 0);
+  private readonly bodyFill = new THREE.AmbientLight(0xffffff, 0);
+  private readonly bodyLamp = new THREE.PointLight(new THREE.Color(0.5, 0.66, 1.0), 0, 0, 0);
   private pixelRatio: number;
   private slowFrames = 0;
   private sampledFrames = 0;
@@ -542,6 +556,8 @@ export class SurfaceView {
     this.resize.observe(container);
     this.fit();
     this.placeAtTouchdown();
+    this.scene.add(this.bodySun, this.bodySun.target, this.bodyFill, this.bodyLamp);
+    this.loadBody();
     this.start();
   }
 
@@ -699,6 +715,12 @@ export class SurfaceView {
     this.dirty = true;
   }
 
+  /** Show or hide your own body (the suit, arms and boots you see looking down). */
+  setBodyShown(shown: boolean): void {
+    this.bodyShown = shown;
+    this.dirty = true;
+  }
+
   setTouchdownMarker(shown: boolean): void {
     this.touchdown.visible = shown;
     this.dirty = true;
@@ -791,6 +813,8 @@ export class SurfaceView {
     if (this.disposed) return;
     this.disposed = true;
     this.stop();
+    this.body?.dispose();
+    this.body = undefined;
     this.releasePointer();
     this.resize.disconnect();
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
@@ -940,7 +964,10 @@ export class SurfaceView {
       else this.descentPoseNow = descentPose(k, this.descent.plan, this.groundAt);
       moving = true;
     } else if (this.mode === 'explore') {
+      this.stepM = 0;
+      this.stepSpeed = 0;
       moving = this.walk(dt, now);
+      if (this.stride(dt)) this.dirty = true;
     }
     if (!this.settled && !moving && now - this.movedAtMs > SETTLE_MS) {
       this.settled = true;
@@ -990,6 +1017,9 @@ export class SurfaceView {
         { east: this.pos.east + de, north: this.pos.north + dn },
         EDGE_MARGIN_M,
       );
+      const stepM = Math.hypot(step.east - this.pos.east, step.north - this.pos.north);
+      this.stepM = forward < 0 ? -stepM : stepM;
+      this.stepSpeed = dt > 0 ? stepM / dt : 0;
       this.pos = { east: step.east, north: step.north };
       this.setBlocked(step.blocked);
       this.markMoved();
@@ -998,6 +1028,76 @@ export class SurfaceView {
       this.setBlocked(null);
     }
     return moved;
+  }
+
+  /** Moves the body's legs and arms on with this frame's step; true while they are still moving. */
+  private stride(dt: number): boolean {
+    if (!this.body) return false;
+    const target = this.stepSpeed > 0.05 ? 1 : 0;
+    const before = this.gaitAmount;
+    this.gaitAmount = easeAmount(this.gaitAmount, target, this.reducedMotion ? 10 : dt);
+    if (target === 0 && this.gaitAmount < 1e-3) this.gaitAmount = 0;
+    if (this.stepM) this.gaitPhase = advancePhase(this.gaitPhase, this.stepM, strideFor(this.stepSpeed));
+    if (this.gaitAmount === before && !this.stepM) return false;
+    this.body.pose(gaitPose(this.gaitPhase, this.gaitAmount));
+    return true;
+  }
+
+  private loadBody(): void {
+    AstronautBody.load()
+      .then((body) => {
+        if (this.disposed) {
+          body.dispose();
+          return;
+        }
+        body.pose(gaitPose(0, 0));
+        this.body = body;
+        this.scene.add(body.root);
+        this.dirty = true;
+      })
+      // Without the suit the view still works: you just do not see yourself.
+      .catch((e: unknown) => console.warn('Land Here: the astronaut did not load', e));
+  }
+
+  /** Your body under the eye, lit by the light where you stand. */
+  private placeBody(ground: number): void {
+    const body = this.body;
+    if (!body) return;
+    const shown = this.mode === 'explore' && this.bodyShown;
+    body.root.visible = shown;
+    if (!shown) return;
+    body.place(this.pos.east, this.pos.north, ground, this.heading);
+    // three.js lights a Lambert surface as colour × intensity × cos / π; the ground is drawn as colour × sunPower × the
+    // light, so π × sunPower matches the two.
+    const power = Math.PI * this.uniforms.sunPower.value;
+    const sunAt = toThree(this.sunDir, this.tmp).normalize();
+    this.bodySun.position.copy(body.root.position).addScaledVector(sunAt, 10);
+    this.bodySun.target.position.copy(body.root.position);
+    this.bodySun.intensity = power * this.sunlitAt(this.pos.east, this.pos.north);
+    this.bodyFill.intensity = power * this.ambientAround(this.pos.east, this.pos.north, 3);
+    this.bodyLamp.position.copy(this.camera.position);
+    this.bodyLamp.intensity = this.uniforms.inspect.value > 0.5 ? Math.PI : 0;
+  }
+
+  /** The share of the Sun reaching the ground at a point: from the fine shadow map where it covers, else the mesh. */
+  private sunlitAt(east: number, north: number): number {
+    const u = this.uniforms;
+    const half = u.shadowHalf.value;
+    if (u.useShadowMap.value > 0.5 && Math.abs(east) < half && Math.abs(north) < half) {
+      const size = u.shadowSize.value;
+      const data = u.shadowMap.value.image.data as Uint8Array;
+      const fx = ((east + half) / (2 * half)) * (size - 1);
+      const fy = ((-north + half) / (2 * half)) * (size - 1);
+      const x0 = Math.min(size - 2, Math.max(0, Math.floor(fx)));
+      const y0 = Math.min(size - 2, Math.max(0, Math.floor(fy)));
+      const tx = Math.min(1, Math.max(0, fx - x0));
+      const ty = Math.min(1, Math.max(0, fy - y0));
+      const v = (x: number, y: number) => data[y * size + x] / 255;
+      const top = v(x0, y0) * (1 - tx) + v(x0 + 1, y0) * tx;
+      const bottom = v(x0, y0 + 1) * (1 - tx) + v(x0 + 1, y0 + 1) * tx;
+      return top * (1 - ty) + bottom * ty;
+    }
+    return this.averageAround('sunlit', east, north, 3, 1);
   }
 
   private applyCamera(): void {
@@ -1013,6 +1113,10 @@ export class SurfaceView {
       cam.rotation.set(this.pitch, -this.heading, 0, 'YXZ');
     }
     cam.updateMatrixWorld();
+    if (this.body) {
+      const under = this.groundAt(this.pos.east, this.pos.north);
+      this.placeBody(Number.isFinite(under) ? under : 0);
+    }
     // Standing on the target, its ring would fill the view: it fades in only once you walk away from it.
     const away = Math.hypot(cam.position.x, cam.position.z);
     this.ring.material.opacity = this.mode === 'descent' ? 0.9 : 0.85 * Math.min(1, Math.max(0, (away - 8) / 25));
