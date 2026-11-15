@@ -3,8 +3,10 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback } from 
 import { useTranslation } from 'react-i18next';
 import { FACT_BODY_OF, type FactBody } from './bodyFacts';
 import { useBoot } from './boot';
+import { REGIONS } from './regions';
 import { useStage, useWide } from './stage';
 import { useApp, type MoonView as ViewName } from './store';
+import { FindSite } from './ui/BestSpots';
 import { BodyFacts } from './ui/BodyFacts';
 import { MarsSide, MoonSide, SiteSide } from './ui/BodySide';
 import { Breadcrumbs } from './ui/Breadcrumbs';
@@ -63,6 +65,7 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
       return <SiteSide key="side" />;
     case 'globe':
       return [
+        <FindSite key="find" regions={REGIONS} />,
         factsCard,
         <LandingTime key="time" />,
         <PinnedSpots key="pinned" />,
@@ -71,6 +74,7 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
       ];
     default:
       return [
+        <FindSite key="find" regions={REGIONS} />,
         <LandingTime key="time" />,
         <PinnedSpots key="pinned" />,
         <SiteReport key="report" />,

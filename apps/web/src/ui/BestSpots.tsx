@@ -1,9 +1,9 @@
 import { DEFAULT_STAY } from '@siteline/contracts';
 import type { BestSearch } from '@siteline/physics';
 import * as Comlink from 'comlink';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatNumber } from '../format';
+import { formatNumber, formatUtc } from '../format';
 import { touchdownUtcMsOf } from '../land';
 import { physics, URLS } from '../physics';
 import type { PassingSearch, PassingSite } from '../physics.worker';
@@ -40,14 +40,21 @@ const LIKELIEST = ['Mons Mouton', 'Mons Mouton Plateau', 'Nobile Rim 2'];
 type FoundSite = PassingSite & { region: string; regionIndex: number };
 
 /**
- * Best first: the most sunlight, then the most Earth. Ties keep the regions' own order, then the flatter site, so the
+ * Best first: the most sunlight, then the most Earth, then the flatter ground. Ties keep the regions' own order, so the
  * list does not depend on which region was searched first or which answer arrived first.
  */
 const byBest = (a: FoundSite, b: FoundSite) =>
   b.sunFractionMin - a.sunFractionMin ||
   b.earthVisiblePct - a.earthVisiblePct ||
-  a.regionIndex - b.regionIndex ||
-  a.slope100mDeg - b.slope100mDeg;
+  a.slope100mDeg - b.slope100mDeg ||
+  a.regionIndex - b.regionIndex;
+
+/**
+ * One entry per spot as the list shows it (to a hundredth of a degree): a site can come in twice, as it is confirmed and
+ * again in its region's reply, and two neighbouring points can read the same.
+ */
+const spotKey = (s: PassingSite) => `${Math.round(s.latDeg * 100)},${Math.round(s.lonDeg * 100)}`;
+const unique = (sites: FoundSite[]) => sites.filter((s, i) => sites.findIndex((o) => spotKey(o) === spotKey(s)) === i);
 
 /**
  * One passing site, as a row that flies to it and opens its report, with Land Here beside it: the search's exact point,
@@ -58,10 +65,13 @@ export function PassingRow({
   label,
   onPick,
   name,
+  best = false,
 }: {
   site: PassingSite;
   label: string;
   onPick: () => void;
+  /** Marks the top site of a search. */
+  best?: boolean;
   /** The search region's name, for the surface view's title. */
   name?: string;
 }) {
@@ -81,6 +91,11 @@ export function PassingRow({
         <span>
           <span className="text-pass">✓ </span>
           {label} {formatNumber(Math.abs(site.latDeg), 2)}° S, {formatNumber(site.lonDeg, 2)}°
+          {best && (
+            <span className="ms-1.5 rounded-pill border border-pass/60 bg-pass/15 px-1.5 py-px text-[11px] font-semibold text-pass">
+              {t('find.best')}
+            </span>
+          )}
         </span>
         <span className="font-mono text-xs text-quiet">
           {t('best.readings', {
@@ -172,21 +187,34 @@ export function BestSpots({ region }: { region: SearchArea }) {
   );
 }
 
+/** How far "Try a week later" moves the landing date when nothing passes. */
+const RETRY_DAYS = 7;
+
 /**
- * The same search over every region, likeliest first: the best passing sites across all of them, each with its region,
- * listed the moment each is confirmed, and a count of regions while it works.
+ * The finder at the top of the Moon's panel, for anyone not using Luna: one button searches every region, likeliest
+ * first, for sites that pass all four checks on the landing date shown; the best few list as they are confirmed, the
+ * top one marked, each opening its report or landing there. Changing the date clears the list, since it no longer holds.
  */
-export function SearchAll({ regions }: { regions: readonly SearchArea[] }) {
+export function FindSite({ regions }: { regions: readonly SearchArea[] }) {
   const { t } = useTranslation();
+  const landingUtc = useApp((s) => s.landingUtc);
+  const slipDays = useApp((s) => s.slipDays);
+  // On the live clock the date moves a little every few seconds; only a date someone picks makes the list stale.
+  const picked = useApp((s) => (s.live ? 'live' : s.landingUtc));
   const [state, setState] = useState<{ done: number; sites: FoundSite[]; checked: number }>();
   const [busy, setBusy] = useState(false);
+  const runId = useRef(0);
+  const retry = useRef(false);
 
   const run = async () => {
+    const id = ++runId.current;
     setBusy(true);
     let all: FoundSite[] = [];
     let checked = 0;
     let done = 0;
-    const show = () => setState({ done, sites: [...all].sort(byBest).slice(0, 5), checked });
+    const show = () => {
+      if (runId.current === id) setState({ done, sites: unique(all).sort(byBest).slice(0, 5), checked });
+    };
     show();
     const rank = (name: string) => {
       const i = LIKELIEST.indexOf(name);
@@ -194,6 +222,7 @@ export function SearchAll({ regions }: { regions: readonly SearchArea[] }) {
     };
     const order = regions.map((r, regionIndex) => ({ r, regionIndex })).sort((a, b) => rank(a.r.name) - rank(b.r.name));
     for (const { r, regionIndex } of order) {
+      if (runId.current !== id) return;
       const tag = (s: PassingSite): FoundSite => ({ ...s, region: r.name, regionIndex });
       const found = await searchArea(r, 2, (s) => {
         all.push(tag(s));
@@ -205,32 +234,100 @@ export function SearchAll({ regions }: { regions: readonly SearchArea[] }) {
       done++;
       show();
     }
-    setBusy(false);
+    if (runId.current === id) setBusy(false);
   };
 
+  // A new date makes the list stale: it goes, and a search still running for the old date stops adding to it. After
+  // "Try a week later", the search runs again for the new date.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the date and slip are what clear it.
+  useEffect(() => {
+    runId.current++;
+    setState(undefined);
+    setBusy(false);
+    if (retry.current) {
+      retry.current = false;
+      void run();
+    }
+  }, [picked, slipDays]);
+
+  const later = () => {
+    const ms = Date.parse(useApp.getState().landingUtc) + RETRY_DAYS * 86_400_000;
+    retry.current = true;
+    useApp.getState().set({ landingUtc: `${new Date(ms).toISOString().slice(0, 19)}Z` });
+  };
+
+  const changeDate = () => {
+    const box = document.getElementById('landing-time');
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box?.querySelector('input')?.focus({ preventScroll: true });
+  };
+
+  const date = formatUtc(new Date(touchdownUtcMsOf(landingUtc, slipDays)).toISOString());
   return (
-    <div className="mb-3 flex flex-col gap-2">
+    <section
+      className="flex flex-col gap-2.5 rounded-xl border border-pass/40 bg-panel-raised p-3"
+      aria-labelledby="find-site-heading"
+      data-testid="find-site"
+    >
+      <div>
+        <h2 id="find-site-heading" className="font-semibold">
+          {t('find.heading')}
+        </h2>
+        <p className="mt-0.5 text-xs text-quiet">{t('find.text', { count: regions.length })}</p>
+      </div>
+      <p className="flex flex-wrap items-center gap-x-2 text-xs">
+        <span className="text-quiet">{t('find.forDate')}</span>
+        <span className="font-mono text-ink">{date}</span>
+        <button type="button" className="min-h-8 text-accent underline-offset-2 hover:underline" onClick={changeDate}>
+          {t('find.changeDate')}
+        </button>
+      </p>
       <button
         type="button"
         disabled={busy}
         aria-busy={busy}
-        className="min-h-11 rounded-md border border-pass/50 bg-panel-raised px-3 text-sm hover:border-pass disabled:opacity-70"
+        className="min-h-11 rounded-md border border-pass bg-pass/15 px-3 text-sm font-semibold text-ink hover:bg-pass/25 disabled:opacity-80"
         onClick={() => void run()}
+        data-testid="find-site-button"
       >
-        {busy ? t('best.allSearching', { done: state?.done ?? 0, of: regions.length }) : t('best.all')}
+        {busy
+          ? t('best.allSearching', { done: state?.done ?? 0, of: regions.length })
+          : state
+            ? t('find.again')
+            : t('find.button')}
       </button>
-      {state && (
-        <ol className="rounded-lg border border-line bg-panel-sunk p-1.5 text-sm" aria-live="polite">
-          {state.sites.map((s) => (
-            <li key={`${s.latDeg},${s.lonDeg}`}>
-              <PassingRow site={s} label={`${s.region},`} name={s.region} onPick={() => {}} />
-            </li>
-          ))}
-          {!busy && state.sites.length === 0 && (
-            <li className="px-2 py-1 text-quiet">{t('best.allNone', { checked: state.checked })}</li>
-          )}
-        </ol>
+      {busy && (
+        <div className="h-1 overflow-hidden rounded-full bg-panel-sunk" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-pass transition-[width] duration-500"
+            style={{ width: `${Math.max(4, ((state?.done ?? 0) / regions.length) * 100)}%` }}
+          />
+        </div>
       )}
-    </div>
+      {state && state.sites.length > 0 && (
+        <>
+          <ol className="rounded-lg border border-line bg-panel-sunk p-1.5 text-sm" aria-live="polite">
+            {state.sites.map((s, i) => (
+              <li key={`${s.latDeg},${s.lonDeg}`}>
+                <PassingRow site={s} label={`${s.region},`} name={s.region} onPick={() => {}} best={i === 0 && !busy} />
+              </li>
+            ))}
+          </ol>
+          <p className="text-xs text-quiet">{t('find.pickHint')}</p>
+        </>
+      )}
+      {state && !busy && state.sites.length === 0 && (
+        <div className="flex flex-col gap-2 text-sm">
+          <p className="text-quiet">{t('best.allNone', { checked: state.checked })}</p>
+          <button
+            type="button"
+            className="min-h-10 rounded-md border border-line bg-panel-sunk px-3 text-sm hover:border-line-hover"
+            onClick={later}
+          >
+            {t('find.later', { count: RETRY_DAYS })}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }

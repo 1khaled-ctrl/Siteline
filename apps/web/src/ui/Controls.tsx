@@ -6,7 +6,7 @@ import { DAY_MS, HOUR_MS, useSunTrack } from '../physics';
 import { REGIONS } from '../regions';
 import { sunAt } from '../sound/maps';
 import { MAX_SLIP_DAYS, PLAY_SPEEDS_H_PER_S, useApp } from '../store';
-import { BestSpots, SearchAll } from './BestSpots';
+import { BestSpots } from './BestSpots';
 
 /** One section of the floating panel: unboxed, as in the demo, so only its heading and spacing set it apart. */
 export const panel = 'min-w-0';
@@ -91,7 +91,7 @@ export function LandingTime() {
   const slipId = useId();
 
   return (
-    <section className={`${box} flex flex-col gap-4`}>
+    <section id="landing-time" className={`${box} flex flex-col gap-4`}>
       <label className="block text-sm text-quiet">
         {t('time.landing')}
         <input
@@ -170,7 +170,6 @@ export function Controls() {
 
       <section className={panel}>
         <h2 className="mb-2 font-semibold">{t('regions.heading')}</h2>
-        <SearchAll regions={REGIONS} />
         <ul className="grid gap-1">
           {REGIONS.map((r) => (
             <li key={r.name} className="flex items-center gap-1">

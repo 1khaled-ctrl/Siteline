@@ -1298,5 +1298,17 @@
     "title": "Ask Luna for help",
     "text": "Your AI assistant is right here. Tap to chat or talk.",
     "dismiss": "Hide this tip"
+  },
+  "find": {
+    "heading": "Find the best landing site",
+    "text": "Searches NASA's {{count}} Artemis regions for spots where the Sun stays up and Earth stays in view for the whole stay, on ground flat enough to land.",
+    "forDate": "Landing on",
+    "changeDate": "Change date",
+    "button": "Find landing sites",
+    "again": "Search again",
+    "best": "Best",
+    "pickHint": "Tap a site to fly there and open its report, or Land Here to stand on it.",
+    "later_one": "Try {{count}} day later",
+    "later_other": "Try {{count}} days later"
   }
 }
