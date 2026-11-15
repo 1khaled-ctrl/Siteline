@@ -15,10 +15,11 @@ import {
   sunHeightDeg,
   toneOf,
 } from '@siteline/engine';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { formatDate, formatNumber } from '../format';
 import { findLander, MISSION_SOURCES, MISSIONS, modelUrl, statusKey, textOf } from '../landers';
+import { missionModel, modelFileUrl } from '../nasaModels';
 import { useApp } from '../store';
 import { useLanderFiles, useShownUtcMs, useSubsolar } from '../useLanders';
 import { chipButton, panel, smallButton } from './Controls';
@@ -253,7 +254,10 @@ function MissionCard({ mission: m }: { mission: Mission }) {
       ? roverProgress(MISSIONS, tracks, m.id, shownMs)
       : undefined;
   const sources = m.sourceIds.flatMap((id) => (MISSION_SOURCES[id] ? [MISSION_SOURCES[id]] : []));
-  const model = modelUrl(m);
+  // The five models the app already had stay on their landers; a mission without one shows the manifest's, if any.
+  const manifestModel = modelUrl(m) ? undefined : missionModel(m.id);
+  const [manifestFailed, setManifestFailed] = useState(false);
+  const model = modelUrl(m) ?? (manifestModel && !manifestFailed ? modelFileUrl(manifestModel) : undefined);
   const hasCloseUp = sites?.[patchKey(m) ?? ''] !== undefined;
 
   return (
@@ -330,7 +334,15 @@ function MissionCard({ mission: m }: { mission: Mission }) {
           </button>
         )}
       </div>
-      {model && at && <ModelBox url={model} body={m.body} sun={sun} />}
+      {model && at && (
+        <ModelBox
+          url={model}
+          body={m.body}
+          sun={sun}
+          credit={manifestModel && { text: manifestModel.credit, href: manifestModel.sourceUrl }}
+          onFail={manifestModel ? () => setManifestFailed(true) : undefined}
+        />
+      )}
       {(sources.length > 0 || m.track || model) && (
         <>
           <h3 className="mt-4 text-xs text-quiet">{t('landers.sources')}</h3>
