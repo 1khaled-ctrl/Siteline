@@ -154,6 +154,8 @@ export function exposureFor(sunElevDeg: number): number {
 /** How bright level ground a few metres ahead is shown, before tone mapping; and the most the picture is brightened. */
 export const LEVEL_GROUND_SHOWN = 0.35;
 const MAX_EXPOSURE = 6;
+/** The share of the Sun's disc under which a blend between nodes is drawn as shadow (see the terrain shader). */
+const SHADOW_CUT = 0.1;
 /** How much longer the picture may be exposed for a shadow, and the ground around the eye it is exposed for, metres. */
 export const MAX_SHADOW_EXPOSURE = 4000;
 const SHADOW_EXPOSURE_RADIUS_M = 150;
@@ -206,6 +208,7 @@ uniform vec3 sunDir;
 uniform float sunPower;
 uniform vec3 albedo;
 uniform float detail;
+uniform float shadowCut;
 uniform float inspect;
 uniform sampler2D shadowMap;
 uniform float shadowHalf;
@@ -249,6 +252,10 @@ void main() {
     vec2 uv = (vWorld.xz + shadowHalf) / (2.0 * shadowHalf) * ((shadowSize - 1.0) / shadowSize) + 0.5 / shadowSize;
     lit = texture2D(shadowMap, uv).r;
   }
+  // Blending a sunlit node with a shadowed one spreads a faint share of sunlight over the triangles between them,
+  // which a picture exposed for the shadow turns into ragged white wedges along the mesh. Shares under shadowCut are
+  // taken as shadow, with the edge smoothed over a pixel; every share above it is kept as it is.
+  lit *= clamp((lit - shadowCut) / max(fwidth(lit), 1e-4) + 0.5, 0.0, 1.0);
   vec3 base = albedo * grain;
   // The light in the shadows, scattered off sunlit terrain and from the Earth, taken as falling on a Lambert surface.
   vec3 colour = base * sunPower * (ls * lit + vAmbient);
@@ -333,6 +340,7 @@ export class SurfaceView {
     shadowHalf: { value: 0 },
     shadowSize: { value: 1 },
     useShadowMap: { value: 0 },
+    shadowCut: { value: SHADOW_CUT },
   };
   private readonly sunDisc: THREE.Sprite;
   private readonly sunGlare: THREE.Sprite;
