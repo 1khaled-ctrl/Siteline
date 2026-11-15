@@ -1,4 +1,5 @@
 import type { EarthPlace, LanderBody, MarsPlace, MissionFilter } from '@siteline/engine';
+import type { SolarBodyKey } from '@siteline/physics';
 import { create } from 'zustand';
 import { findLander } from './landers';
 import { isRobotId, LANDING_RADII_M, type LandingRadius, type RobotId } from './robots';
@@ -57,6 +58,9 @@ interface AppState extends View {
   /** A flight the Worlds list asks the solar-system view for, to a body that has its own view. Not saved in the link. */
   solarCommand: { id: number; body: 'earth' | 'mars' | 'moon' } | null;
   commandSolar: (body: 'earth' | 'mars' | 'moon') => void;
+  /** A look at any planet or the Moon from the solar-system view: fly to it, show its card, pull back. Not saved in the link. */
+  solarVisit: { id: number; body: SolarBodyKey; atMs: number } | null;
+  visitSolar: (body: SolarBodyKey) => void;
   /** Which landers the list shows, and a counter that asks the camera to fly to the open lander. Not saved in the link. */
   missionFilter: MissionFilter;
   missionFlySeq: number;
@@ -215,6 +219,9 @@ export const useApp = create<AppState>((set) => ({
   commandMars: (type) => set((s) => ({ marsCommand: { id: (s.marsCommand?.id ?? 0) + 1, type } })),
   solarCommand: null,
   commandSolar: (body) => set((s) => ({ solarCommand: { id: (s.solarCommand?.id ?? 0) + 1, body } })),
+  solarVisit: null,
+  visitSolar: (body) =>
+    set((s) => ({ view: 'solar', solarVisit: { id: (s.solarVisit?.id ?? 0) + 1, body, atMs: Date.now() } })),
   missionFilter: 'all',
   // A link that names a lander flies to it once its planet is on screen.
   missionFlySeq: initial.missionId ? 1 : 0,

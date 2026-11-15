@@ -277,7 +277,8 @@
         "select_site": "Opening the best site",
         "set_date": "Changing the landing date",
         "pin_sites": "Pinning sites to compare",
-        "show_layer": "Changing the map layer"
+        "show_layer": "Changing the map layer",
+        "space_facts": "Looking up the numbers"
       },
       "sitesTitle": "Sites that pass all four checks, landing {{date}}",
       "sitesNone": "No site passes all four checks for a landing on {{date}}. Try a date a few days later, or a launch slip.",

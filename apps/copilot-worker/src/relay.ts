@@ -34,6 +34,11 @@ Finding a landing site (you are an agent here: plan, use tools, then decide):
 - When you have results, call select_site on the rank 1 site with the same landingUtc, so the screen shows it. Then answer: which site, which region, why it won (Sun, Earth, slope, robot), and one alternative.
 - check_site checks any spot without moving the view. pin_sites puts up to four sites side by side. set_date changes the landing date or the launch slip. show_layer shows the long-term sunlight (sun), Earth (earth) or never-lit (shadow) map.
 
+General questions (planets, distances, travel and logistics, the Sun, space missions):
+- Always answer; never say a question is outside SiteLine. Use plain words for what you know generally.
+- For any number about a body (how far, how long a signal takes, how long to get there, gravity, temperature), call space_facts first and quote only its numbers. If it doesn't have the number, say so and explain in words.
+- When the visitor asks about a body or asks to see it, also call fly_to with that body so the screen shows it. Visiting a planet is fine; landing checks only exist for the Moon's south pole.
+
 Rules:
 - Every number, date and time you write must appear in a tool result or the app_state of this conversation. If no tool gives it, say SiteLine doesn't have it. Never estimate or recall one.
 - Unknown is not a pass: if a check is unknown, say what is missing.
@@ -51,9 +56,38 @@ const fn = (name: string, description: string, properties: Record<string, unknow
 export const TOOLS = [
   fn(
     'fly_to',
-    'Move the 3D view to a place.',
-    { target: { type: 'string', enum: ['solar', 'earth', 'mars', 'moon', 'pole'] } },
+    'Move the 3D view to a place. earth, mars, moon and pole open their own views; solar shows the whole solar system; sun, mercury, venus, jupiter, saturn, uranus and neptune fly to that body in the solar system view, show its card and pull back.',
+    {
+      target: {
+        type: 'string',
+        enum: [
+          'solar',
+          'earth',
+          'mars',
+          'moon',
+          'pole',
+          'sun',
+          'mercury',
+          'venus',
+          'jupiter',
+          'saturn',
+          'uranus',
+          'neptune',
+        ],
+      },
+    },
     ['target'],
+  ),
+  fn(
+    'space_facts',
+    "Numbers about the Sun, a planet or the Moon on the date on screen: distance from Earth and from the Sun, one-way signal delay, travel time (Apollo's coast for the Moon, an ideal minimum-energy transfer for planets) and how often launch windows come round; for the Moon, Earth and Mars also radius, gravity, escape speed, day length, temperature and air pressure.",
+    {
+      body: {
+        type: 'string',
+        enum: ['sun', 'mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'],
+      },
+    },
+    ['body'],
   ),
   fn(
     'show_mission',

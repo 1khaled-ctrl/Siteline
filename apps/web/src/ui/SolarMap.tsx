@@ -22,6 +22,8 @@ const TEXTURES: Partial<Record<SolarBodyKey, string>> = {
 
 /** Bodies with a view to fly into. */
 const NAVIGABLE: ReadonlySet<SolarBodyKey> = new Set(['earth', 'mars', 'moon']);
+/** A visit older than this, still in the store when the view opens again later, is not replayed. */
+const VISIT_FRESH_MS = 8000;
 const VIEW_OF: Partial<Record<SolarBodyKey, MoonView>> = { earth: 'earth', mars: 'mars', moon: 'globe' };
 const KEYS: SolarLabelKey[] = [
   'sun',
@@ -104,6 +106,8 @@ export function SolarMap() {
   const [arriving, setArriving] = useState(arriveFrom !== undefined);
   const moving = flying || arriving;
   const command = useApp((s) => s.solarCommand);
+  const visit = useApp((s) => s.solarVisit);
+  const visited = useRef(0);
   // A flight asked for before this view opened is old news: only later asks from the Worlds list count.
   const handled = useRef(command?.id ?? 0);
   // The worlds that carry a card in the scene: the three you can fly into, plus the one you point at or click.
@@ -156,6 +160,15 @@ export function SolarMap() {
     handled.current = command.id;
     fly(view, command.body, setFlying);
   }, [view, command]);
+
+  // A visit asked for by the copilot ("show me Saturn"), also one asked just before this view opened: the camera goes
+  // to the world and back, and its card stays up with its distance and signal delay.
+  useEffect(() => {
+    if (!view || !visit || visit.id <= visited.current || Date.now() - visit.atMs > VISIT_FRESH_MS) return;
+    visited.current = visit.id;
+    setPicked(visit.body);
+    void view.visit(visit.body);
+  }, [view, visit]);
 
   // The planets follow the store directly, so the time-lapse does not re-render this view on every frame.
   useEffect(() => {

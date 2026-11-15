@@ -84,6 +84,8 @@ export function Copilot() {
   const [liveState, setLiveState] = useState<LiveState | null>(null);
   const [muted, setMuted] = useState(false);
   const live = useRef<LiveSession | null>(null);
+  /** Set once the server says it has no live voice, so the mic goes straight to the browser's speech from then on. */
+  const noLiveVoice = useRef(false);
   /** Each transcript segment's message, so a growing segment updates its message instead of adding one. */
   const segments = useRef(new Map<string, number>());
   /** The steps message for the agent's current piece of work in the call, with the cards and tools it used. */
@@ -433,6 +435,21 @@ export function Copilot() {
       stopListening.current?.();
       return;
     }
+    if (liveState === 'connecting') return;
+    // The mic means talking to SiteLine: the live call and its own voice, wherever the server offers one. The
+    // browser's speech is only the fallback, for a server without live voice set up.
+    if (!noLiveVoice.current) {
+      void startCall().then((started) => {
+        if (!started && noLiveVoice.current && voice) listenInBrowser();
+      });
+      return;
+    }
+    listenInBrowser();
+  };
+
+  /** One question heard by the browser's own speech recognition, answered in the chat and read aloud. */
+  const listenInBrowser = () => {
+    setVoiceError(undefined);
     stopSpeaking();
     setListening(true);
     stopListening.current = listen(
@@ -471,7 +488,7 @@ export function Copilot() {
   };
 
   /** Ask SiteLine Live: a voice call with the LiveKit agent, whose tools run here, through the same steps as the chat. */
-  const startCall = async () => {
+  const startCall = async (): Promise<boolean> => {
     setVoiceError(undefined);
     stopListening.current?.();
     stopSpeaking();
@@ -482,8 +499,9 @@ export function Copilot() {
     const got = await fetchVoiceToken();
     if ('error' in got) {
       setLiveState(null);
+      if (got.error === 'no_voice') noLiveVoice.current = true;
       setVoiceError(t(got.error === 'rate_limited' ? 'copilot.live.busy' : 'copilot.live.unavailable'));
-      return;
+      return false;
     }
     try {
       live.current = await startLive(got.url, got.token, {
@@ -533,7 +551,9 @@ export function Copilot() {
       live.current = null;
       setLiveState(null);
       setVoiceError(t('copilot.live.failed', { message: e instanceof Error ? e.message : String(e) }));
+      return false;
     }
+    return true;
   };
 
   // The orb (Orb.tsx) opens it.
@@ -674,7 +694,7 @@ export function Copilot() {
         <label htmlFor="copilot-input" className="sr-only">
           {t('copilot.inputLabel')}
         </label>
-        {(voice || liveState) && (
+        {(voice || liveState || !noLiveVoice.current) && (
           <button
             type="button"
             onClick={toggleMic}

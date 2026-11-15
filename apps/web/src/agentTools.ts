@@ -9,6 +9,7 @@ import { physics, queryFor, URLS } from './physics';
 import type { PassingSite, StayResponse } from './physics.worker';
 import { REGIONS } from './regions';
 import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS, type RobotId } from './robots';
+import { isSpaceBody, spaceFacts } from './spaceFacts';
 import { FIRST_UTC_MS, LAST_UTC_MS, LAYERS, type Layer, MAX_PINS, type MoonView, useApp } from './store';
 
 /**
@@ -168,10 +169,38 @@ export async function runAgentTool(call: ToolCall, { t, progress, announce }: To
 
   switch (call.name) {
     case 'fly_to': {
-      const target = a.target as Target;
-      if (!TARGETS.includes(target)) throw new Error(`no place called ${String(a.target)}`);
-      app.set({ view: VIEW_OF[target] });
-      return { call: shown, data: { flyingTo: target } };
+      const target = a.target;
+      if (TARGETS.includes(target as Target)) {
+        app.set({ view: VIEW_OF[target as Target] });
+        return { call: shown, data: { flyingTo: target } };
+      }
+      // The other planets have no view of their own: the solar-system view flies to one, shows its card, pulls back.
+      if (target === 'sun') {
+        app.set({ view: 'solar' });
+        return { call: shown, data: { showing: 'the solar system, with the Sun at its centre' } };
+      }
+      if (isSpaceBody(target) && target !== 'sun') {
+        app.visitSolar(target);
+        return { call: shown, data: { visiting: target, onScreen: 'its card with distance and signal delay' } };
+      }
+      throw new Error(`no place called ${String(target)}`);
+    }
+
+    case 'space_facts': {
+      const body = a.body;
+      if (!isSpaceBody(body)) throw new Error(`no body called ${String(body)}`);
+      // Positions at the whole hour of the date on screen, as the solar-system view and its cards use.
+      const hourMs = Math.floor(Date.parse(app.landingUtc) / 3_600_000) * 3_600_000;
+      const positions = await physics.planetsAt(hourMs, URLS.data);
+      const facts = spaceFacts(body, positions, new Date(hourMs).toISOString());
+      return {
+        call: shown,
+        sources: facts.sources,
+        data: {
+          ...facts,
+          note: 'Only these numbers may be quoted. For anything else about this body, answer in words without numbers.',
+        },
+      };
     }
 
     case 'show_mission': {

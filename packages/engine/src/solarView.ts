@@ -262,6 +262,8 @@ export class SolarView {
   /** True once the planets are placed and the pull back waits only for the world's colour map. */
   private arriving = false;
   private disposed = false;
+  /** Counts flights, so a visit's way back out is called off when another flight starts meanwhile. */
+  private flights = 0;
 
   constructor(
     private readonly container: HTMLElement,
@@ -499,6 +501,7 @@ export class SolarView {
 
   /** Dive toward a body until it fills the view; resolves on arrival. */
   flyTo(body: SolarBodyKey, durationMs = 1800): Promise<void> {
+    this.flights++;
     // A dive asked for during the pull back from a world takes over from where the camera is.
     cancelAnimationFrame(this.frame);
     this.arrival = null;
@@ -535,6 +538,31 @@ export class SolarView {
       };
       this.frame = requestAnimationFrame(step);
     });
+  }
+
+  /**
+   * A look at a body that has no view of its own (Saturn, say): the camera dives to it, holds there for `holdMs`, and
+   * pulls back out to the whole system the way the view comes back from a world, with the controls free again after.
+   * Resolves when the camera is on its way back. Another flight started meanwhile calls the way back off.
+   */
+  async visit(body: SolarBodyKey, holdMs = 3500): Promise<void> {
+    const still = this.motion.matches;
+    const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, still ? 0 : ms));
+    const flight = this.flyTo(body, still ? 0 : 1800);
+    const mine = this.flights;
+    await flight;
+    await wait(holdMs);
+    if (this.disposed || mine !== this.flights) return;
+    // The pull back starts from the world's day side, not where the dive stopped: a short fade hides the change.
+    const canvas = this.renderer.domElement;
+    canvas.style.transition = still ? '' : 'opacity 300ms ease';
+    canvas.style.opacity = '0';
+    await wait(300);
+    if (this.disposed || mine !== this.flights) {
+      canvas.style.opacity = '1';
+      return;
+    }
+    this.pullBack(body);
   }
 
   /** Waits a moment for the world's colour map, so it looks itself from the first frame, then pulls back from it. */
