@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { askAi, type ChatMessage, numbersIn, type Relay, type ToolCall, unverifiedNumbers } from './copilotAi';
+import {
+  askAi,
+  type ChatMessage,
+  numbersIn,
+  plainReply,
+  type Relay,
+  type ToolCall,
+  unverifiedNumbers,
+} from './copilotAi';
 
 describe('numbersIn', () => {
   it('reads numbers as written, with thousands commas and decimals', () => {
     expect(numbersIn('Earth is in view 55.9% of 2,054 hours in 2028.')).toEqual(['55.9', '2,054', '2028']);
+  });
+});
+
+describe('plainReply', () => {
+  it('drops markdown the model wrote anyway, keeping the words', () => {
+    expect(plainReply('The best site is **Nobile Rim 2**.\n- Sun up\n## Why\n`flat`')).toBe(
+      'The best site is Nobile Rim 2.\nSun up\nWhy\nflat',
+    );
   });
 });
 
@@ -88,7 +104,7 @@ describe('askAi', () => {
   });
 
   it('stops a model that keeps calling tools', async () => {
-    const loop = Array.from({ length: 5 }, () => ({
+    const loop = Array.from({ length: 8 }, () => ({
       text: '',
       toolCalls: [{ id: 'c', name: 'analyze_site', arguments: {} }],
     }));
@@ -97,7 +113,7 @@ describe('askAi', () => {
   });
 
   it('starts a long chat over instead of trimming it', async () => {
-    const long: ChatMessage[] = Array.from({ length: 17 }, () => ({ role: 'user' as const, content: 'x' }));
+    const long: ChatMessage[] = Array.from({ length: 21 }, () => ({ role: 'user' as const, content: 'x' }));
     const { relay, sent } = scripted([{ text: 'ok', toolCalls: [] }]);
     await askAi('hi', {}, long, tool, relay);
     expect(sent[0]).toHaveLength(1);

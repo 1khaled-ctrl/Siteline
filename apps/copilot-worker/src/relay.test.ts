@@ -84,7 +84,7 @@ describe('readChat', () => {
 
   it('refuses empty, oversized and malformed chats', () => {
     expect(() => readChat({ messages: [] })).toThrow();
-    expect(() => readChat({ messages: Array(25).fill({ role: 'user', content: 'x' }) })).toThrow();
+    expect(() => readChat({ messages: Array(49).fill({ role: 'user', content: 'x' }) })).toThrow();
     expect(() => readChat({ messages: [{ role: 'user', content: 5 }] })).toThrow();
     expect(() => readChat(null)).toThrow();
   });
@@ -145,6 +145,6 @@ describe('relay', () => {
   it('refuses a body that is not a chat', async () => {
     const { ai } = fakeAi({ response: 'x' });
     expect((await relay(post('not json'), { AI: ai })).status).toBe(400);
-    expect((await relay(post('x'.repeat(50_000)), { AI: ai })).status).toBe(413);
+    expect((await relay(post('x'.repeat(100_000)), { AI: ai })).status).toBe(413);
   });
 });

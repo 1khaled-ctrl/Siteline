@@ -23,6 +23,14 @@ describe('parseIntent', () => {
     expect(ask('where is curiosity?')).toEqual({ tool: 'show_mission', input: { id: curiosity?.id } });
   });
 
+  it('reads a request to find a landing site as the search, not a check of the selected site', () => {
+    expect(ask('Find me a landing site that passes')).toEqual({ tool: 'find_landing_sites' });
+    expect(ask('Where should I land a rover?')).toEqual({ tool: 'find_landing_sites' });
+    expect(ask('which spot is best?')).toEqual({ tool: 'find_landing_sites' });
+    expect(ask('Where should the IM-2 hopper land on 1 March 2028?')).toEqual({ tool: 'find_landing_sites' });
+    expect(ask('Does this site pass?')).toMatchObject({ tool: 'analyze_site' });
+  });
+
   it('reads a question about the site as a site check, with the right aspect', () => {
     const aspect = (text: string) => {
       const i = ask(text);

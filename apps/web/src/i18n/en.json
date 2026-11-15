@@ -163,7 +163,7 @@
     "placeholder": "Ask about this site, or say where to go",
     "send": "Send",
     "thinking": "Checking…",
-    "intro": "Ask about the selected Moon landing site, open a mission, or say where to go. Try one of these:",
+    "intro": "Ask me to find a landing site, check the selected one, open a mission, or say where to go. Type, or tap the mic and talk. Try one of these:",
     "example1": "Does this site pass?",
     "example2": "Why does it fail?",
     "example3": "When does the Sun set?",
@@ -185,7 +185,7 @@
       "notMeasured": "Not measured yet: {{list}}."
     },
     "note": "Answers come from a free AI model (Qwen3 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead.",
-    "help": "I can fly the view (\"Fly to Mars\", \"Take me to the south pole\"), open a mission (\"Show me Curiosity\"), or answer questions about the selected Moon landing site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\", \"Sunlight in the long term?\", \"How sure is that?\").",
+    "help": "I can search the south pole for a landing site (\"Find me a landing site for a rover in March 2028\"), check the selected site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\"), fly the view (\"Fly to Mars\"), or open a mission (\"Show me Curiosity\").",
     "flying": "Flying to {{place}}.",
     "places": {
       "solar": "the solar system",
@@ -253,6 +253,48 @@
       "longTerm": "📅 Over many years: sunlit {{sun}}% of the time, Earth visible {{earth}}%.",
       "nextFail": "💡 Try the launch-slip slider to find a better date, or “Find a site that passes” in the side panel.",
       "nextPass": "💡 Want to check a specific lander? Ask “Would the NASA tripod lander fit here?”"
+    },
+    "example8": "Find me a landing site for a rover",
+    "agent": {
+      "working": "Working…",
+      "thinking": "Thinking…",
+      "listening": "Listening…",
+      "searching": "Searching {{region}} ({{done}} of {{of}})",
+      "fitting": "Checking the {{robot}} at site {{done}} of {{of}}",
+      "checking": "Running the full site check",
+      "status": {
+        "running": "Running:",
+        "done": "Done:",
+        "failed": "Failed:"
+      },
+      "tool": {
+        "fly_to": "Flying the view",
+        "show_mission": "Opening a mission",
+        "analyze_site": "Checking the selected site",
+        "check_site": "Checking a site",
+        "robot_fit": "Checking the robot's needs",
+        "find_landing_sites": "Searching the south pole for sites that pass",
+        "select_site": "Opening the best site",
+        "set_date": "Changing the landing date",
+        "pin_sites": "Pinning sites to compare",
+        "show_layer": "Changing the map layer"
+      },
+      "sitesTitle": "Sites that pass all four checks, landing {{date}}",
+      "sitesNone": "No site passes all four checks for a landing on {{date}}. Try a date a few days later, or a launch slip.",
+      "flyThere": "Fly there",
+      "fit": {
+        "fits": "✓ Robot fits",
+        "does_not_fit": "✕ Robot doesn't fit",
+        "not_enough_data": "? Not enough data"
+      },
+      "basicFound": "✅ The best site I found is in {{region}}, for a landing on {{date}}. I've flown there and pinned the others; they're listed below.",
+      "basicNone": "❌ Nothing passes all four checks on this date. Try another date with the date stepper, or a launch slip, and ask again.",
+      "mic": "Talk to Ask SiteLine",
+      "micStop": "Stop listening",
+      "micBlocked": "The microphone is blocked. Allow it for this site in the browser's address bar, then try again.",
+      "micFailed": "The mic didn't catch that. Try again, or type your question.",
+      "speaking": "Reading replies aloud.",
+      "mute": "Stop reading aloud"
     }
   },
   "share": {

@@ -24,6 +24,7 @@ export type Intent =
   | { tool: 'fly_to'; input: { target: Target } }
   | { tool: 'show_mission'; input: { id: string } }
   | { tool: 'analyze_site'; input: { aspect: Aspect } }
+  | { tool: 'find_landing_sites' }
   | { tool: 'help' };
 
 export interface MissionName {
@@ -53,6 +54,8 @@ const TARGETS: [Target, RegExp][] = [
   ['moon', / (moon|lunar|luna) /],
 ];
 const MOVE = / (fly|go|take me|travel|head|show me|open|back to|zoom to|switch to) /;
+const SEARCH = / (find|search|look for|recommend|suggest|best|where should|where can|pick|choose) /;
+const PLACE = / (site|sites|spot|spots|land|landing|place|places|location) /;
 
 /** Site questions, most specific first: "sunset" must not read as "sun", nor "19 years of sun" as plain sunlight. */
 const ASPECTS: [Aspect, RegExp][] = [
@@ -73,7 +76,11 @@ export function parseIntent(text: string, missions: readonly MissionName[]): Int
   const s = normal(text);
   if (s.trim() === '') return { tool: 'help' };
 
-  // A mission named outright wins: "show me Apollo 11" is about the lander, not about the Moon.
+  // "Find me a landing site", "where should I land?", "where should the IM-2 hopper land?": the search, even when a
+  // craft is named, and not a check of this site.
+  if (SEARCH.test(s) && PLACE.test(s)) return { tool: 'find_landing_sites' };
+
+  // Otherwise a mission named outright wins: "show me Apollo 11" is about the lander, not about the Moon.
   let best: { id: string; length: number } | undefined;
   for (const m of missions) {
     for (const a of aliasesOf(m))

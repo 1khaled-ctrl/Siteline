@@ -7,9 +7,10 @@
 
 /** Qwen3 30B A3B: function calling, 32k context, and among the cheapest per token on Workers AI's free allocation. */
 export const MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
-const MAX_TOKENS = 600;
-const MAX_MESSAGES = 24;
-const MAX_BODY_BYTES = 48_000;
+const MAX_TOKENS = 700;
+/** An agent turn adds a call and its results each round, so a chat runs longer than plain questions. */
+const MAX_MESSAGES = 48;
+const MAX_BODY_BYTES = 96_000;
 /** Per visitor, per isolate: a guard against one page draining the shared daily allocation, not a hard quota. */
 const RATE_LIMIT = { requests: 15, windowMs: 60_000 };
 
@@ -26,9 +27,17 @@ You know nothing about the selected site until you call a tool. Any question abo
 
 Robots for robot_fit: a rover, or a lander that carries a rover -> rlldpPallet. A small fixed lander or the NASA tripod -> rlldpTripod. A hopper, or IM-2 -> im2. Astronauts, crew or Artemis -> artemis4. Leave landingRadiusM out unless the user names 50 or 100 m.
 
+Finding a landing site (you are an agent here: plan, use tools, then decide):
+- When the user wants a place to land ("where should I land", "find a site", "best spot for a rover in March 2028"), call find_landing_sites. Pass landingUtc as ISO 8601 UTC (for a month with no day, use the 1st at 00:00Z); leave it out to use the date on screen. Pass robot when they name a craft, and regions only when they name one.
+- Ask a question instead only when the request can't be searched at all. Never ask more than one question in a row.
+- If nothing passes, search once more on a date about 7 days later and say which date you used. At most two searches per request.
+- When you have results, call select_site on the rank 1 site with the same landingUtc, so the screen shows it. Then answer: which site, which region, why it won (Sun, Earth, slope, robot), and one alternative.
+- check_site checks any spot without moving the view. pin_sites puts up to four sites side by side. set_date changes the landing date or the launch slip. show_layer shows the long-term sunlight (sun), Earth (earth) or never-lit (shadow) map.
+
 Rules:
 - Every number, date and time you write must appear in a tool result or the app_state of this conversation. If no tool gives it, say SiteLine doesn't have it. Never estimate or recall one.
 - Unknown is not a pass: if a check is unknown, say what is missing.
+- Write a place as the region name, then latitude and longitude with N/S and E/W and no minus sign, rounded to 2 decimals: "Nobile Rim 1 (85.24° S, 37.18° E)".
 - SiteLine is a screening aid, not mission certification. Earth in view means direct radio contact is geometrically possible, not a working link; Sun up means light for solar power, not enough power.
 - Write for a curious non-expert, in the language the user writes in. For a site or robot question: one plain sentence with the answer first and why in everyday words, then at most four short lines that each start with one emoji (☀️ Sun, 🌍 Earth, ⛰️ ground, 🤖 robot, 📅 long term), then one short suggestion of what to try next. For anything else, answer in one or two plain sentences. Plain text with line breaks, no markdown, no tables.
 /no_think`;
@@ -57,6 +66,64 @@ export const TOOLS = [
     "The selected Moon site's check for the landing date: verdict, the four checks, Sun and Earth visibility over the stay, slope, ground height, long-term light, next events, confidence and sources.",
     {},
     [],
+  ),
+  fn(
+    'find_landing_sites',
+    "Search NASA's nine Artemis regions for landing sites that pass all four checks on a landing date, best first. Moves the view to the pole and pins what it finds. Takes a while: say you are searching.",
+    {
+      landingUtc: {
+        type: 'string',
+        description: 'ISO 8601 UTC, such as 2028-03-01T00:00:00Z. Leave out for the date on screen.',
+      },
+      robot: { type: 'string', enum: ['rlldpTripod', 'rlldpPallet', 'im2', 'artemis4'] },
+      regions: { type: 'array', items: { type: 'string' }, description: 'Region names, only if the user names some.' },
+      landingRadiusM: { type: 'number', enum: [50, 100] },
+    },
+    [],
+  ),
+  fn(
+    'check_site',
+    'The full check of any Moon site on any date, without moving the view.',
+    {
+      latDeg: { type: 'number' },
+      lonDeg: { type: 'number' },
+      landingUtc: { type: 'string', description: 'ISO 8601 UTC. Leave out for the date on screen.' },
+      robot: { type: 'string', enum: ['rlldpTripod', 'rlldpPallet', 'im2', 'artemis4'] },
+    },
+    ['latDeg', 'lonDeg'],
+  ),
+  fn(
+    'select_site',
+    'Fly to a Moon site and open its report, optionally setting the landing date. Use it to show the user your pick.',
+    { latDeg: { type: 'number' }, lonDeg: { type: 'number' }, landingUtc: { type: 'string' } },
+    ['latDeg', 'lonDeg'],
+  ),
+  fn(
+    'set_date',
+    'Change the landing date and/or the launch slip in days; every check on screen re-runs.',
+    { landingUtc: { type: 'string' }, slipDays: { type: 'number' } },
+    [],
+  ),
+  fn(
+    'pin_sites',
+    'Pin up to four Moon sites to compare them side by side.',
+    {
+      sites: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { latDeg: { type: 'number' }, lonDeg: { type: 'number' } },
+          required: ['latDeg', 'lonDeg'],
+        },
+      },
+    },
+    ['sites'],
+  ),
+  fn(
+    'show_layer',
+    'Show a map layer on the south pole: the long-term sunlight (sun), Earth in view (earth), never-lit ground (shadow), or none.',
+    { layer: { type: 'string', enum: ['none', 'sun', 'earth', 'shadow'] } },
+    ['layer'],
   ),
   fn(
     'robot_fit',

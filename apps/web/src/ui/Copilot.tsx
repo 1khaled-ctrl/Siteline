@@ -1,78 +1,111 @@
-import { ARTEMIS_ZONE_LAT_DEG, LANDING_RADIUS_M, MAX_LANDING_SLOPE_DEG } from '@siteline/physics';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MISSION_NAMES, runAgentTool, type SitesCard } from '../agentTools';
 import { type Confidence, confidenceOf, type Reading, SLOPE_NEEDS_M } from '../confidence';
 import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, type Target } from '../copilot';
-import { askAi, type ChatMessage, type ToolCall, type ToolResult } from '../copilotAi';
+import { askAi, type ChatMessage, plainReply, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
-import { findLander, MISSIONS } from '../landers';
+import { findLander } from '../landers';
 import { physics, queryFor, URLS } from '../physics';
-import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS } from '../robots';
 import { sound } from '../sound';
 import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
+import { canListen, canSpeak, listen, speak, stopSpeaking } from '../voice';
 import { Spinner } from './ViewStatus';
+
+/** One tool the agent ran for a reply, shown as a step while it works and kept after. */
+interface Step {
+  id: number;
+  tool: string;
+  call: string;
+  status: 'running' | 'done' | 'failed';
+  /** What it is doing right now, or why it failed. */
+  detail?: string;
+}
 
 interface Message {
   id: number;
   from: 'you' | 'siteline';
   text: string;
-  /** The tool call behind a reply, shown so it is clear what was looked up. */
+  /** The tool call behind a matcher reply, shown so it is clear what was looked up. */
   call?: string;
   sources?: string[];
   /** Numbers in an AI reply that no tool of that turn gave: shown while developing, logged on the live site. */
   unverified?: string[];
+  /** The agent's steps for this reply, in order. */
+  steps?: Step[];
+  /** Sites a search found, as buttons. */
+  card?: SitesCard;
+  /** True while the agent is still working on this reply. */
+  working?: boolean;
 }
 
 /** Who answered last: the free AI model, or the matcher in the browser when the AI is not reachable. */
 type Mode = 'ai' | 'basic' | 'unknown';
 
-/** Rounded to a tenth, the precision the report shows, so the model repeats what the screen says. */
-const tenth = (v: number | undefined) => (v === undefined || !Number.isFinite(v) ? null : Math.round(v * 10) / 10);
-const TARGETS: Target[] = ['solar', 'earth', 'mars', 'moon', 'pole'];
-
-const NAMES = MISSIONS.map((m) => ({ id: m.id, name: m.name }));
 const VIEW_OF: Record<Target, MoonView> = { solar: 'solar', earth: 'earth', mars: 'mars', moon: 'globe', pole: 'pole' };
-const EXAMPLES = ['example1', 'example2', 'example7', 'example3', 'example4', 'example5'];
+const EXAMPLES = ['example8', 'example1', 'example2', 'example7', 'example3', 'example4'];
 const READINGS: Reading[] = ['zone', 'sun', 'earth', 'height', 'longTerm', 'slope'];
 const CONFIDENCE_LEVELS: Confidence[] = ['high', 'firstPass', 'flatHorizon', 'notMeasured'];
 
 const callText = (intent: Intent) =>
-  intent.tool === 'help'
+  intent.tool === 'help' || intent.tool === 'find_landing_sites'
     ? ''
     : `${intent.tool}(${Object.entries(intent.input)
         .map(([k, v]) => `${k}: "${v}"`)
         .join(', ')})`;
 
 /**
- * A small chat over the 3D view. It can fly the view, open a mission's card, and answer questions about the selected
- * Moon landing site from the same check the site report runs. It never writes data and calls no outside service.
+ * Ask SiteLine: a chat over the 3D view that works as an agent. It can fly the view, open a mission, check any Moon
+ * site, and search the south pole for a site that passes, showing each step as it runs and moving the screen as it
+ * goes. Tools run here with the functions the screen uses. It speaks and listens through the browser's own speech.
  */
 export function Copilot() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const open = useStage((s) => s.copilotOpen);
   const setOpen = useStage.getState().setCopilotOpen;
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<Message[]>([]);
   const [mode, setMode] = useState<Mode>('unknown');
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string>();
+  /** Replies are read aloud after a question asked by voice, until the visitor types again. */
+  const [speakReplies, setSpeakReplies] = useState(false);
   const history = useRef<ChatMessage[]>([]);
   const next = useRef(1);
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const stopListening = useRef<(() => void) | null>(null);
+  const voice = canListen();
 
   useEffect(() => {
     if (open) input.current?.focus();
+    else {
+      stopListening.current?.();
+      stopSpeaking();
+    }
   }, [open]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new message is what scrolls the log down.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new message or step is what scrolls the log down.
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' });
   }, [log]);
 
-  const say = (m: Omit<Message, 'id'>) => {
-    setLog((l) => [...l, { ...m, id: next.current++ }]);
-    if (m.from === 'siteline') sound.chime();
+  const add = (m: Omit<Message, 'id'>): number => {
+    const id = next.current++;
+    setLog((l) => [...l, { ...m, id }]);
+    return id;
+  };
+  const update = (id: number, patch: (m: Message) => Partial<Message>) =>
+    setLog((l) => l.map((m) => (m.id === id ? { ...m, ...patch(m) } : m)));
+
+  const say = (m: Omit<Message, 'id'>, spoken: boolean) => {
+    add(m);
+    if (m.from === 'siteline') {
+      sound.chime();
+      if (spoken && m.text) speak(m.text, i18n.language);
+    }
   };
 
   const place = (s: { latDeg: number; lonDeg: number }) =>
@@ -194,117 +227,6 @@ export function Copilot() {
     return lines[aspect].join('\n');
   };
 
-  /** The site check for the current site and date, waiting a few seconds for the 10 m slope as the report does. */
-  const check = () => {
-    const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
-    const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
-    return physics.stay(query, URLS, 6000).then((r) => ({ query, r, site: { latDeg, lonDeg } }));
-  };
-
-  /** The tools the AI may call: the matcher's three, and the robot card's check. They read data or move the view. */
-  const runTool = async (call: ToolCall): Promise<ToolResult> => {
-    const a = call.arguments;
-    const shown = `${call.name}(${Object.entries(a)
-      .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-      .join(', ')})`;
-    if (call.name === 'fly_to') {
-      const target = a.target as Target;
-      if (!TARGETS.includes(target)) throw new Error(`no place called ${String(a.target)}`);
-      useApp.getState().set({ view: VIEW_OF[target] });
-      return { call: shown, data: { flyingTo: target } };
-    }
-    if (call.name === 'show_mission') {
-      const named = parseIntent(String(a.name ?? ''), NAMES);
-      if (named.tool !== 'show_mission') throw new Error(`no mission called ${String(a.name)}`);
-      useApp.getState().selectMission(named.input.id);
-      const m = findLander(named.input.id);
-      return {
-        call: shown,
-        data: { opened: m?.name, status: m?.status, date: m?.date, site: m?.site[0], note: m?.note[0] },
-      };
-    }
-    if (call.name === 'analyze_site') {
-      const { query, r, site } = await check();
-      const s = summarize(r, site, query.landingUtc);
-      return {
-        call: shown,
-        sources: s.sources,
-        data: {
-          site,
-          landingUtc: s.landingUtc,
-          stayDays: query.stayDays,
-          verdict: s.verdict,
-          checks: s.checks,
-          sunMinVisiblePct: tenth(s.sunMinPct),
-          earthInViewPct: tenth(s.earthPct),
-          landingSlope100mDeg: tenth(r.slope?.slope100mDeg),
-          walkableWithin1kmPct: tenth(r.slope?.slope2kmPctUnder20),
-          groundHeightM: s.groundHeightM === undefined ? null : Math.round(s.groundHeightM),
-          horizonTerrainResolutionM: r.terrain?.resolutionM ?? null,
-          longTerm: s.longTerm && {
-            sunPct: tenth(s.longTerm.sunPct),
-            earthPct: tenth(s.longTerm.earthPct),
-            neverSunlit: s.longTerm.shadowed,
-          },
-          firstProblem: s.problem ?? null,
-          next: s.next,
-          rules: {
-            stayDays: query.stayDays,
-            minSunVisiblePct: query.minSunFraction * 100,
-            slopeLimitDeg: MAX_LANDING_SLOPE_DEG,
-            slopeOverM: 2 * LANDING_RADIUS_M,
-            artemisZoneSouthOfDeg: Math.abs(ARTEMIS_ZONE_LAT_DEG),
-          },
-          caveat: 'Screening aid, not certification. Earth in view is not a radio link.',
-        },
-      };
-    }
-    if (call.name === 'robot_fit') {
-      if (!isRobotId(a.robot)) throw new Error(`no robot called ${String(a.robot)}`);
-      const robot = ROBOTS[a.robot];
-      const radiusM = (LANDING_RADII_M as readonly number[]).includes(Number(a.landingRadiusM))
-        ? (Number(a.landingRadiusM) as LandingRadius)
-        : useApp.getState().landingRadiusM;
-      // The card shows the same robot, so what the copilot says can be checked on screen.
-      useApp.getState().set({ robot: robot.id, landingRadiusM: radiusM });
-      const { query, r } = await check();
-      const fit = fitAt(robot, query, r, radiusM);
-      const near = nearestLander(query.site.latDeg, query.site.lonDeg);
-      return {
-        call: shown,
-        sources: robot.sources,
-        data: {
-          robot: t(`robot.name.${robot.id}`),
-          about: t(`robot.blurb.${robot.id}`),
-          overall: fit.overall,
-          landingRadiusM: radiusM,
-          checks: fit.checks
-            .filter((c) => c.status !== 'not_evaluated' || c.id === 'darkness')
-            .map((c) => ({
-              check: c.id,
-              status: c.status,
-              says: t(`robot.check.${c.id}.${c.reason}`, {
-                radius: c.values.radiusM,
-                limit: c.values.limitDeg,
-                worst: tenth(c.values.worstDeg),
-                steep: tenth(c.values.steepPct),
-                sun: tenth(c.values.sunPct),
-                dark: tenth(c.values.darkH),
-                days: query.stayDays,
-                pct: tenth(c.values.pct),
-                walk: tenth(c.values.walkablePct),
-                km: tenth(c.values.shadowKm),
-              }),
-            })),
-          slopeLimitNote: t('robot.limitNote'),
-          nearestLander: near && { name: near.name, km: tenth(near.km), approximate: near.approximate },
-          caveat: t('robot.con3'),
-        },
-      };
-    }
-    throw new Error(`no tool called ${call.name}`);
-  };
-
   const appState = () => {
     const s = useApp.getState();
     const query = queryFor({ latDeg: s.latDeg, lonDeg: s.lonDeg }, s.landingUtc, s.slipDays);
@@ -315,74 +237,141 @@ export function Copilot() {
       slipDays: s.slipDays,
       stayDays: query.stayDays,
       robot: s.robot,
+      pins: s.pins,
       openMission: s.missionId,
     };
   };
 
-  const run = async (message: string) => {
+  /**
+   * A tool runner that shows its work: each call becomes a step on the working message, its progress lines update
+   * the step, and a card it returns (the sites a search found) is kept for the reply.
+   */
+  const stepper = (messageId: number, cards: SitesCard[]) => {
+    let stepId = 0;
+    return async (call: ToolCall): Promise<ToolResult> => {
+      stepId += 1;
+      const id = stepId;
+      const step: Step = {
+        id,
+        tool: call.name,
+        call: `${call.name}(${Object.entries(call.arguments)
+          .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+          .join(', ')})`,
+        status: 'running',
+      };
+      const patchStep = (p: Partial<Step>) =>
+        update(messageId, (m) => ({ steps: (m.steps ?? []).map((s) => (s.id === id ? { ...s, ...p } : s)) }));
+      update(messageId, (m) => ({ steps: [...(m.steps ?? []), step] }));
+      try {
+        const out = await runAgentTool(call, { t, progress: (detail) => patchStep({ detail }) });
+        if (out.card) cards.push(out.card);
+        patchStep({ status: 'done', detail: undefined });
+        return out;
+      } catch (e) {
+        patchStep({ status: 'failed', detail: e instanceof Error ? e.message : String(e) });
+        throw e;
+      }
+    };
+  };
+
+  /** Ends a working message with its reply. */
+  const finish = (id: number, patch: Partial<Message>, spoken: boolean) => {
+    update(id, () => ({ ...patch, working: false }));
+    sound.chime();
+    if (spoken && patch.text) speak(patch.text, i18n.language);
+  };
+
+  const run = async (message: string, spoken: boolean) => {
     // A plain command ("Fly to Mars", "Show me Apollo 11") needs no model: the matcher does it at once, and the free
     // daily allowance is kept for questions.
-    const intent = parseIntent(message, NAMES);
-    if (intent.tool === 'fly_to' || intent.tool === 'show_mission') return runBasic(message);
-    const out = await askAi(message, appState(), history.current, runTool);
+    const intent = parseIntent(message, MISSION_NAMES);
+    if (intent.tool === 'fly_to' || intent.tool === 'show_mission') return runBasic(message, spoken);
+    const working = add({ from: 'siteline', text: '', steps: [], working: true });
+    const cards: SitesCard[] = [];
+    const out = await askAi(message, appState(), history.current, stepper(working, cards));
     if (out.ok && out.unverified.length === 0) {
       history.current = out.history;
       setMode('ai');
-      return say({
-        from: 'siteline',
-        text: out.text,
-        call: out.calls.map((c) => `↳ ${c}`).join('\n') || undefined,
-        sources: out.sources,
-      });
+      // A search the model didn't follow with select_site still ends on its best site, so the screen shows the answer.
+      const card = cards.at(-1);
+      const best = card?.sites[0];
+      if (card && best && !out.calls.some((c) => c.startsWith('select_site('))) flyTo(card, best);
+      return finish(working, { text: plainReply(out.text), sources: out.sources, card }, spoken);
     }
     // A reply with a number no tool gave is never shown: the matcher answers from the check itself instead, and the
-    // chat the model sees stays as it was.
+    // chat the model sees stays as it was. Steps already taken stay on screen, since the view did move.
     if (out.ok) console.warn(`copilot: dropped an AI reply with numbers no tool gave: ${out.unverified.join(', ')}`);
     else setMode('basic');
-    return runBasic(message);
+    setLog((l) =>
+      l.flatMap((m) =>
+        m.id !== working ? [m] : m.steps?.length ? [{ ...m, working: false, card: cards.at(-1) }] : [],
+      ),
+    );
+    return runBasic(message, spoken);
   };
 
   /** The matcher: one tool picked from the message's words, answered from the report's own sentences. */
-  const runBasic = async (message: string) => {
-    const intent = parseIntent(message, NAMES);
+  const runBasic = async (message: string, spoken: boolean) => {
+    const intent = parseIntent(message, MISSION_NAMES);
     const call = callText(intent) || undefined;
-    if (intent.tool === 'help') return say({ from: 'siteline', text: t('copilot.help') });
+    if (intent.tool === 'help') return say({ from: 'siteline', text: t('copilot.help') }, spoken);
     if (intent.tool === 'fly_to') {
       useApp.getState().set({ view: VIEW_OF[intent.input.target] });
-      return say({
-        from: 'siteline',
-        call,
-        text: t('copilot.flying', { place: t(`copilot.places.${intent.input.target}`) }),
-      });
+      return say(
+        { from: 'siteline', call, text: t('copilot.flying', { place: t(`copilot.places.${intent.input.target}`) }) },
+        spoken,
+      );
     }
     if (intent.tool === 'show_mission') {
       const m = findLander(intent.input.id);
       useApp.getState().selectMission(intent.input.id);
-      return say({ from: 'siteline', call, text: t('copilot.mission', { name: m?.name ?? intent.input.id }) });
+      return say({ from: 'siteline', call, text: t('copilot.mission', { name: m?.name ?? intent.input.id }) }, spoken);
+    }
+    if (intent.tool === 'find_landing_sites') {
+      // The same search the agent runs, without the model: the steps, the pins and the card, with a plain sentence.
+      const working = add({ from: 'siteline', text: '', steps: [], working: true });
+      const cards: SitesCard[] = [];
+      try {
+        await stepper(working, cards)({ id: 'basic', name: 'find_landing_sites', arguments: {} });
+      } catch {
+        // The failed step says why.
+      }
+      const card = cards.at(-1);
+      const best = card?.sites[0];
+      if (best) useApp.getState().focusSite(best.latDeg, best.lonDeg);
+      const reply =
+        card && best
+          ? t('copilot.agent.basicFound', { region: best.region, date: formatUtc(card.landingUtc) })
+          : t('copilot.agent.basicNone');
+      return finish(working, { text: reply, card }, spoken);
     }
     // analyze_site: the same check, on the same inputs, that the site report shows.
     const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
     try {
       const s = summarize(await physics.stay(query, URLS), { latDeg, lonDeg }, query.landingUtc);
-      say({ from: 'siteline', call, text: answer(intent.input.aspect, s), sources: s.sources });
+      say({ from: 'siteline', call, text: answer(intent.input.aspect, s), sources: s.sources }, spoken);
     } catch (e) {
-      say({
-        from: 'siteline',
-        call,
-        text: t('copilot.failed', { message: e instanceof Error ? e.message : String(e) }),
-      });
+      say(
+        { from: 'siteline', call, text: t('copilot.failed', { message: e instanceof Error ? e.message : String(e) }) },
+        spoken,
+      );
     }
   };
 
-  const send = async (message: string) => {
+  const send = async (message: string, spoken = false) => {
     const m = message.trim();
     if (!m || busy) return;
     setText('');
-    say({ from: 'you', text: m });
+    setSpeakReplies(spoken);
+    stopSpeaking();
+    add({ from: 'you', text: m });
     setBusy(true);
-    await run(m);
-    setBusy(false);
+    try {
+      await run(m, spoken);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submit = (e: FormEvent) => {
@@ -390,23 +379,66 @@ export function Copilot() {
     void send(text);
   };
 
+  const toggleMic = () => {
+    setVoiceError(undefined);
+    if (listening) {
+      stopListening.current?.();
+      return;
+    }
+    stopSpeaking();
+    setListening(true);
+    stopListening.current = listen(
+      i18n.language,
+      (partial) => setText(partial),
+      (result) => {
+        setListening(false);
+        stopListening.current = null;
+        if ('error' in result) {
+          setVoiceError(t(result.error === 'not-allowed' ? 'copilot.agent.micBlocked' : 'copilot.agent.micFailed'));
+          return;
+        }
+        if (result.text) void send(result.text, true);
+      },
+    );
+  };
+
+  /** A site from a search card: select it on its landing date and fly there, as the agent's own pick would. */
+  const flyTo = (card: SitesCard, site: SitesCard['sites'][number]) => {
+    useApp.getState().set({ landingUtc: card.landingUtc, live: false, slipDays: 0 });
+    useApp.getState().focusSite(site.latDeg, site.lonDeg);
+  };
+
   // The orb (Orb.tsx) opens it.
   if (!open) return null;
+
+  const running = log.some((m) => m.working);
 
   return (
     <section
       aria-label={t('copilot.title')}
       data-avoid
-      className="fixed inset-x-3 bottom-3 z-30 flex h-[min(520px,75dvh)] flex-col gap-2 rounded-xl border border-line bg-panel p-3 shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(520px,calc(100%-80px))] lg:w-[420px]"
+      className="fixed inset-x-3 bottom-3 z-30 flex h-[min(560px,78dvh)] flex-col gap-2 rounded-xl border border-line bg-panel p-3 shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(600px,calc(100%-80px))] lg:w-110"
       data-testid="copilot"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg">
-          {t('copilot.title')}{' '}
-          <span className="ms-1 rounded-pill border border-line px-2 py-0.5 align-middle font-sans text-[11px] font-normal text-quiet">
-            {t(`copilot.badge.${mode}`)}
-          </span>
-        </h2>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden="true"
+            className={`size-7 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)] ${
+              busy || listening ? 'animate-pulse' : ''
+            }`}
+          />
+          <h2 className="min-w-0 text-lg">
+            {t('copilot.title')}{' '}
+            <span className="ms-1 rounded-pill border border-line px-2 py-0.5 align-middle font-sans text-[11px] font-normal text-quiet">
+              {listening
+                ? t('copilot.agent.listening')
+                : running
+                  ? t('copilot.agent.working')
+                  : t(`copilot.badge.${mode}`)}
+            </span>
+          </h2>
+        </div>
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -426,7 +458,9 @@ export function Copilot() {
                   key={k}
                   type="button"
                   onClick={() => void send(t(`copilot.${k}`))}
-                  className="min-h-8 rounded-pill border border-line bg-panel-raised px-3 text-[12.5px] text-ink hover:border-line-hover"
+                  className={`min-h-8 rounded-pill border bg-panel-raised px-3 text-[12.5px] text-ink hover:border-line-hover ${
+                    k === 'example8' ? 'border-sun/60' : 'border-line'
+                  }`}
                 >
                   {t(`copilot.${k}`)}
                 </button>
@@ -442,19 +476,26 @@ export function Copilot() {
           ) : (
             <div
               key={m.id}
-              className="max-w-[92%] self-start rounded-lg border border-line bg-panel-raised px-3 py-2 text-sm"
+              className="flex max-w-[94%] flex-col gap-1.5 self-start rounded-lg border border-line bg-panel-raised px-3 py-2 text-sm"
             >
               {m.call && (
-                <p className="mb-1 whitespace-pre-line font-mono text-[11.5px] text-quiet" dir="ltr">
+                <p className="whitespace-pre-line font-mono text-[11.5px] text-quiet" dir="ltr">
                   {m.call.startsWith('↳') ? m.call : `↳ ${m.call}`}
                 </p>
               )}
-              <p className="whitespace-pre-line">{m.text}</p>
+              {m.steps && m.steps.length > 0 && <Steps steps={m.steps} />}
+              {m.working && !m.steps?.some((s) => s.status === 'running') && (
+                <p className="flex items-center gap-2 text-quiet">
+                  <Spinner /> {t('copilot.agent.thinking')}
+                </p>
+              )}
+              {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+              {m.card && <Sites card={m.card} onFly={(s) => m.card && flyTo(m.card, s)} />}
               {m.unverified && (
-                <p className="mt-1 text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
+                <p className="text-xs text-warn">{t('copilot.unverified', { list: m.unverified.join(', ') })}</p>
               )}
               {m.sources && m.sources.length > 0 && (
-                <p className="mt-1.5 text-xs text-quiet">
+                <p className="text-xs text-quiet">
                   {t('report.sources')}:{' '}
                   {m.sources.map((id, i) => (
                     <span key={id}>
@@ -473,7 +514,7 @@ export function Copilot() {
             </div>
           ),
         )}
-        {busy && (
+        {busy && !running && (
           <p className="flex items-center gap-2 self-start text-sm text-quiet">
             <Spinner /> {t('copilot.thinking')}
           </p>
@@ -485,12 +526,29 @@ export function Copilot() {
         <label htmlFor="copilot-input" className="sr-only">
           {t('copilot.inputLabel')}
         </label>
+        {voice && (
+          <button
+            type="button"
+            onClick={toggleMic}
+            disabled={busy}
+            aria-pressed={listening}
+            aria-label={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
+            title={listening ? t('copilot.agent.micStop') : t('copilot.agent.mic')}
+            className={`grid min-h-9 min-w-9 place-items-center rounded-md border text-sm disabled:opacity-50 ${
+              listening
+                ? 'animate-pulse border-sun bg-sun/25 text-sun-ink'
+                : 'border-line bg-panel-raised hover:border-line-hover'
+            }`}
+          >
+            <MicIcon />
+          </button>
+        )}
         <input
           id="copilot-input"
           ref={input}
           value={text}
           autoComplete="off"
-          placeholder={t('copilot.placeholder')}
+          placeholder={listening ? t('copilot.agent.listening') : t('copilot.placeholder')}
           onChange={(e) => setText(e.currentTarget.value)}
           className="min-h-9 min-w-0 flex-1 rounded-md border border-line bg-panel-sunk px-2.5 text-sm"
         />
@@ -502,7 +560,141 @@ export function Copilot() {
           {t('copilot.send')}
         </button>
       </form>
+      {voiceError && <p className="text-[11.5px] text-warn">{voiceError}</p>}
+      {speakReplies && canSpeak() && (
+        <p className="flex items-center justify-between gap-2 text-[11.5px] text-quiet">
+          <span>{t('copilot.agent.speaking')}</span>
+          <button
+            type="button"
+            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+            onClick={() => {
+              stopSpeaking();
+              setSpeakReplies(false);
+            }}
+          >
+            {t('copilot.agent.mute')}
+          </button>
+        </p>
+      )}
       <p className="text-[11.5px] text-quiet">{t(mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}</p>
     </section>
+  );
+}
+
+/** The agent's steps: what it ran, what it is doing now, and what failed and why. */
+function Steps({ steps }: { steps: Step[] }) {
+  const { t } = useTranslation();
+  return (
+    <ol className="flex flex-col gap-1 border-s border-line ps-2.5">
+      {steps.map((s) => (
+        <li key={s.id} className="grid grid-cols-[16px_minmax(0,1fr)] items-start gap-1.5 text-[12.5px]">
+          <span className="pt-0.5" aria-hidden="true">
+            {s.status === 'running' ? (
+              <Spinner />
+            ) : s.status === 'done' ? (
+              <span className="text-pass">✓</span>
+            ) : (
+              <span className="text-fail">✕</span>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="sr-only">{t(`copilot.agent.status.${s.status}`)} </span>
+            {t(`copilot.agent.tool.${s.tool}`, { defaultValue: s.tool })}
+            {s.detail && (
+              <span className={`block ${s.status === 'failed' ? 'text-fail' : 'text-sun-ink'}`}>{s.detail}</span>
+            )}
+            <span className="block truncate font-mono text-[10.5px] text-quiet" dir="ltr" title={s.call}>
+              {s.call}
+            </span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The sites a search found, best first, each with its readings and a button that flies there. */
+function Sites({ card, onFly }: { card: SitesCard; onFly: (site: SitesCard['sites'][number]) => void }) {
+  const { t } = useTranslation();
+  if (card.sites.length === 0)
+    return (
+      <p className="rounded-md border border-line bg-panel-sunk px-2.5 py-2 text-quiet">
+        {t('copilot.agent.sitesNone', { date: formatUtc(card.landingUtc) })}
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-line bg-panel-sunk p-1.5">
+      <p className="px-1 text-[11.5px] text-quiet">
+        {t('copilot.agent.sitesTitle', { date: formatUtc(card.landingUtc) })}
+      </p>
+      <ol className="flex flex-col gap-1">
+        {card.sites.map((s, i) => (
+          <li
+            key={`${s.latDeg},${s.lonDeg}`}
+            className="flex items-center gap-2 rounded px-1 py-1 hover:bg-panel-raised"
+          >
+            <span className="w-4 shrink-0 text-center font-mono text-xs text-quiet">{i + 1}</span>
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-x-1.5">
+                <span className="text-pass">✓</span>
+                <span className="font-medium">{s.region}</span>
+                <bdi className="font-mono text-[11px] text-quiet">
+                  {t('share.place', {
+                    lat: formatNumber(Math.abs(s.latDeg), 2),
+                    northSouth: s.latDeg < 0 ? t('landers.south') : t('landers.north'),
+                    lon: formatNumber(Math.abs(s.lonDeg), 2),
+                    eastWest: s.lonDeg < 0 ? t('landers.west') : t('landers.east'),
+                  })}
+                </bdi>
+                {s.robotFit && (
+                  <span
+                    className={`rounded-pill border px-1.5 text-[10.5px] ${
+                      s.robotFit === 'fits'
+                        ? 'border-pass/60 text-pass'
+                        : s.robotFit === 'does_not_fit'
+                          ? 'border-fail/60 text-fail'
+                          : 'border-warn/60 text-warn'
+                    }`}
+                  >
+                    {t(`copilot.agent.fit.${s.robotFit}`)}
+                  </span>
+                )}
+              </span>
+              <span className="block font-mono text-[11px] text-quiet">
+                {t('best.readings', {
+                  sun: formatNumber(s.sunFractionMin * 100, 0),
+                  earth: formatNumber(s.earthVisiblePct, 0),
+                  slope: formatNumber(s.slope100mDeg, 1),
+                })}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onFly(s)}
+              className="min-h-8 shrink-0 rounded-md border border-line-hover bg-panel-raised px-2.5 text-xs hover:border-sun"
+            >
+              {t('copilot.agent.flyThere')}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+    >
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" strokeLinecap="round" />
+    </svg>
   );
 }

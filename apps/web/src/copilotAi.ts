@@ -33,10 +33,10 @@ export type AiOutcome =
 
 export type Relay = (messages: ChatMessage[]) => Promise<{ text: string; toolCalls: ToolCall[] } | { error: string }>;
 
-/** Rounds of tools per question before the model must answer. */
-const MAX_ROUNDS = 4;
-/** The relay takes 24 messages; a longer chat starts over rather than trimming what was said. */
-const MAX_HISTORY = 16;
+/** Rounds of tools per question before the model must answer: enough to search, retry on another date, and select. */
+const MAX_ROUNDS = 6;
+/** The relay takes 48 messages and an agent turn can add a dozen; a longer chat starts over rather than trimming. */
+const MAX_HISTORY = 20;
 
 /** The relay at /api/copilot. */
 export const fetchRelay: Relay = async (messages) => {
@@ -68,7 +68,20 @@ export function unverifiedNumbers(reply: string, sources: string[]): string[] {
 }
 
 /**
- * One question, through as many rounds of tools as the model needs (up to four). `history` is the chat so far; the
+ * A reply as plain text. The model is told to write no markdown but sometimes does; the chat shows text as written, so
+ * bold, headings and bullet markers would show as stray symbols.
+ */
+export const plainReply = (text: string): string =>
+  text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .trim();
+
+/**
+ * One question, through as many rounds of tools as the model needs (up to six). `history` is the chat so far; the
  * question goes in with the app's state ahead of it. Tools that throw go back to the model as errors.
  */
 export async function askAi(
