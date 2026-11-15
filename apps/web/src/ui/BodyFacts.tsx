@@ -142,14 +142,16 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
     />
   );
 
-  const folded = useStage((s) => s.folded.has('facts'));
+  // The panel's card starts folded; a planet's card, opened on purpose, starts open. Each keeps its own fold.
+  const foldKey = onClose ? 'facts:opened' : 'facts';
+  const folded = useStage((s) => s.folded.has(foldKey));
   const iconButton =
     'grid size-8 place-items-center rounded-md border border-line bg-panel-raised text-quiet hover:border-line-hover hover:text-ink';
 
   return (
     <section className={panel} data-testid="body-facts" data-body={body} id="body-facts" tabIndex={-1}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-2xl">{t(`facts.heading.${body}`)}</h2>
+      <div className={`flex items-center justify-between gap-2 ${folded ? '' : 'mb-2'}`}>
+        <h2 className="text-2xl leading-tight">{t(`facts.heading.${body}`)}</h2>
         <div className="flex gap-1.5">
           <button
             type="button"
@@ -157,7 +159,7 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
             aria-expanded={!folded}
             aria-controls="body-facts-body"
             aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
-            onClick={() => useStage.getState().toggleFolded('facts')}
+            onClick={() => useStage.getState().toggleFolded(foldKey)}
           >
             <svg
               viewBox="0 0 12 12"

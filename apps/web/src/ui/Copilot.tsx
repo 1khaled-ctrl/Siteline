@@ -25,6 +25,7 @@ import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
 import { canListen, canSpeak, listen, speak, stopSpeaking } from '../voice';
+import { LunaMark } from './LunaMark';
 import { Spinner } from './ViewStatus';
 
 /** One tool the agent ran for a reply, shown as a step while it works and kept after. */
@@ -706,12 +707,7 @@ export function Copilot() {
     >
       <span aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
       <header className="flex items-center gap-3 border-b border-line bg-linear-to-b from-sun/10 to-transparent px-4 py-3">
-        <span
-          aria-hidden="true"
-          className={`size-9 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)] shadow-[0_0_16px_rgba(244,182,63,0.45)] ${
-            busy || listening || (liveState !== null && liveState !== 'listening') ? 'animate-pulse' : ''
-          }`}
-        />
+        <LunaMark className="size-9" pulse={busy || listening || (liveState !== null && liveState !== 'listening')} />
         <div className="min-w-0 flex-1">
           <h2 className="text-lg leading-tight">
             {t('copilot.title')}
@@ -961,14 +957,9 @@ export function Copilot() {
   );
 }
 
-/** Luna's face beside her messages: the same golden orb as the header. */
+/** Luna's face beside her messages: her logo, as in the header. */
 function Avatar() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mt-0.5 size-7 shrink-0 rounded-full bg-[radial-gradient(circle_at_35%_30%,#FFE3A3,#F4B63F_55%,#8A5A0A)]"
-    />
-  );
+  return <LunaMark className="mt-0.5 size-7" />;
 }
 
 /** Three dots that say Luna is on it. */

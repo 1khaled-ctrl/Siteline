@@ -68,7 +68,8 @@ export const useStage = create<StageState>((set) => ({
   setUiHidden: (uiHidden) => set({ uiHidden }),
   copilotOpen: false,
   setCopilotOpen: (copilotOpen) => set({ copilotOpen }),
-  folded: new Set(),
+  // The facts card starts folded: its arrow opens it.
+  folded: new Set(['facts']),
   toggleFolded: (id) =>
     set((s) => {
       const folded = new Set(s.folded);

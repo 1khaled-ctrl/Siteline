@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useBoot } from '../boot';
 import { useStage } from '../stage';
+import { LunaMark } from './LunaMark';
 
 /**
- * Now and then, a small note above the orb that Luna, the AI assistant, lives there: a few seconds after the intro,
- * then every few minutes, a few times a visit, until the visitor opens her. Once they have, it shows at most every few
+ * A small note above the orb that Luna, the AI assistant, lives there: a few seconds after the intro, staying until the
+ * visitor opens her or puts it away, and again a few times a visit if they did not. Once they have, it shows at most every few
  * days on that device. A click opens Luna; the × puts it away for the visit.
  */
 
-const FIRST_AFTER_MS = 10_000;
+const FIRST_AFTER_MS = 4_000;
 const AGAIN_AFTER_MS = 3 * 60_000;
-const SHOWN_FOR_MS = 8_000;
 const MAX_PER_VISIT = 3;
 const AFTER_OPENED_MS = 3 * 24 * 3_600_000;
 const KEY = 'siteline.lunaHint';
@@ -73,11 +73,7 @@ export function LunaHint({ side }: { side: 'start' | 'end' }) {
     return () => clearTimeout(show);
   }, [opened, dismissed, copilotOpen, count]);
 
-  useEffect(() => {
-    if (!shown) return;
-    const hide = setTimeout(() => setShown(false), SHOWN_FOR_MS);
-    return () => clearTimeout(hide);
-  }, [shown]);
+  // Once shown, the note stays until the visitor opens Luna or puts it away with the ×.
 
   if (!shown || orbOpen || uiHidden || copilotOpen) return null;
 
@@ -95,7 +91,7 @@ export function LunaHint({ side }: { side: 'start' | 'end' }) {
     >
       <div className="flex items-center gap-2 rounded-xl border border-sun/60 bg-panel/95 py-2 ps-3 pe-1.5 text-sm shadow-xl backdrop-blur">
         <button type="button" onClick={openLuna} className="flex min-w-0 items-center gap-2 text-start">
-          <span aria-hidden="true">✨</span>
+          <LunaMark className="size-7" />
           <span>
             <span className="block font-semibold text-ink">{t('hint.title')}</span>
             <span className="block text-xs text-quiet">{t('hint.text')}</span>
