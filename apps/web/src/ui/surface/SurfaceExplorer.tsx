@@ -181,6 +181,21 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     };
   }, []);
 
+  // Whether Shift is held, so the sprint key on screen lights up as the astronaut speeds up.
+  const [sprinting, setSprinting] = useState(false);
+  useEffect(() => {
+    const set = (e: KeyboardEvent) => setSprinting(e.shiftKey);
+    const off = () => setSprinting(false);
+    window.addEventListener('keydown', set);
+    window.addEventListener('keyup', set);
+    window.addEventListener('blur', off);
+    return () => {
+      window.removeEventListener('keydown', set);
+      window.removeEventListener('keyup', set);
+      window.removeEventListener('blur', off);
+    };
+  }, []);
+
   // The suit's breathing runs while you walk (below), so the occasional breath is not played here as well.
 
   // Load the terrain around the point; a retry asks again, and closing or a newer load cancels this one.
@@ -929,7 +944,21 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
             ) : (
               <div className="glass flex max-w-md flex-wrap items-center gap-2 px-3 py-2 text-xs text-quiet">
                 <p className="min-w-0 flex-1 max-sm:hidden" data-testid="surface-help">
-                  {locked ? t('land.lockedHint') : t('land.lookHint', { fast: formatNumber(FAST_M_PER_S, 0) })}
+                  {locked ? t('land.lockedHint') : t('land.lookHint')}
+                </p>
+                {/* Sprinting is easy to miss in a sentence: a key of its own, lit while Shift is held. */}
+                <p
+                  className={`flex basis-full items-center gap-2 transition-colors ${sprinting ? 'text-sun-ink' : ''}`}
+                  data-testid="surface-sprint"
+                >
+                  <kbd
+                    className={`rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-semibold transition-colors ${
+                      sprinting ? 'border-sun bg-sun text-panel' : 'border-line-hover bg-panel-raised text-ink'
+                    }`}
+                  >
+                    {t('land.sprintKey')}
+                  </kbd>
+                  <span>{t('land.sprintHint', { fast: formatNumber(FAST_M_PER_S, 0) })}</span>
                 </p>
                 {!locked && (
                   <button
