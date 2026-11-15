@@ -47,7 +47,7 @@ Most bugs in planetary software are one of these.
 
 - TypeScript strict mode. No `any` in `packages/physics`, and every exported physics function has a unit test.
 - Never type a number shown on screen by hand. Each comes from `packages/physics` or the API, with its dataset id.
-- Every UI string goes through an i18n key, in English and Arabic, in the same PR. Layout uses start and end, never left and right.
+- Every UI string goes through an i18n key in `en.json`. The site is English only. Layout uses start and end, never left and right.
 - No secrets in the repo, no file over 5 MB, and no generated tiles or raw data in git.
 - Never invent data. Every new dataset goes into CREDITS.md with its licence, citation, link and its id from the dataset inventory.
 - Use Biome and tsc for TypeScript, Ruff, mypy and pytest for Python.
@@ -56,7 +56,7 @@ Most bugs in planetary software are one of these.
 
 - Tests and type checks pass, and the tests check something real.
 - The feature works on the PR's preview deploy.
-- The PR has screenshots in English and Arabic.
+- The PR has screenshots.
 - Every number traces back to a source. If one can't be verified yet, hide it or label it "being checked".
 
 ## Commands

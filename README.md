@@ -37,7 +37,7 @@ The site is on Cloudflare Pages at https://siteline-a1a.pages.dev. Cloudflare bu
 - Map layers for long-term sunlight, Earth visibility and never-sunlit ground, and a time-lapse that plays a lunar day over the terrain.
 - A "How we checked it" panel whose numbers are written by the test suite (`tests/reference/validation.json`), never typed by hand.
 - Horizons come from the terrain and include lunar curvature. On the current 1.2 km terrain, sunlight agrees with published values within 5 points except on ridges narrower than a pixel.
-- English only for now; the strings live in `apps/web/src/i18n/en.json`, so Arabic can be added back.
+- English only; the strings live in `apps/web/src/i18n/en.json`.
 - The terrain, textures and models from the Landfall concept demo are in `pipeline/raw/landfall/` (not in git). Run `corepack pnpm e2e` with the dev server running for the browser smoke test.
 
 ## Licence

@@ -17,5 +17,5 @@ about: Anything not already in issues #1 to #100
 
 - [ ] Tests and type checks pass, and the tests check something real
 - [ ] Works on the PR's preview deploy
-- [ ] Screenshots in English and Arabic
+- [ ] Screenshots
 - [ ] Every number traces to a dataset id
