@@ -1,5 +1,5 @@
 import type { Reason, StayQuery, StayResult } from '@siteline/contracts';
-import { Fragment, useEffect } from 'react';
+import { Fragment, type ReactNode, useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
@@ -7,7 +7,7 @@ import { touchdownFromQuery } from '../land';
 import { DAY_MS, useStay } from '../physics';
 import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
-import { type Check, checksOf, verdictOf } from '../verdict';
+import { type Check, checksOf, ICE_USES_URL, iceLineOf, verdictOf } from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
@@ -26,6 +26,15 @@ const VERDICT_BOX = {
   fail: 'border-fail/60 bg-fail/7',
   undecided: 'border-warn/60 bg-warn/8',
 } as const;
+/** A link to a page outside SiteLine, with its words from the translation it sits in. */
+function SourceLink({ href, children }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink">
+      {children}
+    </a>
+  );
+}
+
 const CHIP: Record<Check, string> = {
   yes: 'border-pass/55 bg-pass/10 text-pass',
   no: 'border-fail/55 bg-fail/10 text-fail',
@@ -109,6 +118,7 @@ export function SiteReport() {
 
   const c = checksOf(result);
   const verdict = verdictOf(c);
+  const ice = iceLineOf(result);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -185,6 +195,28 @@ export function SiteReport() {
             </li>
           ))}
         </ul>
+        {ice && (
+          // The fifth line: information beside the four checks, never one of them, so it has no tick or cross.
+          <div className="mt-2 border-t border-line/70 pt-2 text-[12.5px]" data-testid="ice-line">
+            <p>
+              <span aria-hidden="true">◇ </span>
+              {t('report.ice')}:{' '}
+              <strong className="font-semibold">
+                {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
+              </strong>{' '}
+              <ConfidenceBadge level={confidenceOf('longTerm', sure)} terrainM={sure.terrainM} />
+            </p>
+            <p className="mt-1 text-quiet">{t('report.iceProxy')}</p>
+            <p className="mt-1 text-quiet">
+              <Trans
+                i18nKey="report.iceUses"
+                components={{
+                  link: <SourceLink href={ICE_USES_URL} />,
+                }}
+              />
+            </p>
+          </div>
+        )}
       </div>
 
       <dl className="grid grid-cols-2 gap-2">

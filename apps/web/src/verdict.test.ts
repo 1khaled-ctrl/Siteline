@@ -1,6 +1,6 @@
 import type { Reason, StayResult } from '@siteline/contracts';
 import { describe, expect, it } from 'vitest';
-import { bestOf, cardFileName, checksOf, firstProblem, rankSites, shareLink, verdictOf } from './verdict';
+import { bestOf, cardFileName, checksOf, firstProblem, iceLineOf, rankSites, shareLink, verdictOf } from './verdict';
 
 function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
   return {
@@ -148,5 +148,27 @@ describe('shareLink', () => {
     const none = new URL(shareLink('https://siteline.example/', { ...base, robot: null, landingRadiusM: 50 }));
     expect(none.searchParams.has('robot')).toBe(false);
     expect(none.searchParams.has('ring')).toBe(false);
+  });
+});
+
+describe('iceLineOf', () => {
+  const stay = (iceDistanceKm?: number) => ({ reasons: [], slope100mDeg: 1, iceDistanceKm }) as unknown as StayResult;
+
+  it('gives the distance to the nearest permanent shadow, and says when the site itself is in one', () => {
+    expect(iceLineOf(stay(2.4))).toEqual({ distanceKm: 2.4, atSite: false });
+    expect(iceLineOf(stay(0))).toEqual({ distanceKm: 0, atSite: true });
+  });
+
+  it('gives nothing where the maps carry no distance, rather than a made-up one', () => {
+    expect(iceLineOf(stay(undefined))).toBeUndefined();
+    expect(iceLineOf(stay(Number.NaN))).toBeUndefined();
+    expect(iceLineOf(stay(-1))).toBeUndefined();
+  });
+
+  it('never changes the verdict: it is not one of the checks', () => {
+    const near = stay(0.1);
+    const far = stay(40);
+    expect(verdictOf(checksOf(near))).toBe(verdictOf(checksOf(far)));
+    expect(Object.keys(checksOf(near))).not.toContain('ice');
   });
 });
