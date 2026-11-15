@@ -142,14 +142,18 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
     />
   );
 
-  const folded = useStage((s) => s.folded.has('facts'));
+  // The panel's card starts folded and remembers being opened ('facts:open'); a planet's card, opened on purpose,
+  // starts open and remembers being folded ('facts').
+  const foldKey = onClose ? 'facts' : 'facts:open';
+  const marked = useStage((s) => s.folded.has(foldKey));
+  const folded = onClose ? marked : !marked;
   const iconButton =
     'grid size-8 place-items-center rounded-md border border-line bg-panel-raised text-quiet hover:border-line-hover hover:text-ink';
 
   return (
     <section className={panel} data-testid="body-facts" data-body={body} id="body-facts" tabIndex={-1}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-2xl">{t(`facts.heading.${body}`)}</h2>
+      <div className={`flex items-center justify-between gap-2 ${folded ? '' : 'mb-2'}`}>
+        <h2 className="text-2xl leading-tight">{t(`facts.heading.${body}`)}</h2>
         <div className="flex gap-1.5">
           <button
             type="button"
@@ -157,7 +161,7 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
             aria-expanded={!folded}
             aria-controls="body-facts-body"
             aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
-            onClick={() => useStage.getState().toggleFolded('facts')}
+            onClick={() => useStage.getState().toggleFolded(foldKey)}
           >
             <svg
               viewBox="0 0 12 12"
@@ -188,82 +192,85 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
           )}
         </div>
       </div>
-      <div id="body-facts-body" hidden={folded}>
-        <dl className="grid grid-cols-2 gap-2">
-          {body !== 'Earth' && (
-            <>
-              <StatTile label={t('facts.distance')} edge="earth">
-                {r.distance}
-              </StatTile>
-              <StatTile label={t('facts.signal')} edge="earth">
-                {r.signal}
-              </StatTile>
-            </>
-          )}
-          <StatTile label={t('facts.sunlight')} edge="sun" wide>
-            {r.sunlightShare}
-          </StatTile>
-          <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
-          <StatTile label={t('facts.rotation')}>
-            {r.rotation}
-            {c.rotationH < 0 && (
-              <span className="block font-sans text-xs text-quiet" dir="auto" data-testid="retrograde">
-                {t('facts.retrograde')}
-              </span>
+      {/* Folded, the facts are not drawn at all: nothing hidden stays on the page, and the models are not checked. */}
+      {!folded && (
+        <div id="body-facts-body">
+          <dl className="grid grid-cols-2 gap-2">
+            {body !== 'Earth' && (
+              <>
+                <StatTile label={t('facts.distance')} edge="earth">
+                  {r.distance}
+                </StatTile>
+                <StatTile label={t('facts.signal')} edge="earth">
+                  {r.signal}
+                </StatTile>
+              </>
             )}
-          </StatTile>
-          <StatTile label={t('facts.tilt')} wide={body === 'Moon'}>
-            {t('facts.units.deg', { n: formatNumber(c.obliquityDeg, c.obliquityDeg < 1 ? 3 : 2) })}
-            {body === 'Moon' && (
-              <span className="mt-0.5 block font-sans text-sm" dir="auto">
-                {t('facts.moonTilt')}
-              </span>
-            )}
-          </StatTile>
-          <StatTile label={giant ? t('facts.gravityAtLevel', { bar }) : t('facts.gravity')}>{r.gravity}</StatTile>
-          <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
-          <StatTile label={t('facts.temperature')} text>
-            {giant
-              ? t('facts.temp.atLevel', { level: celsius(c.temperatureK.atLevelK), bar })
-              : t(`facts.temp.${body}`, {
-                  mean: celsius(c.temperatureK.meanK),
-                  low: celsius(c.temperatureK.rangeK?.[0]),
-                  high: celsius(c.temperatureK.rangeK?.[1]),
-                  coldest: celsius(c.temperatureK.coldestK),
-                })}
-          </StatTile>
-          <StatTile label={t('facts.surface')} text>
-            {giant ? t('facts.surfaceKind.none') : t(`facts.surfaceKind.${body}`, { mbar })}
-          </StatTile>
-          {body !== 'Earth' && (
-            <StatTile label={t('facts.landers')} text wide>
-              <span data-testid="body-landers">
-                {landers.past + landers.toCome === 0 ? (
-                  <Trans i18nKey="facts.landersNone" components={{ list: missionList }} />
-                ) : (
-                  <Trans
-                    i18nKey="facts.landersCount"
-                    values={{ past: landers.past, toCome: landers.toCome }}
-                    components={{ list: missionList }}
-                  />
-                )}
-              </span>
+            <StatTile label={t('facts.sunlight')} edge="sun" wide>
+              {r.sunlightShare}
             </StatTile>
-          )}
-        </dl>
-        {body === 'Moon' && <MoonModels />}
-        <p className="mt-3 text-xs text-quiet">
-          <Trans
-            i18nKey={OWN_SOURCES.has(body) ? `facts.sources.${body}` : 'facts.sources.planet'}
-            values={{ name: t(`bodies.${TABLE_KEY[body]}`) }}
-            components={{
-              fact: <Ext href={FACT_SOURCES[c.factSheet][1]} />,
-              gm: <Ext href={FACT_SOURCES.spiceGm[1]} />,
-              paige: <Ext href={FACT_SOURCES.paige2010[1]} />,
-            }}
-          />
-        </p>
-      </div>
+            <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
+            <StatTile label={t('facts.rotation')}>
+              {r.rotation}
+              {c.rotationH < 0 && (
+                <span className="block font-sans text-xs text-quiet" dir="auto" data-testid="retrograde">
+                  {t('facts.retrograde')}
+                </span>
+              )}
+            </StatTile>
+            <StatTile label={t('facts.tilt')} wide={body === 'Moon'}>
+              {t('facts.units.deg', { n: formatNumber(c.obliquityDeg, c.obliquityDeg < 1 ? 3 : 2) })}
+              {body === 'Moon' && (
+                <span className="mt-0.5 block font-sans text-sm" dir="auto">
+                  {t('facts.moonTilt')}
+                </span>
+              )}
+            </StatTile>
+            <StatTile label={giant ? t('facts.gravityAtLevel', { bar }) : t('facts.gravity')}>{r.gravity}</StatTile>
+            <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
+            <StatTile label={t('facts.temperature')} text>
+              {giant
+                ? t('facts.temp.atLevel', { level: celsius(c.temperatureK.atLevelK), bar })
+                : t(`facts.temp.${body}`, {
+                    mean: celsius(c.temperatureK.meanK),
+                    low: celsius(c.temperatureK.rangeK?.[0]),
+                    high: celsius(c.temperatureK.rangeK?.[1]),
+                    coldest: celsius(c.temperatureK.coldestK),
+                  })}
+            </StatTile>
+            <StatTile label={t('facts.surface')} text>
+              {giant ? t('facts.surfaceKind.none') : t(`facts.surfaceKind.${body}`, { mbar })}
+            </StatTile>
+            {body !== 'Earth' && (
+              <StatTile label={t('facts.landers')} text wide>
+                <span data-testid="body-landers">
+                  {landers.past + landers.toCome === 0 ? (
+                    <Trans i18nKey="facts.landersNone" components={{ list: missionList }} />
+                  ) : (
+                    <Trans
+                      i18nKey="facts.landersCount"
+                      values={{ past: landers.past, toCome: landers.toCome }}
+                      components={{ list: missionList }}
+                    />
+                  )}
+                </span>
+              </StatTile>
+            )}
+          </dl>
+          {body === 'Moon' && <MoonModels />}
+          <p className="mt-3 text-xs text-quiet">
+            <Trans
+              i18nKey={OWN_SOURCES.has(body) ? `facts.sources.${body}` : 'facts.sources.planet'}
+              values={{ name: t(`bodies.${TABLE_KEY[body]}`) }}
+              components={{
+                fact: <Ext href={FACT_SOURCES[c.factSheet][1]} />,
+                gm: <Ext href={FACT_SOURCES.spiceGm[1]} />,
+                paige: <Ext href={FACT_SOURCES.paige2010[1]} />,
+              }}
+            />
+          </p>
+        </div>
+      )}
     </section>
   );
 }
