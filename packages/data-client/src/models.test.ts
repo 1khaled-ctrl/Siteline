@@ -44,7 +44,7 @@ describe('data/models.json', () => {
 
   it('labels the models no NASA page places as "being checked"', () => {
     const status = Object.fromEntries(file.models.map((m) => [m.id, m.status]));
-    expect(status.rassor).toBe('being checked');
+    expect(status.llcd).toBe('being checked');
     expect(status.hdu_part_2).toBe('being checked');
     expect(status.lro_b).toBe('being checked');
   });

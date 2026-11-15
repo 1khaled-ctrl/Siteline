@@ -100,12 +100,11 @@ simplifyError = 0.005
 name = "Lunar Laser Communications Demonstration (LLCD)"
 sourceUrl = "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/"
 credit = "NASA/Christopher R. Meaney"
-status = "flew"
-statusSource = "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/"
-statusNote = "NASA's page says the technology was demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission."
+status = "being checked"
 mission = "none"
 logoChecked = true
 logoCheck = "The built file has no picture textures, only two 128 x 4 palettes (colour, metal and roughness), looked at by the Data session on 2026-11-15."
+note = "NASA's page says laser communications were demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission. The model shows a box-shaped spacecraft with two cross-shaped solar wings, which is not LADEE, and the page does not say what it depicts, so its status is being checked."
 
 [models.hdu_part_2]
 folder = "Habitat Demonstration Unit"
@@ -117,7 +116,7 @@ status = "being checked"
 mission = "none"
 logoChecked = true
 logoCheck = "The one texture of the hand-built file looked at by the Data session on 2026-11-15, with a zoomed look at its small labels: panels, grilles and fittings, no logo or insignia. The owner's own visual check is separate."
-note = "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested."
+note = "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested. This part is the floor, inner walls and stairs; the outer shell is part 1, which is not published because its texture shows the NASA insignia."
 
 [models.hdu_part_1]
 folder = "Habitat Demonstration Unit"
@@ -147,16 +146,8 @@ logoChecked = false
 logoCheck = "Its texture InSIGHT_tex_02, looked at by the Data session on 2026-11-15, carries a plate with the NASA insignia and the DLR and CNES logos."
 rejected = "Its texture shows the NASA insignia and the DLR and CNES logos."
 
-[models.rassor]
-folder = "Regolith Advanced Surface Systems Operations Robot (RASSOR)"
-file = "Regolith Advanced Surface Systems Operations Robot (RASSOR).glb"
-textureSize = 512
-simplifyError = 0.005
-name = "Regolith Advanced Surface Systems Operations Robot (RASSOR)"
-sourceUrl = "https://science.nasa.gov/3d-resources/regolith-advanced-surface-systems-operations-robot-rassor/"
-credit = "NASA/Dewey L. Smith; NASA/Jason M. Schuler"
-status = "being checked"
-mission = "none"
-logoChecked = true
-logoCheck = "The file has no textures at all (one plain material), checked by the Data session on 2026-11-15."
-note = "NASA's page describes a robotic excavator for precursor landing missions. Neither it nor NASA's technology page for RASSOR (KSC-TOPS-7) says what was built or flown. It has not been to the Moon."
+# Left out on 2026-11-15:
+# - RASSOR ("Regolith Advanced Surface Systems Operations Robot (RASSOR).glb"): over the limit at textureSize 512 with
+#   simplifyError 0.005 (5,877,395 bytes) and with 0.01 (5,787,079 bytes). Its mesh has 2 million triangles and barely
+#   simplifies; it has no textures to shrink.
+# - Space Exploration Vehicle and Gateway Core (too large), the other three InSight poses, and Curiosity (.blend only).

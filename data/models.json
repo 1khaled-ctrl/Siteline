@@ -87,13 +87,13 @@
       "name": "Lunar Laser Communications Demonstration (LLCD)",
       "sourceUrl": "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/",
       "credit": "NASA/Christopher R. Meaney",
-      "status": "flew",
-      "statusSource": "https://science.nasa.gov/3d-resources/lunar-laser-communications-demonstration-llcd/",
-      "statusNote": "NASA's page says the technology was demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission.",
+      "status": "being checked",
+      "statusSource": null,
+      "statusNote": null,
       "mission": null,
       "logoChecked": true,
       "logoCheck": "The built file has no picture textures, only two 128 x 4 palettes (colour, metal and roughness), looked at by the Data session on 2026-11-15.",
-      "note": null,
+      "note": "NASA's page says laser communications were demonstrated with LLCD from October 2013 through April 2014, during the LADEE mission. The model shows a box-shaped spacecraft with two cross-shaped solar wings, which is not LADEE, and the page does not say what it depicts, so its status is being checked.",
       "key": "models/v1/llcd.json",
       "bytes": null,
       "sha256": null,
@@ -118,7 +118,7 @@
       "mission": null,
       "logoChecked": true,
       "logoCheck": "The one texture of the hand-built file looked at by the Data session on 2026-11-15, with a zoomed look at its small labels: panels, grilles and fittings, no logo or insignia. The owner's own visual check is separate.",
-      "note": "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested.",
+      "note": "NASA's page describes a Deep Space Habitat unit from NASA's Habitation Systems Project for future missions. It does not say whether it was built or tested. This part is the floor, inner walls and stairs; the outer shell is part 1, which is not published because its texture shows the NASA insignia.",
       "key": "models/v1/hdu_part_2.json",
       "bytes": null,
       "sha256": null,
@@ -129,31 +129,6 @@
       },
       "optimize": {
         "textureSize": 1024
-      }
-    },
-    {
-      "id": "rassor",
-      "name": "Regolith Advanced Surface Systems Operations Robot (RASSOR)",
-      "sourceUrl": "https://science.nasa.gov/3d-resources/regolith-advanced-surface-systems-operations-robot-rassor/",
-      "credit": "NASA/Dewey L. Smith; NASA/Jason M. Schuler",
-      "status": "being checked",
-      "statusSource": null,
-      "statusNote": null,
-      "mission": null,
-      "logoChecked": true,
-      "logoCheck": "The file has no textures at all (one plain material), checked by the Data session on 2026-11-15.",
-      "note": "NASA's page describes a robotic excavator for precursor landing missions. Neither it nor NASA's technology page for RASSOR (KSC-TOPS-7) says what was built or flown. It has not been to the Moon.",
-      "key": "models/v1/rassor.json",
-      "bytes": null,
-      "sha256": null,
-      "source": {
-        "path": "3D Models/Regolith Advanced Surface Systems Operations Robot (RASSOR)/Regolith Advanced Surface Systems Operations Robot (RASSOR).glb",
-        "bytes": null,
-        "gitBlob": null
-      },
-      "optimize": {
-        "textureSize": 512,
-        "simplifyError": 0.005
       }
     }
   ]
