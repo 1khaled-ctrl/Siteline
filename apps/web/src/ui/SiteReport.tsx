@@ -129,7 +129,7 @@ export function SiteReport() {
   const c = checksOf(result);
   const verdict = verdictOf(c);
   const ice = iceLineOf(result);
-  const detected = iceDetectedLineOf(iceDetected);
+  const detected = iceDetectedLineOf(iceDetected, ice);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -259,6 +259,7 @@ export function SiteReport() {
                 components={{
                   b: <strong className="font-semibold text-ink" />,
                   fisher: <SourceLink href={ICE_SOURCES.consistent} />,
+                  lemelin: <SourceLink href={ICE_SOURCES.detectedNearby} />,
                   lcross: <SourceLink href={ICE_SOURCES.lcross} />,
                   m3: <SourceLink href={ICE_SOURCES.m3} />,
                 }}

@@ -31,6 +31,14 @@ describe.skipIf(!existsSync(path))("Lemelin et al. 2021's ice-bearing regions, a
   const features: Feature[] = json.features;
   const regions = polarRegionsFromGeoJson(json);
 
+  it('lies thousands of km from a northern site, so the report must not offer it as the nearest ice there', () => {
+    // Apollo 11 (data/missions.json): the file covers the south polar region only, which is why the report shows this
+    // reading only beside the permanent-shadow one (iceDetectedLineOf).
+    const apollo11 = nearestPolarRegion(regions, 0.6741, 23.473);
+    expect(apollo11?.inside).toBe(false);
+    expect(apollo11?.distanceKm).toBeCloseTo(2345.4, 1);
+  });
+
   it('reads all 169 regions in the south polar stereographic plane', () => {
     expect(regions).toHaveLength(169);
   });

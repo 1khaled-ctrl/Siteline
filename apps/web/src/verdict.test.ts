@@ -189,20 +189,36 @@ describe('iceLineOf', () => {
 });
 
 describe('iceDetectedLineOf', () => {
+  /** The permanent-shadow reading at a south polar site, which the detected-nearby reading shows beside. */
+  const shadow = iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: 1.5 } as unknown as StayResult);
+
   it('gives the distance to the nearest ice-bearing region, and says when the site is within its outline', () => {
-    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 3.2, inside: false })).toEqual({
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 3.2, inside: false }, shadow)).toEqual({
       distanceKm: 3.2,
       withinOutline: false,
       level: 'detectedNearby',
       id: 'lemelin-2021-ice-psrs',
     });
-    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 0, inside: true })?.withinOutline).toBe(true);
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 0, inside: true }, shadow)?.withinOutline).toBe(
+      true,
+    );
+  });
+
+  it('shows only beside the permanent-shadow reading, so never at a northern site such as Apollo 11', () => {
+    // Apollo 11, 0.67° N 23.47° E: NASA's south polar maps do not reach it, so there is no permanent-shadow reading,
+    // and the nearest region in Lemelin et al. 2021's south polar file is 2,345 km away (iceRegions.data.test.ts).
+    // That is not the nearest ice (M3 also found surface ice near the north pole, Li et al. 2018): nothing is shown.
+    const apollo11 = { reasons: [], slope100mDeg: 1, iceDistanceKm: undefined } as unknown as StayResult;
+    const southward = { id: 'lemelin-2021-ice-psrs', distanceKm: 2345.4, inside: false };
+    expect(iceLineOf(apollo11)).toBeUndefined();
+    expect(iceDetectedLineOf(southward, iceLineOf(apollo11))).toBeUndefined();
+    expect(iceDetectedLineOf(southward, shadow)?.distanceKm).toBe(2345.4);
   });
 
   it('gives nothing without a region, rather than a made-up distance', () => {
-    expect(iceDetectedLineOf(undefined)).toBeUndefined();
-    expect(iceDetectedLineOf({ id: 'x', distanceKm: Number.NaN, inside: false })).toBeUndefined();
-    expect(iceDetectedLineOf({ id: 'x', distanceKm: -1, inside: false })).toBeUndefined();
+    expect(iceDetectedLineOf(undefined, shadow)).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: Number.NaN, inside: false }, shadow)).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: -1, inside: false }, shadow)).toBeUndefined();
   });
 });
 
@@ -213,13 +229,14 @@ describe('ice evidence wording', () => {
       expect(iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult)?.level).toBe(
         'canLast',
       );
-      expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: km, inside: km === 0 })?.level).toBe(
+      const shadow = iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult);
+      expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: km, inside: km === 0 }, shadow)?.level).toBe(
         'detectedNearby',
       );
     }
     // Every level has its words, and the note names the three kinds of evidence.
     for (const level of ICE_LEVELS) expect(en.report.iceLevels[level]).toBeTruthy();
-    expect(en.report.iceEvidence).toMatch(/can last.*consistent with ice.*detected/s);
+    expect(en.report.iceEvidence).toMatch(/four levels.*can last.*consistent with ice.*detected nearby.*detected/s);
   });
 
   it('says what the detected-nearby distance is measured to, with its caveats, and takes its 280 m from the data', () => {

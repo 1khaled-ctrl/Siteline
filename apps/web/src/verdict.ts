@@ -101,11 +101,18 @@ export interface IceDetectedLine {
   id: string;
 }
 
-/** The second reading, from the worker's nearest ice-bearing region: undefined without one, never a made-up distance. */
+/**
+ * The second reading, from the worker's nearest ice-bearing region: undefined without one, never a made-up distance.
+ * It shows only beside the first reading (`shadow`, from `iceLineOf`), that is, only where NASA's south polar maps cover
+ * the site. Lemelin et al. 2021 outline the south polar region only, and M3 also found surface ice near the north pole
+ * (Li et al. 2018), so at a northern site, an Apollo site say, the nearest region in the file lies thousands of km south
+ * and is not the nearest ice.
+ */
 export function iceDetectedLineOf(
   d: { id: string; distanceKm: number; inside: boolean } | undefined,
+  shadow: IceLine | undefined,
 ): IceDetectedLine | undefined {
-  if (!d || !Number.isFinite(d.distanceKm) || d.distanceKm < 0) return undefined;
+  if (!shadow || !d || !Number.isFinite(d.distanceKm) || d.distanceKm < 0) return undefined;
   return { distanceKm: d.distanceKm, withinOutline: d.inside, level: 'detectedNearby', id: d.id };
 }
 
