@@ -24,6 +24,7 @@ import { usePlanetsAtHour } from '../physics';
 import { useStage } from '../stage';
 import { useApp } from '../store';
 import { panel } from './Controls';
+import { MoonModels } from './NasaModels';
 
 /** The bodies whose sources line has words of its own (the Moon also cites Paige et al.); the rest share one. */
 const OWN_SOURCES: ReadonlySet<FactBody> = new Set(['Earth', 'Moon', 'Mars']);
@@ -250,6 +251,7 @@ export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => v
             </StatTile>
           )}
         </dl>
+        {body === 'Moon' && <MoonModels />}
         <p className="mt-3 text-xs text-quiet">
           <Trans
             i18nKey={OWN_SOURCES.has(body) ? `facts.sources.${body}` : 'facts.sources.planet'}

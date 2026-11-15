@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@siteline/contracts": "workspace:*",
+    "@siteline/data-client": "workspace:*",
     "@siteline/engine": "workspace:*",
     "@siteline/physics": "workspace:*",
     "comlink": "4.4.2",

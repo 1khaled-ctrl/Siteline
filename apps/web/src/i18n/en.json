@@ -668,6 +668,21 @@
     "flyToPole": "Fly to the south pole",
     "flying": "Flying to the south pole…"
   },
+  "nasaModels": {
+    "heading": "Spacecraft and concepts",
+    "intro": "NASA 3D models of spacecraft and hardware. None of them is or was on the Moon's surface unless its row says so.",
+    "status": {
+      "flew": "flew",
+      "prototype": "prototype",
+      "concept": "concept",
+      "beingChecked": "being checked"
+    },
+    "statusSaid": "{{note}} (<link>NASA</link>)",
+    "credit": "Credit: <link>{{credit}}</link>",
+    "view": "View in 3D ({{size}} MB)",
+    "hide": "Hide the 3D model",
+    "caption": "NASA 3D model"
+  },
   "landers": {
     "tab": "Landers",
     "sideLabel": "Show in this panel",
