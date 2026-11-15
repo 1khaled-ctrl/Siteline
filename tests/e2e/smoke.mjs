@@ -241,6 +241,22 @@ await phone.getByTestId('world-jupiter').getByRole('button').click();
 await card.waitFor({ state: 'detached', timeout: 10_000 });
 await phone.getByTestId('world-venus').getByRole('button').click();
 await card.getByTestId('retrograde').waitFor({ timeout: 10_000 });
+
+// Feature 40: a closer look at Jupiter from the phone's sheet. The camera goes beside it with its facts card open,
+// there is a way back, and it leads to the whole solar system again, not to a view of Jupiter's own.
+await phone.getByTestId('world-jupiter').getByRole('button').click();
+const look = phone.getByTestId('sheet').getByRole('button', { name: 'Take a closer look at Jupiter' });
+await look.click();
+const back = phone.getByTestId('sheet').getByRole('button', { name: 'Back to the solar system' });
+await back.waitFor({ timeout: 10_000 });
+await card.and(phone.locator('[data-body="Jupiter"]')).waitFor({ timeout: 10_000 });
+await phone.waitForTimeout(2600);
+if (shots) await phone.screenshot({ path: `${shots}-phone-jupiter-close.png` });
+await back.click();
+await back.waitFor({ state: 'detached', timeout: 10_000 });
+await phone.locator('section[data-moving]').waitFor({ state: 'detached', timeout: 10_000 });
+await phone.waitForSelector('[data-testid="solar-map"] canvas');
+await look.waitFor();
 await phone.close();
 
 if (errors.length) {
