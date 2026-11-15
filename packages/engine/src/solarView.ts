@@ -1,6 +1,7 @@
 import { KM_PER_AU, PLANET_NAMES, type PlanetName, type SolarBodyKey, type Vec3 } from '@siteline/physics';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { closeUpDistance, closeUpLimits, fitRadius, poseFrom, RING_INNER, RING_OUTER } from './closeUp';
 import { angleBetween, reportFlight, zoomSize } from './flights';
 import { fitCamera, type Insets, LookOffset, NO_INSETS, type ScreenPoint, toScreen } from './screen';
 
@@ -92,6 +93,11 @@ const PULL_BACK_FROM_RADII = 3.5;
 const PULL_BACK_WAIT_MS = 600;
 /** How far round toward the Sun the pull back starts from the usual angle, so the world shows its day side. */
 const PULL_BACK_SUNWARD = 0.7;
+/** The dive into a close-up (`closeUp`): within the 2 to 4 s every fly-to takes. */
+const CLOSE_UP_MS = 2000;
+/** The usual view's zoom limits, which a close-up narrows round its body and the way back restores. */
+const OVERVIEW_MIN_DISTANCE = 2;
+const OVERVIEW_MAX_DISTANCE = 400;
 
 /** Square-root radial scale: Mercury (0.39 AU) and Neptune (30 AU) both fit on screen. */
 const radial = (au: number) => 14 * Math.sqrt(au);
@@ -261,6 +267,10 @@ export class SolarView {
   private arrival: SolarBodyKey | null;
   /** True once the planets are placed and the pull back waits only for the world's colour map. */
   private arriving = false;
+  /** The body a close-up stays beside (`closeUp`), until `pullBack` or another flight; null in the usual view. */
+  private focus: SolarBodyKey | null = null;
+  /** Resolves `pullBack`'s promise once its flight lands, or is called off. */
+  private landed: (() => void) | null = null;
   private disposed = false;
 
   constructor(
@@ -279,8 +289,8 @@ export class SolarView {
     if (this.arrival !== null) this.flying = true;
     this.camera.position.copy(this.introK ? this.introTo : this.introFrom);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.minDistance = 2;
-    this.controls.maxDistance = 400;
+    this.controls.minDistance = OVERVIEW_MIN_DISTANCE;
+    this.controls.maxDistance = OVERVIEW_MAX_DISTANCE;
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.autoRotateSpeed = 0.12;
@@ -383,6 +393,9 @@ export class SolarView {
   }
 
   setSnapshot(s: SolarSnapshot): void {
+    // Beside a body, the camera keeps its place by it as the date moves it.
+    const followed = this.closeUpBody;
+    const before = followed ? this.mesh(followed).position.clone() : null;
     for (const name of PLANET_NAMES) {
       toScene(s.positionsKm[name], this.mesh(name).position);
       this.updateTrail(name);
@@ -391,6 +404,11 @@ export class SolarView {
     const away = toScene(s.positionsKm.moon).normalize();
     this.mesh('moon').position.copy(earth).addScaledVector(away, MOON_ORBIT_SCENE);
     this.moonRing.position.copy(earth);
+    if (followed && before) {
+      const moved = this.mesh(followed).position.clone().sub(before);
+      this.camera.position.add(moved);
+      this.controls.target.add(moved);
+    }
     this.requestRender();
     if (this.arrival !== null && !this.arriving) this.arrive();
   }
@@ -537,6 +555,103 @@ export class SolarView {
     });
   }
 
+  /** The body a close-up stays beside, or null: in the usual view, and during any flight. */
+  get closeUpBody(): SolarBodyKey | null {
+    return this.flying ? null : this.focus;
+  }
+
+  /**
+   * Dive beside a body and stay there. `flyTo` hands over to another view on arrival; this ends the flight instead, so
+   * the view keeps drawing, the controls turn and zoom round the body, and the camera keeps its place by the body as the
+   * date moves it. It stops where the body (and Saturn's ring) fills half the narrower side of the part of the view the
+   * panels leave free. A cut with reduced motion. Resolves on arrival.
+   */
+  closeUp(body: SolarBodyKey, durationMs = CLOSE_UP_MS): Promise<void> {
+    // A dive asked for during another flight takes over from where the camera is; a way back it cuts short still ends.
+    cancelAnimationFrame(this.frame);
+    this.frame = 0;
+    this.arrival = null;
+    this.focus = null;
+    this.settleLanding();
+    const ms = this.motion.matches ? 0 : durationMs;
+    const target = this.mesh(body).position.clone();
+    const fit = fitRadius(LOOK[body].size, body === 'saturn' ? RING_OUTER : undefined);
+    const { clientWidth: w, clientHeight: h } = this.container;
+    const stop = closeUpDistance(fit, this.camera.fov, w, h, this.insets);
+    // Approach from the side facing the camera, so the body never swings out of view.
+    const endPos = target.clone().addScaledVector(poseFrom(this.camera.position, target).dir, stop);
+    const startPos = this.camera.position.clone();
+    const startTarget = this.controls.target.clone();
+    reportFlight({
+      durationMs: ms,
+      zoom: zoomSize(startPos.distanceTo(startTarget), endPos.distanceTo(target)),
+      turnRad: angleBetween(startTarget.clone().sub(startPos), target.clone().sub(startPos)),
+    });
+    this.introK = 1;
+    this.setHover(null);
+    this.flying = true;
+    this.controls.enabled = false;
+    // A pull back from a world's own view may still have the picture and the names faded out.
+    this.renderer.domElement.style.opacity = '1';
+    this.labelLayer.style.opacity = '1';
+    return new Promise((resolve) => {
+      const t0 = performance.now();
+      const step = () => {
+        const k = ms <= 0 ? 1 : Math.min(1, (performance.now() - t0) / ms);
+        const e = easeInOut(k);
+        this.camera.position.lerpVectors(startPos, endPos, e);
+        this.controls.target.lerpVectors(startTarget, target, e);
+        this.camera.lookAt(this.controls.target);
+        this.draw();
+        if (k < 1) {
+          this.frame = requestAnimationFrame(step);
+          return;
+        }
+        // Arrived: the flight ends here, so the view draws, spins and answers the pointer again, round the body.
+        this.frame = 0;
+        this.flying = false;
+        this.focus = body;
+        const limits = closeUpLimits(fit, stop);
+        this.controls.minDistance = limits.min;
+        this.controls.maxDistance = limits.max;
+        this.controls.enabled = true;
+        this.controls.update();
+        this.lastTickMs = performance.now();
+        this.requestRender();
+        resolve();
+      };
+      this.frame = requestAnimationFrame(step);
+    });
+  }
+
+  /**
+   * Back out of a close-up to the usual view of the whole system: the same pull back as after a world's own view, but
+   * started from wherever the camera is now, so turning or zooming first never makes it jump. A cut with reduced motion.
+   * Resolves when it lands, after `onArrive`; at once when there is no close-up.
+   */
+  pullBack(): Promise<void> {
+    const body = this.closeUpBody;
+    if (body === null) return Promise.resolve();
+    const from = poseFrom(this.camera.position, this.mesh(body).position);
+    this.focus = null;
+    this.controls.minDistance = OVERVIEW_MIN_DISTANCE;
+    this.controls.maxDistance = OVERVIEW_MAX_DISTANCE;
+    this.controls.enabled = false;
+    this.setHover(null);
+    this.flying = true;
+    return new Promise((resolve) => {
+      this.landed = resolve;
+      this.pullBackFrom(body, from);
+    });
+  }
+
+  /** Ends a `pullBack` promise: when its flight lands, or when another flight or the view closing calls it off. */
+  private settleLanding(): void {
+    const landed = this.landed;
+    this.landed = null;
+    landed?.();
+  }
+
   /** Waits a moment for the world's colour map, so it looks itself from the first frame, then pulls back from it. */
   private arrive(): void {
     this.arriving = true;
@@ -551,7 +666,7 @@ export class SolarView {
         // A dive asked for meanwhile (`flyTo`) or the view closing calls it off.
         if (this.disposed || body === null) return;
         this.arrival = null;
-        this.pullBack(body);
+        this.pullBackFrom(body);
       });
   }
 
@@ -559,17 +674,18 @@ export class SolarView {
    * The way back out, `flyTo` in reverse: from close beside a world the camera backs away to the usual view of the whole
    * system. Its distance eases on a log scale, so it reads as one steady zoom; it swings from the world's day side round
    * to the usual angle; and its aim slides from the world to the Sun as fast as the world shrinks, so the world drifts
-   * smoothly from the middle of the picture to its place in the system.
+   * smoothly from the middle of the picture to its place in the system. `from`, for a close-up's way back, starts it where
+   * the camera already is instead of at the world's day side.
    */
-  private pullBack(body: SolarBodyKey): void {
+  private pullBackFrom(body: SolarBodyKey, from?: { distance: number; dir: THREE.Vector3 }): void {
     const durationMs = this.motion.matches ? 0 : PULL_BACK_MS;
     const world = this.mesh(body).position.clone();
     const sun = new THREE.Vector3();
-    const d0 = LOOK[body].size * PULL_BACK_FROM_RADII;
+    const d0 = from?.distance ?? LOOK[body].size * PULL_BACK_FROM_RADII;
     const d1 = this.introTo.length();
     const dir1 = this.introTo.clone().normalize();
     const sunward = world.clone().negate().setY(0).normalize();
-    const dir0 = dir1.clone().addScaledVector(sunward, PULL_BACK_SUNWARD).normalize();
+    const dir0 = from?.dir.clone() ?? dir1.clone().addScaledVector(sunward, PULL_BACK_SUNWARD).normalize();
     const swing = new THREE.Quaternion().setFromUnitVectors(dir0, dir1);
     const turn = new THREE.Quaternion();
     const dir = new THREE.Vector3();
@@ -624,6 +740,7 @@ export class SolarView {
       this.controls.update();
       this.lastTickMs = performance.now();
       this.opts.onArrive?.();
+      this.settleLanding();
       this.requestRender();
     };
     step();
@@ -632,6 +749,7 @@ export class SolarView {
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.frame);
+    this.settleLanding();
     this.stopLoop();
     clearTimeout(this.idleTimer);
     const canvas = this.renderer.domElement;
@@ -709,13 +827,13 @@ export class SolarView {
       mesh.add(sprite);
     }
     if (key === 'saturn') {
-      const geometry = new THREE.RingGeometry(size * 1.35, size * 2.2, 64);
+      const geometry = new THREE.RingGeometry(size * RING_INNER, size * RING_OUTER, 64);
       // Remap the UVs so the texture runs across the ring's width instead of across its face.
       const pos = geometry.getAttribute('position');
       const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
       for (let i = 0; i < pos.count; i++) {
         const r = Math.hypot(pos.getX(i), pos.getY(i));
-        uv.setXY(i, (r - size * 1.35) / (size * 0.85), 0.5);
+        uv.setXY(i, (r - size * RING_INNER) / (size * (RING_OUTER - RING_INNER)), 0.5);
       }
       const map = ringTexture();
       this.textures.push(map);
@@ -974,7 +1092,8 @@ export class SolarView {
       }
       return;
     }
-    this.controls.autoRotate = this.driftWanted && this.introK >= 1;
+    // No idle drift beside a body: it would swing the body's card and its line round the screen.
+    this.controls.autoRotate = this.driftWanted && this.introK >= 1 && this.focus === null;
     this.controls.update();
     this.draw();
   };
