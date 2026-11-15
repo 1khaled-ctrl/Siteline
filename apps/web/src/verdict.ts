@@ -21,6 +21,28 @@ export function checksOf(r: StayResult): Record<CheckKey, Check> {
   };
 }
 
+/** The stay's fifth line: how far it is to the nearest permanent shadow, where ice can last. */
+export interface IceLine {
+  distanceKm: number;
+  /** The site itself is in permanent shadow, by the map the distance comes from. */
+  atSite: boolean;
+}
+
+/** The Planetary Society's guide, for what ice near a site could be used for. */
+export const ICE_USES_URL = 'https://www.planetary.org/articles/water-on-the-moon-guide';
+
+/**
+ * The ice line, from the stay's `iceDistanceKm` (the nearest permanent shadow on NASA's long-term maps): a proxy, since
+ * permanent shadow means ice can last there, not that ice has been found. It is information, never a check, and never
+ * changes the verdict: no source we cite gives a distance that counts as near enough. Undefined where the maps carry
+ * no distance for the site, or the nearest shadow is beyond their reach.
+ */
+export function iceLineOf(r: StayResult): IceLine | undefined {
+  const km = r.iceDistanceKm;
+  if (km === undefined || !Number.isFinite(km) || km < 0) return undefined;
+  return { distanceKm: km, atSite: km === 0 };
+}
+
 /** Any failed check fails the site; otherwise any unknown one leaves it undecided. */
 export function verdictOf(checks: Readonly<Record<CheckKey, Check>>): Verdict {
   const all = Object.values(checks);

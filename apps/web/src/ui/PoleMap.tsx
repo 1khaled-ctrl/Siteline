@@ -1,12 +1,14 @@
 import { type LayerColour, PoleView } from '@siteline/engine';
-import { mapValue, maxSunPct, type PolarMaps } from '@siteline/physics';
+import { mapValue, maxSunPct, type PolarMaps, type Vec3 } from '@siteline/physics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber } from '../format';
+import { perf } from '../perf';
 import { followLighting, physics, URLS, useStay } from '../physics';
 import { REGIONS } from '../regions';
 import { useActiveView, useStageInsets } from '../stage';
 import { LAYERS, type Layer, useApp } from '../store';
+import { alongPath, easeProgress, easeTimes, shouldEase, tooSlow } from '../sunEase';
 import { checksOf, verdictOf } from '../verdict';
 import { CalloutLayer } from './Callouts';
 import { SiteCard, VERDICT_TONE } from './SceneCards';
@@ -121,13 +123,80 @@ export function PoleMap() {
     view.setLayer(maps ? colourFor(layer, maps) : null);
   }, [view, maps, layer]);
 
-  // The Sun follows the store directly, so the time-lapse does not re-render this view on every frame.
+  // The Sun follows the store directly, so the time-lapse does not re-render this view on every frame. A new date or
+  // launch slip eases the light and the shadows over half a second, through the Sun's real positions in between rather
+  // than a shortcut; the time-lapse, reduced motion and jumps of more than 16 days move the light at once.
   useEffect(() => {
     if (!view) return;
-    return followLighting(
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let shown: Vec3 | undefined;
+    let shownMs = Number.NaN;
+    let run = 0;
+    let frame = 0;
+    let easing = false;
+    // Set when an ease ran too slowly on this device: from then on, for this visit, the light jumps as it used to.
+    let slow = false;
+    const show = (sun: Vec3, tUtcMs: number) => {
+      shown = sun;
+      shownMs = tUtcMs;
+      view.setSun(sun);
+    };
+    const endEase = () => {
+      cancelAnimationFrame(frame);
+      if (!easing) return;
+      easing = false;
+      // Back to the detail the time-lapse asks for, or full detail when it is not playing.
+      view.setMotion(useApp.getState().playing);
+    };
+    const stop = followLighting(
       (tUtcMs) => physics.sunKm(tUtcMs, URLS.data),
-      (sun) => view.setSun(sun),
+      (sun: Vec3, tUtcMs) => {
+        const id = ++run;
+        const from = shown;
+        const fromMs = shownMs;
+        endEase();
+        const ease = { playing: useApp.getState().playing, reducedMotion: reduced.matches, slow: perf.low || slow };
+        if (!from || !shouldEase(fromMs, tUtcMs, ease)) {
+          show(sun, tUtcMs);
+          return;
+        }
+        const between = easeTimes(fromMs, tUtcMs).slice(0, -1);
+        Promise.all(between.map((t) => physics.sunKm(t, URLS.data))).then(
+          (mid) => {
+            if (id !== run) return;
+            const path: Vec3[] = [from, ...mid, sun];
+            const start = performance.now();
+            const gaps: number[] = [];
+            let last = start;
+            easing = true;
+            // The shadow map is redrawn every frame on the way, lighter, as during the time-lapse.
+            view.setMotion(true);
+            const step = () => {
+              if (id !== run) return;
+              const now = performance.now();
+              gaps.push(now - last);
+              last = now;
+              const p = easeProgress(now - start);
+              show(alongPath(path, p), fromMs + (tUtcMs - fromMs) * p);
+              if (p < 1) frame = requestAnimationFrame(step);
+              else {
+                if (tooSlow(gaps.slice(1))) slow = true;
+                endEase();
+              }
+            };
+            step();
+          },
+          () => {
+            if (id === run) show(sun, tUtcMs);
+          },
+        );
+      },
     );
+    return () => {
+      run++;
+      endEase();
+      stop();
+    };
   }, [view]);
 
   const insets = useStageInsets();

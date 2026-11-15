@@ -232,7 +232,8 @@ export function useLightingUtcMs(): number {
  */
 export function followLighting<T>(
   ask: (tUtcMs: number) => Promise<T>,
-  apply: (value: T) => void,
+  /** Given the answer and the lighting time it is for. */
+  apply: (value: T, tUtcMs: number) => void,
   onError?: (e: unknown) => void,
 ): () => void {
   let stopped = false;
@@ -248,7 +249,7 @@ export function followLighting<T>(
       (value) => {
         busy = false;
         if (stopped) return;
-        apply(value);
+        apply(value, tUtcMs);
         next();
       },
       (e: unknown) => {

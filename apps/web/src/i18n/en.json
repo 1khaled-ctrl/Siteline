@@ -521,7 +521,12 @@
     "landingSlope": "Slope over 100 m",
     "walkable": "Ground under 20° within 1 km",
     "measuringSlope": "measuring on 10 m terrain…",
-    "coldTrap": "Nearest permanent shadow (where ice can last)"
+    "coldTrap": "Nearest permanent shadow (where ice can last)",
+    "ice": "Ice nearby (where it can last)",
+    "iceKm": "{{km}} km to the nearest permanent shadow",
+    "iceAtSite": "this spot is in permanent shadow",
+    "iceProxy": "A proxy: permanent shadow means ice can last there, not that ice has been found. It is shown, not checked: no distance here counts as near enough.",
+    "iceUses": "Ice can become drinking water, oxygen and rocket propellant (<link>The Planetary Society</link>)."
   },
   "robot": {
     "heading": "Fit for a robot",
@@ -899,7 +904,8 @@
     "flyTo": "Fly to {{name}}",
     "place": "The place you picked",
     "fold": "Fold this card away",
-    "unfold": "Open this card"
+    "unfold": "Open this card",
+    "ice": "Ice nearby"
   },
   "sheet": {
     "open": "Show the panel",

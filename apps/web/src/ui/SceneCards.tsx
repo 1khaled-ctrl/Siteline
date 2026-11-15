@@ -4,7 +4,7 @@ import type { FactBody } from '../bodyFacts';
 import { formatNumber } from '../format';
 import { useStay } from '../physics';
 import { useApp } from '../store';
-import { CHECK_KEYS, type Check, checksOf, type Verdict, verdictOf } from '../verdict';
+import { CHECK_KEYS, type Check, checksOf, iceLineOf, type Verdict, verdictOf } from '../verdict';
 import { useBodyReadings } from './BodyFacts';
 import type { CalloutTone } from './Callouts';
 import { Spinner } from './ViewStatus';
@@ -59,6 +59,7 @@ export function SiteCard() {
   const coords = useCoordinates();
   const checks = result && checksOf(result);
   const verdict = checks && verdictOf(checks);
+  const ice = result && iceLineOf(result);
   const pct = (v: number) => (Number.isFinite(v) ? `${formatNumber(v)}%` : '—');
 
   return (
@@ -92,6 +93,18 @@ export function SiteCard() {
                 <span className="sr-only">: {t(`report.${checks[k]}`)}</span>
               </li>
             ))}
+            {ice && (
+              // Beside the checks, not one of them: no tick or cross.
+              <li className="col-span-2 flex items-center gap-1.5" data-testid="ice-line-card">
+                <span aria-hidden="true" className="w-3 text-center text-quiet">
+                  ◇
+                </span>
+                <span>
+                  {t('callout.ice')}:{' '}
+                  {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
+                </span>
+              </li>
+            )}
           </ul>
           <dl className="callout-readings mt-2 border-t border-line/70 pt-2">
             <dt>{t('report.sunMin')}</dt>
