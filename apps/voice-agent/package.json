@@ -8,7 +8,8 @@
     "start": "tsx src/main.ts start",
     "download-files": "tsx src/main.ts download-files",
     "bundle": "pnpm dlx esbuild@0.28.2 src/main.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist/main.js",
-    "deploy:cloud": "pnpm run bundle && lk agent deploy ."
+    "deploy:cloud": "pnpm run bundle && lk agent deploy .",
+    "deploy:siteline": "pnpm run bundle && lk agent deploy --config livekit.siteline.toml ."
   },
   "dependencies": {
     "@livekit/agents": "1.9.5",

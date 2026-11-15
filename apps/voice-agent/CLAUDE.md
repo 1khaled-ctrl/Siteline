@@ -45,3 +45,13 @@ Without the secrets, `/api/voice-token` answers `no_voice` and the chat says liv
 - Keep RPC replies under LiveKit's 15 KiB limit. `liveVoice.ts` refuses a bigger result with an error the model can act on.
 - The browser answers RPC only from the room's agent participant.
 - The pnpm `allowBuilds` entries in `pnpm-workspace.yaml` skip install scripts this package's dependencies ask for. None is needed while the agent uses LiveKit Inference and no local models.
+
+### The site's own agent (project `siteline-fmajm84m`)
+
+The live site's `/api/voice-token` hands out tokens for the LiveKit project `siteline-fmajm84m`, so calls from https://siteline-a1a.pages.dev are answered by the agent deployed there: `CA_QMEiQSLMWMow` in me-central, named in `livekit.siteline.toml`. It runs on LiveKit Cloud, 24/7, with no laptop involved. To ship a new version, with that project's `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` in the environment (or after `lk cloud auth`):
+
+```
+corepack pnpm --filter @siteline/voice-agent deploy:siteline
+```
+
+On Windows, if the nested `pnpm` refuses to run, bundle and deploy by hand from this folder: `corepack pnpm dlx esbuild@0.28.2 src/main.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=dist/main.js`, then `lk agent deploy --config livekit.siteline.toml .`. Check it with `lk agent status --config livekit.siteline.toml`. A local `corepack pnpm voice-agent` registers in the same project too, and LiveKit sends each call to either, so stop it when testing the cloud one.
