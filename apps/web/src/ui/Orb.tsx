@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStage, useWide } from '../stage';
+import { LunaHint } from './LunaHint';
 
 /** One of the orb's floating buttons. Add a row here to add a button; they fan out from the orb in this order. */
 interface OrbAction {
@@ -142,6 +143,7 @@ export function Orb() {
           </button>
         );
       })}
+      <LunaHint side={wide ? 'start' : 'end'} />
       <button
         type="button"
         aria-expanded={open}

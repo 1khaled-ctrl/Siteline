@@ -71,6 +71,12 @@ export const APP_FACTS =
   '4 pinned sites; slope under 10 degrees across 100 m; 1.7 m eye height; 50 and 100 m landing circles; 30 m, 10 m and 5 m terrain; ' +
   'horizons out to 300 km';
 
+/** A reply that says it is about to act ("Let me search…", "I'll take you there") rather than reporting what it did. */
+export const promisesAction = (text: string): boolean =>
+  /\b(let me|i'll|i will|i'm going to|i am going to|give me a (moment|second)|one moment|hold on)\b[^.?!]{0,60}\b(search|find|look|check|land|take|fly|show|start|play|simulate|open|bring|get)/i.test(
+    text,
+  );
+
 /** Every number in a text, as written: "55.9", "2,054", "2028". */
 export const numbersIn = (text: string): string[] => text.match(/\d[\d,]*(?:\.\d+)?/g) ?? [];
 
@@ -152,6 +158,19 @@ export async function askAi(
           {
             role: 'user',
             content: `[check] These numbers in your reply came from no tool: ${invented.join(', ')}. Call the tool that has them (space_facts for a planet or the Moon, analyze_site or check_site for a site) and answer again quoting only its numbers, or answer without numbers. Don't mention this check.`,
+          },
+        ];
+        continue;
+      }
+      // "Let me search…" with no tool called this turn is a promise the model did not keep: it goes back once.
+      if (calls.length === 0 && !corrected && promisesAction(reply.text) && round < MAX_ROUNDS - 1) {
+        corrected = true;
+        messages = [
+          ...messages,
+          {
+            role: 'user',
+            content:
+              "[check] You said you would do something, but called no tool. Call the tool now (for example find_landing_sites, land_here, simulate_journey, fly_to or space_facts), then answer with what it gave. Don't mention this check.",
           },
         ];
         continue;

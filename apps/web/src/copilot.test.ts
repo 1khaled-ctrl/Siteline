@@ -79,6 +79,20 @@ describe('parseIntent', () => {
     expect(ask('Is Earth in view for radio?')).toMatchObject({ tool: 'analyze_site', input: { aspect: 'earth' } });
   });
 
+  it('reads landing and walking as Land Here, and the trip from Earth as the journey', () => {
+    for (const q of [
+      'land here',
+      'Can I walk on the moon here?',
+      'simulate the landing',
+      'take me down to walk around',
+    ])
+      expect(ask(q), q).toEqual({ tool: 'land_here' });
+    for (const q of ['simulate the journey', 'show me the flight there', 'simulate the trip from Earth'])
+      expect(ask(q), q).toEqual({ tool: 'simulate_journey' });
+    // Finding a site to land on is still the search.
+    expect(ask('Find me a landing site')).toEqual({ tool: 'find_landing_sites' });
+  });
+
   it('reads a request to find a landing site as the search, not a check of the selected site', () => {
     expect(ask('Find me a landing site that passes')).toEqual({ tool: 'find_landing_sites' });
     expect(ask('Where should I land a rover?')).toEqual({ tool: 'find_landing_sites' });

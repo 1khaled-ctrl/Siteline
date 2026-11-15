@@ -277,6 +277,10 @@ body {
   outline: 1px solid var(--color-accent);
 }
 
+.luna-input:focus-visible {
+  outline: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
@@ -689,6 +693,21 @@ body {
   bottom: calc(var(--peek) + 10px);
 }
 @media (width < 64rem) {
+  .luna-hint {
+    animation: luna-hint-in 380ms ease-out both;
+  }
+  @keyframes luna-hint-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .luna-hint {
+      animation: none;
+    }
+  }
+
   .orb-wrap {
     bottom: calc(var(--peek) + 36px);
   }
