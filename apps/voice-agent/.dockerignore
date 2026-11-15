@@ -1,0 +1,5 @@
+# The image needs only the manifest and the bundle (Dockerfile); secrets and local installs stay out of the upload.
+*
+!Dockerfile
+!package.json
+!dist/**

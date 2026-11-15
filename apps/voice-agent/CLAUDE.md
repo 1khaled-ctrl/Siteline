@@ -25,7 +25,17 @@ The tools and the base prompt are the chat relay's own (`TOOLS` and `SYSTEM_PROM
    ```
 3. `.dev.vars` at the repository root, for the token Function under Wrangler (git ignores it), with the same three lines.
 4. Run three things: `corepack pnpm dev` (the app), `corepack pnpm copilot` (the Functions on 8788, which serve `/api/copilot` and `/api/voice-token`) and `corepack pnpm voice-agent` (this worker).
-5. On the deployed site, add the three values to the Pages project as encrypted variables, and run the worker somewhere that stays up: `lk agent create` deploys it to LiveKit Cloud. Set a spending limit in the LiveKit project.
+5. On the deployed site, add the three values to the Pages project as encrypted variables. Set a spending limit in the LiveKit project.
+
+## LiveKit Cloud
+
+The agent runs on LiveKit Cloud (project `linesite`, agent `CA_e4E8E3uUrDk5` in eu-central; `livekit.toml` names them). To ship a new version, log in once with `lk cloud auth` (the LiveKit CLI), then:
+
+```
+corepack pnpm --filter @siteline/voice-agent deploy:cloud
+```
+
+LiveKit builds the image from this folder alone (the `Dockerfile`; bringing a prebuilt image needs an Enterprise plan), and the agent imports the relay's prompt and tools from `apps/copilot-worker/src`, outside it. So `deploy:cloud` first bundles `src/main.ts` with those files into `dist/main.js` (esbuild, npm packages left outside), then runs `lk agent deploy`. LiveKit Cloud supplies the three LIVEKIT_* values; nothing else is needed. `lk agent status` and `lk agent logs` show it running.
 
 Without the secrets, `/api/voice-token` answers `no_voice` and the chat says live voice isn't set up. The mic button keeps working with the browser's own speech.
 
