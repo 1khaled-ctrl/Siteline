@@ -80,7 +80,7 @@ export const TOOLS = [
   ),
   fn(
     'space_facts',
-    "Numbers about the Sun, a planet or the Moon on the date on screen: distance from Earth and from the Sun, one-way signal delay, travel time (Apollo's coast for the Moon, an ideal minimum-energy transfer for planets) and how often launch windows come round; for the Moon, Earth and Mars also radius, gravity, escape speed, day length, temperature and air pressure.",
+    "Numbers about the Sun, a planet or the Moon on the date on screen: distance from Earth and from the Sun, one-way signal delay, travel time (Apollo's coast for the Moon, an ideal minimum-energy transfer for planets) and how often launch windows come round; for the Moon and every planet also NASA's radius, gravity, escape speed, day length, axial tilt, temperature and air pressure (the giant planets have no solid surface, so their numbers are at a pressure level).",
     {
       body: {
         type: 'string',

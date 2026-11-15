@@ -1,6 +1,7 @@
 import type { StayQuery, StayResult } from '@siteline/contracts';
 import {
   type Dem,
+  type DemHorizon,
   type HeightSource,
   heightsFromDem,
   horizonFromHeights,
@@ -10,7 +11,7 @@ import {
 } from './dem';
 import type { Ephemeris } from './ephemeris';
 import { siteFrame } from './frames';
-import { type StayInputs, stayTest } from './stay';
+import { type StayInputs, stayBins, stayTest } from './stay';
 
 export interface BestSpot {
   latDeg: number;
@@ -41,13 +42,28 @@ export function scoreOf(r: StayResult): number {
   return 0.6 * sun + 0.3 * earth + (r.pass ? 0.1 : 0);
 }
 
-/** Sample a square around a region's centre, run the stay test at each point and rank them. */
+/**
+ * A cache for the skylines: given a point, the bins wanted and the walk that fills bins, it answers with a skyline
+ * holding at least those bins, walking only the ones it does not have yet.
+ */
+export type SkylineCache = (
+  latDeg: number,
+  lonDeg: number,
+  bins: number[],
+  walk: (bins: number[]) => DemHorizon | undefined,
+) => DemHorizon | undefined;
+
+/**
+ * Sample a square around a region's centre, run the stay test at each point and rank them. Each skyline is walked only
+ * in the directions the stay's Sun and Earth pass through (`stayBins`): the ranking reads nothing else.
+ */
 export function bestSpots(
   search: BestSearch,
   query: Omit<StayQuery, 'site'>,
   terrain: Dem | HeightSource,
   ephemeris: Ephemeris,
   inputs: Pick<StayInputs, 'sources' | 'stepMinutes'>,
+  skylines?: SkylineCache,
 ): BestSpot[] {
   // A plain grid or a windowed source: the walk reads both the same way, and a source knows its own finest cell size.
   const heights = 'heightsM' in terrain ? heightsFromDem(terrain) : terrain;
@@ -61,11 +77,23 @@ export function bestSpots(
       const x = centre.x - halfM + (c / (grid - 1)) * 2 * halfM;
       const y = centre.y + halfM - (r / (grid - 1)) * 2 * halfM;
       const { latDeg, lonDeg } = unitToLatLon(polarToUnit(x, y));
-      const hz = horizonFromHeights(heights, latDeg, lonDeg, {
-        observerHeightM: query.observerHeightM,
-        stepM,
-        ...(search.reachM ? { maxDistM: search.reachM } : {}),
-      });
+      // Read where the skyline walk reads it, so the two agree on which points are on the terrain.
+      const at = polarXY(siteFrame(latDeg, lonDeg).u);
+      const groundM = heights.heightAt(at.x, at.y);
+      if (Number.isNaN(groundM)) continue;
+      const bins = stayBins(
+        { ...query, site: { id: '', body: 'moon', latDeg, lonDeg, heightM: groundM } },
+        ephemeris,
+        inputs.stepMinutes,
+      );
+      const walk = (only: number[]) =>
+        horizonFromHeights(heights, latDeg, lonDeg, {
+          observerHeightM: query.observerHeightM,
+          stepM,
+          bins: only,
+          ...(search.reachM ? { maxDistM: search.reachM } : {}),
+        });
+      const hz = skylines ? skylines(latDeg, lonDeg, bins, walk) : walk(bins);
       if (!hz) continue;
       const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg, heightM: hz.groundHeightM };
       const result = stayTest(

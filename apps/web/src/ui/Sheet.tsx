@@ -61,6 +61,11 @@ export function Sheet({ peek, label, children }: { peek: ReactNode; label: strin
     else y.set(yOf(at.current));
   }, [height, y, yOf, opened]);
   useEffect(() => () => setSheetOpen(false), [setSheetOpen]);
+  // Something outside the sheet asked for it, such as a planet's facts card or a closer look: come up from the peek.
+  const wanted = useStage((s) => s.sheetOpen);
+  useEffect(() => {
+    if (wanted && height && at.current === 'peek') go('half');
+  }, [wanted, height, go]);
 
   /** Where a flick ends: the stop nearest to where the sheet would coast to. */
   const settle = (velocityY: number) => {

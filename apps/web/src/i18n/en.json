@@ -352,6 +352,7 @@
       "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. Inside 83°S the slope is measured on LOLA’s 10 m terrain of the south pole, reading only the few tiles around the site: a plane fitted to the heights within 50 m gives the landing slope, and Horn’s method on each 10 m cell within 1 km gives how much of that 2 km area is under 20°, as steep as astronauts can walk. Outside 83°S, or if those tiles do not arrive, the report says it needs finer terrain instead of guessing.",
       "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
       "longTerm": "Long-term sunlight, Earth view and permanent shadow: NASA's maps from LOLA terrain (Mazarico et al. 2011, PGDA product 69) at 60 m, averaged to 360 m by our pipeline, which also works out the distance to the nearest permanent shadow from them. Until the pipeline has published them, the Landfall concept demo's 2.4 km maps.",
+      "ice": "Ice nearby, shown and never checked: the distance to the nearest permanent shadow on NASA's long-term maps, where ice can last, and the distance to the nearest shadowed region where M3 detected surface ice (Lemelin et al. 2021), measured straight over the Moon's surface to that region's published outline, which extends {{beyond}} m beyond the shadow itself.",
       "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
       "facts": "World facts: NASA's planetary fact sheets and NAIF's gravitational parameters. Gravity and escape speed are worked out from them."
     },
@@ -406,9 +407,15 @@
   },
   "facts": {
     "heading": {
-      "Moon": "About the Moon",
+      "Mercury": "About Mercury",
+      "Venus": "About Venus",
       "Earth": "About Earth",
-      "Mars": "About Mars"
+      "Moon": "About the Moon",
+      "Mars": "About Mars",
+      "Jupiter": "About Jupiter",
+      "Saturn": "About Saturn",
+      "Uranus": "About Uranus",
+      "Neptune": "About Neptune"
     },
     "gravity": "Gravity",
     "escape": "Escape speed",
@@ -426,27 +433,58 @@
       "h": "{{n}} h",
       "d": "{{n}} d",
       "s": "{{n}} s",
-      "min": "{{n}} min"
+      "min": "{{n}} min",
+      "km": "{{n}} km",
+      "mkm": "{{n}} million km",
+      "deg": "{{n}}°",
+      "sunlightPct": "{{n}} W/m², {{pct}}% of Earth's",
+      "sunlightTimes": "{{n}} W/m², {{x}} times Earth's"
     },
     "temp": {
       "Moon": "{{low}} to {{high}} °C at the equator from night to day; about {{coldest}} °C in some polar craters",
       "Earth": "{{mean}} °C on average",
-      "Mars": "{{mean}} °C on average; {{low}} to {{high}} °C from night to day at the Viking 1 landing site"
+      "Mars": "{{mean}} °C on average; {{low}} to {{high}} °C from night to day at the Viking 1 landing site",
+      "Mercury": "{{mean}} °C on average",
+      "Venus": "{{mean}} °C on average",
+      "atLevel": "{{level}} °C at the {{bar}} bar level"
     },
     "surfaceKind": {
       "Moon": "Solid rock, almost no air",
       "Earth": "Land and ocean, with air at {{mbar}} mbar",
-      "Mars": "Solid ground, with thin air at {{mbar}} mbar"
+      "Mars": "Solid ground, with thin air at {{mbar}} mbar",
+      "Mercury": "Solid rock, almost no air",
+      "Venus": "Solid rock, under air at {{mbar}} mbar",
+      "none": "No solid surface to land on"
     },
     "sources": {
       "Moon": "Sources: <fact>NASA Moon fact sheet</fact>, NAIF's <gm>gravitational parameters</gm> and, for the coldest craters, <paige>Paige et al. 2010</paige>. Sunlight and signal delay are for the date shown. Details in CREDITS.md.",
       "Earth": "Sources: <fact>NASA Earth fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight is for the date shown. Details in CREDITS.md.",
-      "Mars": "Sources: <fact>NASA Mars fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md."
-    }
+      "Mars": "Sources: <fact>NASA Mars fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md.",
+      "planet": "Sources: <fact>NASA {{name}} fact sheet</fact> and NAIF's <gm>gravitational parameters</gm>. Sunlight and signal delay are for the date shown. Details in CREDITS.md."
+    },
+    "distance": "Distance from Earth",
+    "tilt": "Axial tilt",
+    "moonTilt": "So little tilt keeps the Sun near the horizon at the poles all year, where a hill can hide it for days: the problem SiteLine checks for at every landing site.",
+    "retrograde": "Spins backwards (retrograde)",
+    "gravityAtLevel": "Gravity at the {{bar}} bar level",
+    "landers": "Landers",
+    "landersCount": "{{past}} that have gone, {{toCome}} still to come, in our <list>mission list</list>",
+    "landersNone": "No landings in our <list>mission list</list>",
+    "close": "Close the facts card"
+  },
+  "pinned": {
+    "heading_one": "{{count}} pinned spot",
+    "heading_other": "{{count}} pinned spots",
+    "go": "Go to {{site}}",
+    "unnamed": "Pinned spot {{n}}",
+    "here": "Shown now",
+    "compare": "Compare {{count}}",
+    "hideCompare": "Hide comparison",
+    "oneMore": "Pin another spot to compare them side by side.",
+    "hint": "Tap a spot to go back to it. Its verdict is for the date and slip above.",
+    "full": "That is the most you can pin ({{max}}): unpin one to add another."
   },
   "compare": {
-    "heading_one": "{{count}} pinned site",
-    "heading_other": "{{count}} pinned sites",
     "site": "Site",
     "verdict": "Stay",
     "undecided": "Undecided",
@@ -558,7 +596,24 @@
     "landingSlope": "Slope over 100 m",
     "walkable": "Ground under 20° within 1 km",
     "measuringSlope": "measuring on 10 m terrain…",
-    "coldTrap": "Nearest permanent shadow (where ice can last)"
+    "coldTrap": "Nearest permanent shadow (where ice can last)",
+    "ice": "Ice nearby (where it can last)",
+    "iceKm": "{{km}} km to the nearest permanent shadow",
+    "iceAtSite": "this spot is in permanent shadow",
+    "iceDetected": "Ice nearby (detected)",
+    "iceDetectedKm": "{{km}} km to a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)",
+    "iceDetectedWithin": "this spot is within the outline of a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)",
+    "iceDetectedNote": "Distance to the outline of a shadowed region, which extends {{m}} m beyond the shadow itself, measured straight over the Moon's surface. M3 detected surface ice in that region from orbit; that ice is patchy and low in abundance (<m3>Li et al. 2018</m3>), and it is not a guarantee of ice at this site.",
+    "iceUses": "Ice can become drinking water, oxygen and rocket propellant (<link>The Planetary Society</link>).",
+    "iceLevel": "Evidence: {{level}}",
+    "iceLevels": {
+      "canLast": "can last",
+      "consistent": "consistent with ice",
+      "detectedNearby": "detected nearby",
+      "detected": "detected"
+    },
+    "iceEvidence": "Ice evidence comes at four levels: <b>can last</b> (permanent shadow, shown here), <b>consistent with ice</b> (brighter laser reflectance in the coldest ground, <fisher>Fisher et al. 2017</fisher>), <b>detected nearby</b> (surface ice M3 detected in a shadowed region near the site, shown here at south polar sites, <lemelin>Lemelin et al. 2021</lemelin>) and <b>detected</b> (measured directly, as by the LCROSS impact at Cabeus, <lcross>Colaprete et al. 2010</lcross>, and as patchy surface ice in M3 spectra, <m3>Li et al. 2018</m3>). Permanent shadow means ice can last there, not that ice is there, and ice detected in a region nearby says nothing certain about this spot. Ice is shown, never checked: no distance counts as near enough, and it never changes Pass or Fail.",
+    "iceColdTrap": "<nasa>NASA</nasa> describes cold traps as permanently dark ground below {{c}} °C ({{f}} °F), where water ice can last for millions or billions of years. SiteLine maps the shadow, not its temperature."
   },
   "robot": {
     "heading": "Fit for a robot",
@@ -684,13 +739,31 @@
     "neptune": "Neptune"
   },
   "solar": {
-    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there.",
-    "flying": "Flying there…"
+    "hint": "The planets where they are on the landing date (sizes and distances are compressed to fit). Drag to turn, scroll to zoom, and click Earth, Mars or the Moon to fly there. Click any other planet for its facts and a closer look.",
+    "flying": "Flying there…",
+    "back": "Back to the solar system",
+    "backShort": "Back",
+    "closeHint": "Beside {{name}}. Drag to turn, scroll to zoom. There is no landing view here: SiteLine has no surface data for {{name}}."
   },
   "globe": {
     "hint": "The Moon lit by the Sun for the landing date. Drag to turn it, scroll to zoom. Click near the south pole to check a spot there.",
     "flyToPole": "Fly to the south pole",
     "flying": "Flying to the south pole…"
+  },
+  "nasaModels": {
+    "heading": "Spacecraft and concepts",
+    "intro": "NASA 3D models of spacecraft and hardware. None of them is or was on the Moon's surface unless its row says so.",
+    "status": {
+      "flew": "flew",
+      "prototype": "prototype",
+      "concept": "concept",
+      "beingChecked": "being checked"
+    },
+    "statusSaid": "{{note}} (<link>NASA</link>)",
+    "credit": "Credit: <link>{{credit}}</link>",
+    "view": "View in 3D ({{size}} MB)",
+    "hide": "Hide the 3D model",
+    "caption": "NASA 3D model"
   },
   "landers": {
     "tab": "Landers",
@@ -922,6 +995,8 @@
   },
   "callout": {
     "fly": "Fly there",
+    "closer": "Take a closer look",
+    "closerTo": "Take a closer look at {{name}}",
     "sourceDe440": "Positions: NASA JPL DE440",
     "site": "Landing site",
     "fullReport": "Full report",
@@ -936,7 +1011,8 @@
     "flyTo": "Fly to {{name}}",
     "place": "The place you picked",
     "fold": "Fold this card away",
-    "unfold": "Open this card"
+    "unfold": "Open this card",
+    "ice": "Ice nearby (can last)"
   },
   "sheet": {
     "open": "Show the panel",
@@ -953,6 +1029,8 @@
     "site": "Site {{n}} of {{of}}",
     "turn": "Turn",
     "tapFly": "Tap to fly",
+    "tapLook": "Tap to look",
+    "tapBack": "Tap: back",
     "tapReset": "Tap: landing",
     "modeTime": "Time",
     "modeSites": "Pinned sites"
@@ -974,5 +1052,136 @@
     "ask": "Ask Luna",
     "hide": "Hide the interface",
     "show": "Show the interface"
+  },
+  "land": {
+    "button": "Land Here",
+    "buttonShort": "Land",
+    "buttonLabel": "Land at {{place}} and explore the surface",
+    "outsideHint": "Land Here needs NASA's LOLA south-pole terrain, which reaches about {{lat}}° S; this point is outside it.",
+    "coarseHint": "Outside the 10 m terrain: the ground here comes from NASA's 30 m terrain.",
+    "dialog": "Surface view of the landing point",
+    "title": "Landing point",
+    "subtitle": "Interactive reconstruction from NASA LOLA terrain. Not a photograph or a live view.",
+    "return": "Return to map",
+    "stage": {
+      "opening": "Opening the terrain files",
+      "fine": "NASA's 5 m terrain of {{region}} ({{done}} of {{total}} MB)",
+      "walk": "Walkable ground",
+      "rings": "Distant terrain (coarse at first, sharpened as you look)",
+      "building": "Building the surface at real scale",
+      "light": "Working out sunlight and shadows"
+    },
+    "loadingTitle": "Preparing the surface",
+    "loadingNote": "Only the tiles around this point are read, never the whole multi-gigabyte terrain files.",
+    "cancel": "Cancel",
+    "cancelled": "Loading was cancelled.",
+    "retry": "Try again",
+    "failed": "The terrain didn't arrive",
+    "outside": "No terrain model reaches this point. Land Here uses NASA's LOLA south-pole terrain, which reaches about {{lat}}° S.",
+    "noData": "The terrain has no heights at this point, so there is nothing measured to stand on. Pick a point a little away from it.",
+    "lost": "The graphics stopped (the browser reset them). Try again, or return to the map.",
+    "descending": "Illustrative descent",
+    "descentNote": "A camera path down to the target, not a validated guidance simulation: no thrust, fuel or speed is worked out.",
+    "skip": "Skip descent",
+    "replay": "Replay descent",
+    "reset": "Reset position",
+    "labels": "Labels",
+    "marker": "Touchdown marker",
+    "inspect": "Inspection light",
+    "inspectOn": "Inspection light on: a lamp at your eye, not the light at this time.",
+    "darkHere": "Most of the ground around you is in shadow at this moment.",
+    "darkExposed": "The picture is exposed for the shadow, as a camera would be: its light is sunlight scattered off sunlit slopes, and earthshine.",
+    "darkFaint": "Almost no light reaches here: no sunlit slope or Earth in view lights it enough to show.",
+    "about": "About this view",
+    "close": "Close",
+    "options": "View options",
+    "touchdown": "Touchdown",
+    "showing": "Showing",
+    "backToTouchdown": "Back to touchdown",
+    "timeSlider": "Hours after touchdown",
+    "minusDay": "−1 day",
+    "minusHour": "−1 hour",
+    "plusHour": "+1 hour",
+    "plusDay": "+1 day",
+    "offset": "{{sign}}{{d}} d {{h}} h",
+    "clamped": "The ephemeris covers {{from}} to {{to}}; the sky is shown at its nearest end.",
+    "shadowsBusy": "Working out shadows…",
+    "sharpening": "Sharpening the distant terrain ({{done}} of {{total}} rings)",
+    "eyeTitle": "From your eye, {{eye}} m above the ground",
+    "fromTouchdown": "{{m}} m from touchdown",
+    "atTouchdown": "at touchdown",
+    "sun": "Sun",
+    "earth": "Earth",
+    "discInView": "{{pct}}% of the disc in view, {{elev}}° up",
+    "behindTerrain": "behind terrain, {{elev}}° up",
+    "belowHorizon": "below the horizon, {{elev}}°",
+    "earthLit": "{{pct}}% of its face lit",
+    "readingsPending": "Working out what your eye sees…",
+    "fineOffer": "Finer ground: NASA's 5 m terrain ({{mb}} MB)",
+    "fineOfferNote": "This point is in {{region}}, one of NASA's Artemis III candidate regions, mapped at 5 m by shape-from-shading. The model is downloaded once for this visit.",
+    "lookMouse": "Look with the mouse",
+    "lookHint": "Drag to look around. W A S D or the arrow keys walk, Q and E turn, Shift travels fast ({{fast}} m/s, not a walking pace).",
+    "lockedHint": "The mouse is captured for looking. Press Esc to release it.",
+    "touchHint": "Drag to look around; hold an arrow to walk.",
+    "walk": {
+      "forward": "Walk forward",
+      "back": "Walk back",
+      "left": "Step left",
+      "right": "Step right"
+    },
+    "edge": "Edge of the walkable terrain, {{km}} km from touchdown. The ground beyond is drawn coarser and can't be walked on.",
+    "nodataBlock": "No terrain data there: the view won't walk you onto heights that weren't measured.",
+    "compass": {
+      "north": "N",
+      "northEast": "NE",
+      "east": "E",
+      "southEast": "SE",
+      "south": "S",
+      "southWest": "SW",
+      "west": "W",
+      "northWest": "NW"
+    },
+    "compassTitle": "Compass",
+    "facing": "Facing",
+    "compassBodies": "The Sun is at {{sun}}° and the Earth at {{earth}}°, clockwise from north.",
+    "passing": "From the passing-site search: least Sun over the stay {{sun}}%, Earth in view {{earth}}%, landing slope {{slope}}°. Those are the site check's figures ({{observer}} m observer), not this view's.",
+    "info": {
+      "what": "An interactive reconstruction from measured terrain heights. The ground is NASA LOLA's terrain; the Sun and the Earth come from the SPICE ephemeris for the moment shown. It is not a photograph, a live view, or a certified landing simulator.",
+      "factScale": "Real scale: heights not stretched",
+      "factEye": "Eye {{eye}} m above the ground",
+      "factShadows": "Shadows every {{m}} m",
+      "factSky": "Sun and Earth from the SPICE ephemeris",
+      "ringsTitle": "Terrain",
+      "rings": "Terrain: each ring out from the point has cells twice the size of the one inside it and reaches twice as far, so the distance stays as sharp on screen as the ground at your feet.",
+      "colReach": "Distance",
+      "colDataset": "Dataset",
+      "colData": "Data",
+      "colMesh": "Drawn",
+      "reach": "{{from}}–{{to}} km",
+      "metres": "{{m}} m",
+      "walkable": "Walkable ground",
+      "tableNote": "Data is the cell size read from the dataset; drawn is the spacing of the mesh on screen.",
+      "filled": "{{pct}}% filled from a coarser read",
+      "missing": "{{pct}}% with no data (left out)",
+      "scale": "Real scale: heights are not stretched. The south-pole map stretches them to show the relief; this view does not.",
+      "lightTitle": "Light and shadows",
+      "eye": "Your eye is {{eye}} m above the ground. The site report judges the whole stay for a {{observer}} m observer on NASA's 30 m terrain; the Sun and Earth readings here are worked out again for your eye on the terrain drawn here, at the moment shown, and change as you walk.",
+      "compassTitle": "Compass and pointers",
+      "compass": "The compass at the top shows which way you face, in degrees clockwise from local north where you stand: along the meridian toward the Moon’s north pole. The Moon has no global magnetic field, so this is not a magnetic north. Near the south pole the meridians meet, so north turns as you walk; at the pole itself it is taken along the 0° meridian.",
+      "compassMarks": "On the compass and at the edges of the screen, the Sun and the Earth are filled while some of their disc is in view from your eye, and drawn as an outline while they are behind the terrain or below the horizon. Their directions come from the same ephemeris as the sky. The gold ring with a dot points back to touchdown.",
+      "limitsTitle": "What it leaves out",
+      "shadows": "Shadows come from tracing each point of the terrain toward the Sun through these same heights, the Moon’s curvature included: every {{shadow}} m on the walkable ground, and at every node of the rings beyond.",
+      "shadowLight": "Shadows are not black. They get sunlight scattered once off the sunlit terrain they can see (its skyline in eight directions, at the Moon’s albedo of {{albedo}}), and earthshine (the Earth as a Lambert sphere of albedo {{earthAlbedo}}, at its phase). Light scattered more than once is left out, so shadows are a little darker than they should be. Both are far dimmer than the Sun: standing in shadow, the picture is exposed for it, up to {{max}} times longer, as a camera would be.",
+      "earthshineNow": "Earthshine now: 1 part in {{n}} of sunlight.",
+      "earthshineNone": "No earthshine now: the Earth is new.",
+      "detail": "Nothing smaller than the terrain's cells is in the data, so no boulders or small craters are drawn. The faint grain near your feet is illustrative texture and changes no height.",
+      "material": "The ground is one even grey under the Moon's usual brightness law (Lommel-Seeliger). No photograph is draped over it, so no shadows are baked in. Like a camera, the picture is exposed for the Sun's height, so a Sun near the horizon still shows the ground: brightness on screen is not a measurement.",
+      "earthLook": "The Earth is a plain sphere lit by the Sun: its phase is right, its oceans and clouds are not drawn.",
+      "eyeTitle": "Your eye",
+      "slope": "The site report's 100 m landing slope describes the landing area; it is not a promise that every step here is walkable.",
+      "descent": "The descent is an illustrative camera path, not a guidance simulation.",
+      "provisional": "coarse for now: its own read is on the way",
+      "fineCredit": "The ground within {{km}} km is NASA's 5 m shape-from-shading terrain of the {{region}} Artemis III region (Bertone et al., The Planetary Science Journal, doi:10.3847/PSJ/ae5b70; data: Zenodo, doi:10.5281/zenodo.17954508; PGDA product 104), used under CC BY 4.0."
+    }
   }
 }

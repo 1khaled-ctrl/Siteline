@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   BODY_CONSTANTS,
+  bodyEscapeSpeedKmS,
   dayLength,
   distancesOf,
-  escapeSpeedKmS,
+  earthDistance,
   FACT_SOURCES,
   type FactBody,
   kelvinToCelsius,
@@ -12,14 +13,21 @@ import {
   type Measure,
   SOLAR_CONSTANT_W_M2,
   signalDelay,
+  sunlightVsEarth,
   sunlightWM2,
   surfaceGravityMS2,
   TABLE_KEY,
 } from '../bodyFacts';
 import { formatNumber } from '../format';
+import { landersOn, MISSIONS } from '../landers';
 import { usePlanetsAtHour } from '../physics';
 import { useStage } from '../stage';
+import { useApp } from '../store';
 import { panel } from './Controls';
+import { MoonModels } from './NasaModels';
+
+/** The bodies whose sources line has words of its own (the Moon also cites Paige et al.); the rest share one. */
+const OWN_SOURCES: ReadonlySet<FactBody> = new Set(['Earth', 'Moon', 'Mars']);
 
 function Ext({ href, children }: { href: string; children?: ReactNode }) {
   return (
@@ -39,6 +47,7 @@ export function StatTile({
   text,
   edge,
   badge,
+  wide,
 }: {
   label: string;
   children: ReactNode;
@@ -46,10 +55,14 @@ export function StatTile({
   edge?: 'sun' | 'earth';
   /** A mark at the end of the label, such as how far to trust the reading. */
   badge?: ReactNode;
+  /** Across both columns. */
+  wide?: boolean;
 }) {
   const edgeClass = edge === 'sun' ? 'border-s-3 border-s-sun' : edge === 'earth' ? 'border-s-3 border-s-accent' : '';
   return (
-    <div className={`min-w-0 rounded-lg border border-line bg-panel-raised px-2.5 py-2 ${edgeClass}`}>
+    <div
+      className={`min-w-0 rounded-lg border border-line bg-panel-raised px-2.5 py-2 ${edgeClass} ${wide ? 'col-span-2' : ''}`}
+    >
       <dt className="flex items-start justify-between gap-1 text-xs text-quiet">
         <span>{label}</span>
         {badge}
@@ -68,8 +81,9 @@ export function StatTile({
 }
 
 /**
- * A body's readings worded for the screen, shared by its facts card and its card in the scene. The last two depend on
- * how far the body is from the Sun and the Earth at the hour the map is lit for, and say so until the table arrives.
+ * A body's readings worded for the screen, shared by its facts card, its card in the scene and the phone's sheet. The
+ * ones that depend on how far the body is from the Sun and the Earth are for the hour the map is lit for, and say so
+ * until the planets table arrives.
  */
 export function useBodyReadings(body: FactBody) {
   const { t } = useTranslation();
@@ -78,84 +92,170 @@ export function useBodyReadings(body: FactBody) {
   const c = BODY_CONSTANTS[body];
   const unit = (m: Measure<string>) => t(`facts.units.${m.unit}`, { n: formatNumber(m.n, m.digits) });
   const sunlight = distances && sunlightWM2(SOLAR_CONSTANT_W_M2, distances.sunDistAu);
+  const share = distances && sunlightVsEarth(distances.sunDistAu);
   const pending = t('facts.pending');
+  const escapeKmS = bodyEscapeSpeedKmS(c);
   return {
     gravity: t('facts.units.gravity', { n: formatNumber(surfaceGravityMS2(c.gmKm3PerS2, c.radiusKm), 2) }),
-    escape: t('facts.units.escape', { n: formatNumber(escapeSpeedKmS(c.gmKm3PerS2, c.radiusKm), 2) }),
+    // Three significant figures, as NASA prints them: Jupiter's 59.5 km/s, Mercury's 4.25.
+    escape: t('facts.units.escape', { n: formatNumber(escapeKmS, escapeKmS >= 10 ? 1 : 2) }),
     rotation: unit(dayLength(c.rotationH)),
     solarDay: unit(dayLength(c.solarDayH)),
     sunlight: sunlight === undefined ? pending : t('facts.units.sunlight', { n: formatNumber(sunlight, 0) }),
+    /** The sunlight, and how it compares with Earth's: a share below one and a half, a multiple above. */
+    sunlightShare:
+      sunlight === undefined || share === undefined
+        ? pending
+        : share >= 1.5
+          ? t('facts.units.sunlightTimes', { n: formatNumber(sunlight, 0), x: formatNumber(share, 1) })
+          : t('facts.units.sunlightPct', {
+              n: formatNumber(sunlight, 0),
+              pct: formatNumber(share * 100, share < 0.1 ? 1 : 0),
+            }),
+    distance: distances?.earthDistKm == null ? pending : unit(earthDistance(distances.earthDistKm)),
     signal: distances?.earthDistKm == null ? pending : unit(signalDelay(lightTimeS(distances.earthDistKm))),
   };
 }
 
-/** What the Moon, the Earth or Mars is like: the facts that do not depend on where you land. */
-export function BodyFacts({ body }: { body: FactBody }) {
+/**
+ * What landing and working on a body would mean, in the order a mission planner asks: how far, how much sunlight, how
+ * long a day, how tilted, how strong the pull, what the surface is like, who has been there, and where each number
+ * comes from. `onClose` adds a close button, for the card a planet opens in the solar system.
+ */
+export function BodyFacts({ body, onClose }: { body: FactBody; onClose?: () => void }) {
   const { t } = useTranslation();
   const r = useBodyReadings(body);
   const c = BODY_CONSTANTS[body];
+  const giant = c.surface === 'none';
+  const bar = formatNumber(c.levelBar ?? 1, 0);
   // A true minus sign, as in the rest of the text, rather than the hyphen the number formatter gives.
   const celsius = (kelvin: number | undefined) =>
     kelvin === undefined ? '' : formatNumber(kelvinToCelsius(kelvin), 0).replace('-', '−');
   const mbar =
     c.surfacePressureMbar === null ? '' : formatNumber(c.surfacePressureMbar, c.surfacePressureMbar < 100 ? 1 : 0);
+  const landers = landersOn(MISSIONS, body);
+  const missionList = (
+    <button
+      type="button"
+      className="underline decoration-dotted hover:text-ink"
+      onClick={() => useApp.getState().setSources('landfall-missions')}
+    />
+  );
 
   const folded = useStage((s) => s.folded.has('facts'));
+  const iconButton =
+    'grid size-8 place-items-center rounded-md border border-line bg-panel-raised text-quiet hover:border-line-hover hover:text-ink';
 
   return (
-    <section className={panel} data-testid="body-facts" id="body-facts" tabIndex={-1}>
+    <section className={panel} data-testid="body-facts" data-body={body} id="body-facts" tabIndex={-1}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-2xl">{t(`facts.heading.${body}`)}</h2>
-        <button
-          type="button"
-          className="grid size-8 place-items-center rounded-md border border-line bg-panel-raised text-quiet hover:border-line-hover hover:text-ink"
-          aria-expanded={!folded}
-          aria-controls="body-facts-body"
-          aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
-          onClick={() => useStage.getState().toggleFolded('facts')}
-        >
-          <svg
-            viewBox="0 0 12 12"
-            width="12"
-            height="12"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            aria-hidden="true"
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            className={iconButton}
+            aria-expanded={!folded}
+            aria-controls="body-facts-body"
+            aria-label={t(folded ? 'callout.unfold' : 'callout.fold')}
+            onClick={() => useStage.getState().toggleFolded('facts')}
           >
-            <path d={folded ? 'M2 4l4 4 4-4' : 'M2 8l4-4 4 4'} />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 12 12"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              aria-hidden="true"
+            >
+              <path d={folded ? 'M2 4l4 4 4-4' : 'M2 8l4-4 4 4'} />
+            </svg>
+          </button>
+          {onClose && (
+            <button type="button" className={iconButton} aria-label={t('facts.close')} onClick={onClose}>
+              <svg
+                viewBox="0 0 12 12"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <path d="M3 3l6 6M9 3l-6 6" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
       <div id="body-facts-body" hidden={folded}>
         <dl className="grid grid-cols-2 gap-2">
-          <StatTile label={t('facts.gravity')}>{r.gravity}</StatTile>
-          <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
-          <StatTile label={t('facts.rotation')}>{r.rotation}</StatTile>
-          <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
-          <StatTile label={t('facts.sunlight')} edge="sun">
-            {r.sunlight}
-          </StatTile>
           {body !== 'Earth' && (
-            <StatTile label={t('facts.signal')} edge="earth">
-              {r.signal}
-            </StatTile>
+            <>
+              <StatTile label={t('facts.distance')} edge="earth">
+                {r.distance}
+              </StatTile>
+              <StatTile label={t('facts.signal')} edge="earth">
+                {r.signal}
+              </StatTile>
+            </>
           )}
+          <StatTile label={t('facts.sunlight')} edge="sun" wide>
+            {r.sunlightShare}
+          </StatTile>
+          <StatTile label={t('facts.solarDay')}>{r.solarDay}</StatTile>
+          <StatTile label={t('facts.rotation')}>
+            {r.rotation}
+            {c.rotationH < 0 && (
+              <span className="block font-sans text-xs text-quiet" dir="auto" data-testid="retrograde">
+                {t('facts.retrograde')}
+              </span>
+            )}
+          </StatTile>
+          <StatTile label={t('facts.tilt')} wide={body === 'Moon'}>
+            {t('facts.units.deg', { n: formatNumber(c.obliquityDeg, c.obliquityDeg < 1 ? 3 : 2) })}
+            {body === 'Moon' && (
+              <span className="mt-0.5 block font-sans text-sm" dir="auto">
+                {t('facts.moonTilt')}
+              </span>
+            )}
+          </StatTile>
+          <StatTile label={giant ? t('facts.gravityAtLevel', { bar }) : t('facts.gravity')}>{r.gravity}</StatTile>
+          <StatTile label={t('facts.escape')}>{r.escape}</StatTile>
           <StatTile label={t('facts.temperature')} text>
-            {t(`facts.temp.${body}`, {
-              mean: celsius(c.temperatureK.meanK),
-              low: celsius(c.temperatureK.rangeK?.[0]),
-              high: celsius(c.temperatureK.rangeK?.[1]),
-              coldest: celsius(c.temperatureK.coldestK),
-            })}
+            {giant
+              ? t('facts.temp.atLevel', { level: celsius(c.temperatureK.atLevelK), bar })
+              : t(`facts.temp.${body}`, {
+                  mean: celsius(c.temperatureK.meanK),
+                  low: celsius(c.temperatureK.rangeK?.[0]),
+                  high: celsius(c.temperatureK.rangeK?.[1]),
+                  coldest: celsius(c.temperatureK.coldestK),
+                })}
           </StatTile>
           <StatTile label={t('facts.surface')} text>
-            {t(`facts.surfaceKind.${body}`, { mbar })}
+            {giant ? t('facts.surfaceKind.none') : t(`facts.surfaceKind.${body}`, { mbar })}
           </StatTile>
+          {body !== 'Earth' && (
+            <StatTile label={t('facts.landers')} text wide>
+              <span data-testid="body-landers">
+                {landers.past + landers.toCome === 0 ? (
+                  <Trans i18nKey="facts.landersNone" components={{ list: missionList }} />
+                ) : (
+                  <Trans
+                    i18nKey="facts.landersCount"
+                    values={{ past: landers.past, toCome: landers.toCome }}
+                    components={{ list: missionList }}
+                  />
+                )}
+              </span>
+            </StatTile>
+          )}
         </dl>
+        {body === 'Moon' && <MoonModels />}
         <p className="mt-3 text-xs text-quiet">
           <Trans
-            i18nKey={`facts.sources.${body}`}
+            i18nKey={OWN_SOURCES.has(body) ? `facts.sources.${body}` : 'facts.sources.planet'}
+            values={{ name: t(`bodies.${TABLE_KEY[body]}`) }}
             components={{
               fact: <Ext href={FACT_SOURCES[c.factSheet][1]} />,
               gm: <Ext href={FACT_SOURCES.spiceGm[1]} />,

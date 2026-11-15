@@ -1,4 +1,5 @@
 import { type Insets, NO_INSETS, type SolarLabelKey, type SolarView } from '@siteline/engine';
+import type { SolarBodyKey } from '@siteline/physics';
 import { useEffect, useMemo, useState } from 'react';
 import { create } from 'zustand';
 
@@ -14,6 +15,19 @@ interface StageState {
   setDialWorld: (world: SolarLabelKey) => void;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
+  /**
+   * The planet clicked in the solar system, whose facts card is open; picking it again closes the card. Only the
+   * worlds with no view of their own: the Moon, the Earth and Mars fly in instead.
+   */
+  solarPicked: SolarBodyKey | null;
+  toggleSolarPicked: (body: SolarBodyKey | null) => void;
+  /**
+   * The planet the camera has dived beside for a closer look, from the moment the dive starts. Only the six planets
+   * with no view of their own. Null in the usual view of the solar system.
+   */
+  solarCloseUp: SolarBodyKey | null;
+  /** True while the camera pulls back from that planet to the whole solar system. */
+  solarLeaving: boolean;
   /** The 3D view on screen, for what turns its camera from outside (the phone's tilt-to-look). */
   active: Lookable | null;
   setActive: (view: Lookable | null) => void;
@@ -42,6 +56,10 @@ export const useStage = create<StageState>((set) => ({
   setDialWorld: (dialWorld) => set({ dialWorld }),
   sheetOpen: false,
   setSheetOpen: (sheetOpen) => set({ sheetOpen }),
+  solarPicked: null,
+  toggleSolarPicked: (body) => set((s) => ({ solarPicked: body === null || s.solarPicked === body ? null : body })),
+  solarCloseUp: null,
+  solarLeaving: false,
   active: null,
   setActive: (active) => set({ active }),
   orbOpen: false,
@@ -111,4 +129,44 @@ export function useStageInsets(): Insets {
     () => (wide ? (rtl ? { left: PANEL_PX, right: 0 } : { left: 0, right: PANEL_PX }) : NO_INSETS),
     [wide, rtl],
   );
+}
+
+/**
+ * On a phone: open or close a planet's facts card from the dial, the sheet or the worlds list. Opening it brings the
+ * sheet up and turns the dial to that planet, so the sheet's top line names the planet whose card is open.
+ */
+export function openFacts(world: SolarBodyKey) {
+  const s = useStage.getState();
+  s.toggleSolarPicked(world);
+  if (useStage.getState().solarPicked) {
+    s.setDialWorld(world);
+    s.setSheetOpen(true);
+  }
+}
+
+/** Counts the dives, so one that was cut short can tell whether a later one has taken its place. */
+let dives = 0;
+
+/**
+ * Dive beside a planet that has no view of its own, with its facts card open. The card opens as the dive starts:
+ * the camera stops where the planet fits the part of the view the card leaves free. The way back is live from the
+ * start too. A dive cut short by anything but a later dive or the way back puts the interface back as it was.
+ */
+export async function closerLook(body: SolarBodyKey): Promise<void> {
+  const { solar } = useStage.getState();
+  if (!solar) return;
+  const dive = ++dives;
+  useStage.setState({ solarPicked: body, dialWorld: body, sheetOpen: true, solarCloseUp: body, solarLeaving: false });
+  const arrived = await solar.closeUp(body);
+  if (!arrived && dive === dives && useStage.getState().solarCloseUp === body)
+    useStage.setState({ solarCloseUp: null });
+}
+
+/** Pull back from a closer look to the whole solar system. The planet's facts card stays open. */
+export async function backToSystem(): Promise<void> {
+  const { solar, solarCloseUp } = useStage.getState();
+  if (!solar || !solarCloseUp) return;
+  useStage.setState({ solarCloseUp: null, solarLeaving: true });
+  await solar.pullBack();
+  useStage.setState({ solarLeaving: false });
 }

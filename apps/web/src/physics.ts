@@ -2,6 +2,7 @@ import { DEFAULT_STAY, type StayQuery, type StayResult } from '@siteline/contrac
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import * as Comlink from 'comlink';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { touchdownUtcMsOf } from './land';
 import type { DataUrls, PhysicsApi, StayResponse } from './physics.worker';
 import { type MoonView, type Pin, useApp } from './store';
 
@@ -26,6 +27,14 @@ export const URLS: DataUrls = {
   // site a Pages Function (the repository's functions/pgda). A host without either names a copy that allows cross-site
   // reads in VITE_TERRAIN_10M_URL; if the reads fail, the slope says it needs finer terrain.
   fine: import.meta.env.VITE_TERRAIN_10M_URL ?? '/pgda/data/LOLA_20mpp/LDEM_83S_10MPP_ADJ.TIF',
+  /*
+   * Lemelin et al. 2021's 169 water-ice-bearing shadowed regions (CREDITS.md `lemelin-2021-ice-psrs`): their published
+   * shapefile, converted to GeoJSON on the pipeline VM without any other change, in the same R2 bucket as the 30 m
+   * terrain. The ice line's "detected nearby" reading measures to them.
+   */
+  iceRegions:
+    import.meta.env.VITE_ICE_REGIONS_URL ??
+    'https://pub-950982926f534224a9e16061b39f6217.r2.dev/ice/psr-volatiles-lemelin2021.geojson',
 };
 export const DAY_MS = 86_400_000;
 export const HOUR_MS = 3_600_000;
@@ -46,7 +55,8 @@ export function queryFor(site: Pin, landingUtc: string, slipDays: number): StayQ
   return {
     ...DEFAULT_STAY,
     site: { id: `moon:${site.latDeg},${site.lonDeg}`, body: 'moon', latDeg: site.latDeg, lonDeg: site.lonDeg },
-    landingUtc: new Date(Date.parse(landingUtc) + slipDays * DAY_MS).toISOString(),
+    // The slip is added here and nowhere after: the query's landing date is the touchdown moment (land.ts).
+    landingUtc: new Date(touchdownUtcMsOf(landingUtc, slipDays)).toISOString(),
   };
 }
 
@@ -230,7 +240,8 @@ export function useLightingUtcMs(): number {
  */
 export function followLighting<T>(
   ask: (tUtcMs: number) => Promise<T>,
-  apply: (value: T) => void,
+  /** Given the answer and the lighting time it is for. */
+  apply: (value: T, tUtcMs: number) => void,
   onError?: (e: unknown) => void,
 ): () => void {
   let stopped = false;
@@ -246,7 +257,7 @@ export function followLighting<T>(
       (value) => {
         busy = false;
         if (stopped) return;
-        apply(value);
+        apply(value, tUtcMs);
         next();
       },
       (e: unknown) => {

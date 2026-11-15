@@ -1,44 +1,80 @@
 import type { StayQuery, StayResult } from '@siteline/contracts';
 import {
+  angularRadiusDeg,
   type BestSearch,
   type BestSpot,
   bestSpots,
+  bouncedIrradiance,
   type Dem,
   type DemHorizon,
   demFromInt16,
+  EARTH_RADIUS_KM,
   type EphemerisTable,
+  EYE_HEIGHT_M,
+  earthshineIrradiance,
+  elevAz,
+  eyeSky,
   flatHorizon,
+  gridNormals,
+  gridPositions,
+  gridTriangles,
   type HeightPatch,
   type HeightSource,
+  HORIZON_BINS,
+  HORIZON_MIN_DIST_M,
+  type Horizon,
+  heightsFromDem,
   heightsFromPatches,
   horizonFromDem,
   horizonFromHeights,
   type LandingCircle,
+  type LocalFrame,
+  type LocalGrid,
   landingCircle,
+  levelsUpAt,
+  localDirection,
+  localFrame,
+  localToGeo,
   MAX_LANDING_SLOPE_DEG,
+  MOON_BOND_ALBEDO,
   mapsAtSite,
   mapsFromBytes,
   marsSubsolarPoint,
+  nearestPolarRegion,
   PLANET_NAMES,
   type PlanetName,
   type PlanetTable,
+  type PointGrid,
   type PolarMaps,
+  type PolarRegion,
   parseEphemeris,
   parsePlanets,
+  patchHeightM,
+  polarRegionsFromGeoJson,
   polarScaleFactor,
   polarToUnit,
   polarXY,
+  resampleGrid,
+  resampleToLocal,
+  type SkylineCache,
   type SolarBodyKey,
+  SUN_RADIUS_KM,
   siteFrame,
   siteSlopes,
+  stayBins,
   stayTest,
   subsolarPoint,
+  sweepDiscVisibility,
+  sweepHorizon,
   unitToLatLon,
+  type Vec3,
   WALK_RADIUS_M,
 } from '@siteline/physics';
 import * as Comlink from 'comlink';
-import type { GeoTIFFImage } from 'geotiff';
+import type { GeoTIFFImage, RemoteSourceOptions } from 'geotiff';
+import fineRegions from './a3clrRegions.json';
 import { type DayStrip, dayStrip } from './dayStrip';
+import { cacheStorageStore, cachingFetch } from './terrainCache';
 import { checksOf, verdictOf } from './verdict';
 
 const EPHEMERIS_SOURCES = ['spice-de440s', 'spice-moon-pa', 'spice-moon-fk', 'spice-naif0012'];
@@ -76,6 +112,11 @@ const HORIZON_REACH_M = 300_000;
 const DEMO_MAPS = { id: 'landfall-polar-maps', n: 186, pixM: 2400 };
 /** LOLA's 10 m terrain of the south pole inside 83°S (PGDA product 90), read only around the sites asked about. */
 const FINE = { id: 'lola-spole-10m' };
+/**
+ * Lemelin et al. 2021's water-ice-bearing permanently shadowed regions: the shadows where Moon Mineralogy Mapper (M3)
+ * detected surface ice, each outlined 280 m beyond the shadow itself. Read once, as published (CREDITS.md).
+ */
+const ICE_REGIONS = { id: 'lemelin-2021-ice-psrs' };
 
 export interface DataUrls {
   data: string;
@@ -90,6 +131,11 @@ export interface DataUrls {
   fine?: string;
   /** NASA's long-term maps (PGDA product 69), as the pipeline publishes them; `maps` is read where they are not. */
   illumination?: string;
+  /**
+   * Lemelin et al. 2021's water-ice-bearing shadowed regions, a GeoJSON in LOLA's south polar stereographic plane;
+   * without it the ice line has no "detected nearby" reading.
+   */
+  iceRegions?: string;
 }
 
 /** The slopes around a site, measured on the 10 m terrain. */
@@ -125,6 +171,21 @@ export interface LongTerm {
   shadowDistanceKm?: number;
 }
 
+/**
+ * The nearest shadowed region where M3 detected surface ice (Lemelin et al. 2021), for the ice line: information,
+ * never one of the checks.
+ */
+export interface IceDetected {
+  id: string;
+  /**
+   * Straight over the 1737.4 km sphere to the region's published outline, which extends 280 m beyond the shadow
+   * itself; 0 inside that outline.
+   */
+  distanceKm: number;
+  /** The site lies within the outline: within the shadow or the 280 m beyond it, the data cannot say which. */
+  inside: boolean;
+}
+
 export interface StayResponse {
   result: StayResult;
   terrain?: TerrainInfo;
@@ -139,6 +200,7 @@ export interface StayResponse {
    */
   terrainPending?: boolean;
   longTerm?: LongTerm;
+  iceDetected?: IceDetected;
 }
 
 interface Base64File {
@@ -194,6 +256,17 @@ const loadDrawnDem = (url: string): Promise<Dem> =>
     return demFromInt16(new Int16Array(bytes.buffer), DRAWN.n, DRAWN.pixM, DRAWN.metresPerUnit);
   });
 
+/**
+ * How a terrain GeoTIFF is opened: through a cache of the bytes it has read, in 64 kB blocks, up to 64 MB a file.
+ * geotiff.js otherwise downloads a tile again for every read that touches it, and the reads around nearby sites touch
+ * the same few tiles: one region's search fetched 18 distinct 10 m tiles 130 times (64 MB for 3.2 MB). The bytes are
+ * the file's own, so no height changes. (`fromUrl` hands these to its block cache; its typings leave them out.)
+ */
+const TIFF_BYTE_CACHE: RemoteSourceOptions & { blockSize: number; cacheSize: number } = {
+  blockSize: 65_536,
+  cacheSize: 1_024,
+};
+
 /** One level of a terrain GeoTIFF: its image, where its grid starts, and how big its cells are. */
 interface TerrainLevel {
   image: GeoTIFFImage;
@@ -221,16 +294,28 @@ const levelOf = (image: GeoTIFFImage, base: GeoTIFFImage): TerrainLevel => {
   return { image, cornerX: x - half, cornerY: y + half, pixM, width: image.getWidth(), height: image.getHeight() };
 };
 
-/** The terrain's levels, opened once: headers and tile indexes only, never the whole file. */
+/**
+ * Every level of a terrain GeoTIFF, finest first, opened once per file: headers and tile indexes only, never the whole
+ * file. The stay check, the slope and the surface view all read through this one copy, so a file's header is fetched
+ * once and its tiles share one cache.
+ */
+const loadPyramid = (url: string): Promise<TerrainLevel[]> =>
+  memo(`pyramid:${url}`, async () => {
+    const { fromUrl } = await import('geotiff');
+    const tiff = await fromUrl(url, TIFF_BYTE_CACHE);
+    const base = await tiff.getImage();
+    const levels = [levelOf(base, base)];
+    for (let i = 1; i < (await tiff.getImageCount()); i++) levels.push(levelOf(await tiff.getImage(i), base));
+    return levels;
+  });
+
+/** The terrain's full-resolution level and the overview the far skyline is read from. */
 const loadTerrain = (url: string): Promise<TerrainGrids> =>
   memo(`terrain:${url}`, async () => {
-    const { fromUrl } = await import('geotiff');
-    const tiff = await fromUrl(url);
-    const base = await tiff.getImage();
-    const near = levelOf(base, base);
+    const levels = await loadPyramid(url);
+    const near = levels[0];
     let far = near;
-    for (let i = 1; i < (await tiff.getImageCount()); i++) {
-      const level = levelOf(await tiff.getImage(i), base);
+    for (const level of levels.slice(1)) {
       // The coarsest level still at or under the far cell size, so the 300 km reach is a window of a few hundred cells.
       if (level.pixM <= FAR_PIX_M && level.pixM > far.pixM) far = level;
     }
@@ -304,6 +389,10 @@ const loadMapsFile = (url: string): Promise<LoadedMaps> =>
       : { maps: mapsFromBytes(bytes, DEMO_MAPS.n, DEMO_MAPS.pixM), id: DEMO_MAPS.id };
   });
 
+/** The ice-bearing regions, read once. */
+const loadIceRegions = (url: string): Promise<PolarRegion[]> =>
+  memo(`iceRegions:${url}`, async () => polarRegionsFromGeoJson(await (await fetchOk(url)).json()));
+
 /** NASA's maps where the pipeline has published them, the demo's otherwise. */
 const loadMaps = (urls: DataUrls): Promise<LoadedMaps> =>
   urls.illumination ? loadMapsFile(urls.illumination).catch(() => loadMapsFile(urls.maps)) : loadMapsFile(urls.maps);
@@ -362,17 +451,9 @@ interface FineGrid {
   height: number;
 }
 
-const loadFine = (url: string): Promise<FineGrid> =>
-  memo(`fine:${url}`, async () => {
-    const { fromUrl } = await import('geotiff');
-    const image = await (await fromUrl(url)).getImage();
-    const [x, y] = image.getOrigin();
-    const [pixM, pixY] = image.getResolution();
-    if (!(pixM > 0) || Math.abs(pixM + pixY) > 1e-9) throw new Error(`${url}: not a grid of square cells`);
-    // The tie point is the first cell's outer corner, or its centre for a grid of points.
-    const half = image.getGeoKeys()?.GTRasterTypeGeoKey === 2 ? pixM / 2 : 0;
-    return { image, cornerX: x - half, cornerY: y + half, pixM, width: image.getWidth(), height: image.getHeight() };
-  });
+// The full-resolution level's tie point is its first cell's outer corner, or its centre for a grid of points; `levelOf`
+// turns either into the outer corner.
+const loadFine = (url: string): Promise<FineGrid> => memo(`fine:${url}`, async () => (await loadPyramid(url))[0]);
 
 /**
  * The landing slope and the walkable share around a site, from the 10 m grid: only the cells within 1 km are read (one
@@ -408,6 +489,102 @@ const slopeAt = (latDeg: number, lonDeg: number, url: string): Promise<SlopeInfo
 const within = <T>(p: Promise<T | undefined>, ms: number): Promise<T | undefined> =>
   Promise.race([p, new Promise<undefined>((resolve) => setTimeout(resolve, ms))]);
 
+/** A skyline walked in some of its bins, the rest still −90°. */
+interface CachedSkyline {
+  mask: Float32Array;
+  walked: Uint8Array;
+  groundHeightM: number;
+}
+
+/**
+ * Skylines the searches have walked, bin by bin. A skyline does not depend on the date, so searching again, or on
+ * another date, walks only the directions not walked before. The site report never reads these: its skyline is the
+ * whole circle (`fineHorizon`).
+ */
+const skylines = new Map<string, CachedSkyline>();
+/** About 4 kB a skyline. */
+const MAX_SKYLINES = 20_000;
+
+/** A site's skyline for the search, keyed by where it is, how high the observer stands, the terrain and the reach. */
+const skylineCache =
+  (terrainId: string, observerHeightM: number, reachM: number): SkylineCache =>
+  (latDeg, lonDeg, bins, walk) => {
+    const key = `${terrainId}:${round4(latDeg)},${round4(lonDeg)}:${observerHeightM}:${reachM}`;
+    let entry = skylines.get(key);
+    const missing = entry ? bins.filter((b) => !entry?.walked[b]) : bins;
+    if (!entry || missing.length) {
+      const hz = walk(missing);
+      if (!hz) return undefined;
+      if (!entry) {
+        if (skylines.size >= MAX_SKYLINES) skylines.delete(skylines.keys().next().value as string);
+        entry = { mask: hz.mask, walked: new Uint8Array(HORIZON_BINS), groundHeightM: hz.groundHeightM };
+        skylines.set(key, entry);
+      } else for (const b of missing) entry.mask[b] = hz.mask[b];
+      for (const b of missing) entry.walked[b] = 1;
+    }
+    return { mask: entry.mask, groundHeightM: entry.groundHeightM };
+  };
+
+/**
+ * The site report's stay check (`api.stay`) as far as its verdict goes, for the search: the same terrain, the same
+ * fallback to the 1.2 km grid when the 30 m one does not arrive in time, the same slope; but the skyline is walked only
+ * in the directions the stay's Sun and Earth pass through (`stayBins`), and cached, and no 30-day timeline is drawn.
+ * Its pass or fail, least sunlight, Earth share and slope are the report's.
+ */
+async function searchStay(query: StayQuery, urls: DataUrls, patienceMs: number): Promise<StayResult> {
+  const { latDeg, lonDeg } = query.site;
+  const { observerHeightM } = query;
+  const slopeRun = urls.fine
+    ? quiet(slopeAt(latDeg, lonDeg, urls.fine), (m) => console.warn(`slope: ${m}`))
+    : Promise.resolve(undefined);
+  const fineRun = urls.horizonTerrain
+    ? (async () => {
+        const grids = await loadTerrain(urls.horizonTerrain as string);
+        const heights = await heightsAround(grids, latDeg, lonDeg, HORIZON_REACH_M);
+        return heights && { heights, stepM: grids.near.pixM };
+      })().catch(() => undefined)
+    : Promise.resolve(undefined);
+  const ephemeris = await loadEphemeris(urls.data);
+  const [fine, slope] = await Promise.all([within(fineRun, patienceMs), within(slopeRun, patienceMs)]);
+  const binsAt = (heightM: number) => stayBins({ ...query, site: { ...query.site, heightM } }, ephemeris);
+  const at = polarXY(siteFrame(latDeg, lonDeg).u);
+  let hz: (DemHorizon & { id: string }) | undefined;
+  const fineGroundM = fine?.heights.heightAt(at.x, at.y);
+  if (fine && fineGroundM !== undefined && !Number.isNaN(fineGroundM)) {
+    const found = skylineCache(TERRAIN.id, observerHeightM, HORIZON_REACH_M)(
+      latDeg,
+      lonDeg,
+      binsAt(fineGroundM),
+      (bins) =>
+        horizonFromHeights(fine.heights, latDeg, lonDeg, {
+          observerHeightM,
+          stepM: fine.stepM,
+          maxDistM: HORIZON_REACH_M,
+          bins,
+        }),
+    );
+    hz = found && { ...found, id: TERRAIN.id };
+  }
+  if (!hz) {
+    const dem = await quiet(loadDrawnDem(urls.terrain), () => {});
+    const coarseGroundM = dem && heightsFromDem(dem).heightAt(at.x, at.y);
+    if (dem && coarseGroundM !== undefined && !Number.isNaN(coarseGroundM)) {
+      const found = skylineCache(DRAWN.id, observerHeightM, 0)(latDeg, lonDeg, binsAt(coarseGroundM), (bins) =>
+        horizonFromDem(dem, latDeg, lonDeg, { observerHeightM, bins }),
+      );
+      hz = found && { ...found, id: DRAWN.id };
+    }
+  }
+  return stayTest(hz ? { ...query, site: { ...query.site, heightM: hz.groundHeightM } } : query, {
+    ephemeris,
+    horizon: hz?.mask ?? flatHorizon(),
+    slope100mDeg: slope?.slope100mDeg ?? Number.NaN,
+    slope2kmPctUnder20: slope?.slope2kmPctUnder20 ?? Number.NaN,
+    timelineDays: 0,
+    sources: [...EPHEMERIS_SOURCES, ...(hz ? [hz.id] : []), ...(slope ? [slope.id] : [])],
+  });
+}
+
 /** A landing site that passes all four checks, as the site report itself judges them. */
 export interface PassingSite {
   latDeg: number;
@@ -437,6 +614,792 @@ const FLATTER_STEPS_M = [120, 250];
 const PASSING_PATIENCE_MS = 45_000;
 
 const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
+
+// --- Land Here: the ground around one point at real scale, for the surface view ---
+
+/** One ring of the surface view's terrain: how far it reaches and how finely it is drawn. */
+interface SurfaceRing {
+  /** 0 is the walkable ground; each ring after it has cells twice the size and reaches twice as far. */
+  index: number;
+  spacingM: number;
+  halfM: number;
+}
+
+export type SurfaceQuality = 'high' | 'low';
+
+/** Cells along each side of every ring: the same for all of them, so each draws the same detail on screen. */
+const RING_CELLS: Record<SurfaceQuality, number> = { high: 320, low: 160 };
+/** The walkable ground's cell: the 10 m terrain's own. */
+const WALK_SPACING_M = 10;
+/** Cells across each coarse stand-in read: a single tile, or a few, of the 30 m terrain's overviews. */
+const STAND_IN_CELLS = 100;
+/** How many rings are sharpened at once, nearest first: the near ones are the ones you notice. */
+const RINGS_AT_ONCE = 2;
+/** The walkable ground's shadow map, finer than its 10 m mesh so shadow edges stay sharp. */
+const SHADOW_MAP_M: Record<SurfaceQuality, number> = { high: 2.5, low: 5 };
+
+/**
+ * The surface view's terrain as nested squares around the landing point (a geometry clipmap): the walkable ground at
+ * the terrain's own 10 m, then rings whose cells double in size as they double in reach, out past the skyline's
+ * 300 km (the stay check's own reach). A cell then looks about the same size on screen at every distance, so far ridges
+ * stay as sharp as near ones. `low` draws a quarter of the triangles: the same 10 m ground, half as far across. With
+ * NASA's 5 m terrain, one more ring at 5 m goes inside the walkable ground.
+ */
+function surfaceRings(quality: SurfaceQuality, innerSpacingM = WALK_SPACING_M): SurfaceRing[] {
+  const cells = RING_CELLS[quality];
+  const rings: SurfaceRing[] = [];
+  for (let index = 0, spacingM = innerSpacingM; ; index++, spacingM *= 2) {
+    const halfM = (cells / 2) * spacingM;
+    rings.push({ index, spacingM, halfM });
+    if (halfM >= HORIZON_REACH_M) return rings;
+  }
+}
+
+export interface SurfaceRequest {
+  /** Names this request, so a newer one, or Cancel, can stop it. */
+  id: number;
+  latDeg: number;
+  lonDeg: number;
+  quality: SurfaceQuality;
+  /**
+   * Also download NASA's 5 m terrain of the Artemis III region the point lies in (`a3clr-sfs-5m`), for the ground
+   * around it: one member of the region's zip, 16 to 73 MB, fetched whole. Asked for only when the person chooses it.
+   */
+  fine5?: boolean;
+}
+
+export interface SurfaceProgress {
+  /** What is under way: opening the files' headers, reading the first terrain, building the meshes. */
+  now: 'opening' | 'reading' | 'building';
+  /** Whether the walkable ground is in, and the coarse reads that stand in for the rest until each ring's own arrives. */
+  walkRead: boolean;
+  farRead: boolean;
+  /** The 5 m terrain's download, when asked for: bytes so far, of all. */
+  fineBytes?: number;
+  fineTotal?: number;
+}
+
+/**
+ * One ring rebuilt from its own detailed read, after the first scene went up with a coarse stand-in for it; or, with
+ * `done`, word that every ring is in (the shadows are then worth working out again).
+ */
+export type RingUpdate = { key: string; level: SurfaceLevelData; done?: undefined } | { key: string; done: true };
+
+export interface SurfaceLevelData {
+  /** 0 is the walkable ground; each ring after it has cells twice the size and reaches twice as far. */
+  index: number;
+  /** The terrain file the heights came from, by its id in CREDITS.md. */
+  datasetId: string;
+  /** The cell size of the level of that file that was read, metres. */
+  sourcePixM: number;
+  /** The drawn mesh's node spacing, metres. */
+  spacingM: number;
+  halfM: number;
+  size: number;
+  /** Nodes with no height at all, and nodes whose height came from a coarser read, percent. */
+  missingPct: number;
+  filledPct: number;
+  /** True while this ring is drawn from a coarse stand-in, before its own read arrives. */
+  provisional: boolean;
+  positions: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  /** Local up of each node; sent for the rings the camera can be over (the walkable ground and the next ring). */
+  up?: Float32Array;
+}
+
+export interface SurfaceScene {
+  key: string;
+  /** The ring you walk on: 0, or 1 when a 5 m ring lies inside it. */
+  walkIndex: number;
+  /** The Artemis III region whose 5 m terrain the innermost ring comes from, if it does. */
+  fineRegion?: string;
+  latDeg: number;
+  lonDeg: number;
+  /** The ground's height at the point above the 1737.4 km sphere, metres. */
+  groundHeightM: number;
+  levels: SurfaceLevelData[];
+}
+
+export type SurfaceOutcome =
+  | { status: 'ready'; scene: SurfaceScene }
+  /** The point is outside every terrain file's grid. */
+  | { status: 'outside' }
+  /** Inside a grid, but no file has a height at the point itself. */
+  | { status: 'nodata' }
+  | { status: 'cancelled' };
+
+export interface SkyBody {
+  /** Local east, north, up unit vector from the landing point. */
+  dir: [number, number, number];
+  distKm: number;
+  radiusDeg: number;
+}
+
+export interface EyeView {
+  east: number;
+  north: number;
+  /** Where the eye is, and the ground under it: local up, metres. */
+  groundUpM: number;
+  eyeHeightM: number;
+  latDeg: number;
+  lonDeg: number;
+  /** Elevation and azimuth in the eye's own frame, degrees. */
+  sun: { elevDeg: number; azDeg: number; horizonDeg: number; fraction: number };
+  earth: { elevDeg: number; azDeg: number; horizonDeg: number; fraction: number };
+}
+
+export interface SurfaceSky {
+  /** The moment worked out, clamped to the ephemeris (`clamped` says if it was). */
+  tUtcMs: number;
+  clamped: boolean;
+  sun: SkyBody;
+  earth: SkyBody;
+  /** The share of the Sun's disc each node of each ring sees above the terrain, 0 to 1, ring by ring. */
+  sunlit?: Float32Array[];
+  /**
+   * The light reaching each node of each ring besides the Sun's own: sunlight scattered off sunlit terrain around it,
+   * and earthshine, as a share of direct sunlight on a surface square to the Sun.
+   */
+  ambient?: Float32Array[];
+  /** Earthshine at this moment on a surface square to the Earth, as a share of direct sunlight. */
+  earthshine?: number;
+  /** The same on the walkable ground, at `spacingM` (finer than its mesh), as bytes 0 to 255, laid out like a grid. */
+  shadowMap?: { data: Uint8Array; size: number; spacingM: number; halfM: number };
+  /** How finely the shadows were worked out on the walkable ground, metres. */
+  shadowM?: number;
+  eye?: EyeView;
+}
+
+/** What is said about each ring, beside its grid. */
+type RingInfo = Omit<SurfaceLevelData, 'positions' | 'normals' | 'indices' | 'up' | 'size'>;
+
+/**
+ * A surface the worker has built: its frame and grids, kept for the light and the eye, and to draw again without
+ * reading the terrain again when the same point is visited twice.
+ */
+interface BuiltSurface {
+  frame: LocalFrame;
+  grids: LocalGrid[];
+  rings: RingInfo[];
+  /** How finely the walkable ground's shadow map is worked out, metres. */
+  shadowMapM: number;
+  /** False while rings still wait for their own reads; only a complete surface is drawn again from memory. */
+  complete: boolean;
+  walkIndex: number;
+  fineRegion?: string;
+  /** The skylines for the light in the shadows, worked out once for these grids (see `shadowLightGeometry`). */
+  light?: ShadowLightGeometry;
+}
+
+/** The azimuths whose skylines give the light scattered off the terrain: every 45°. */
+const SCATTER_AZ_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
+
+interface ShadowLightGeometry {
+  /** The grids it was worked out for: a ring sharpened since means working it out again. */
+  grids: LocalGrid[];
+  rings: { coarse: PointGrid; horizons: Horizon[]; normals: Float32Array; coarseNormals: Float32Array }[];
+}
+
+/**
+ * What each ring sees of the terrain around it, which does not change with the time: its skyline in eight azimuths
+ * and how far off the terrain setting it is, at a quarter of the ring's density (the scattered light is smooth), and
+ * each node's slope.
+ */
+function shadowLightGeometry(surface: BuiltSurface): ShadowLightGeometry {
+  const kept = surface.light;
+  if (kept && kept.grids.length === surface.grids.length && kept.grids.every((g, i) => g === surface.grids[i]))
+    return kept;
+  const rings = surface.grids.map((g) => {
+    const factor = (g.size - 1) % 4 === 0 ? 4 : (g.size - 1) % 2 === 0 ? 2 : 1;
+    const coarse: PointGrid = { size: (g.size - 1) / factor + 1, spacingM: g.spacingM * factor, halfM: g.halfM };
+    const horizons = SCATTER_AZ_DEG.map((azDeg) => ({ azDeg, ...sweepHorizon(surface.grids, coarse, azDeg) }));
+    const normals = gridNormals(g);
+    const coarseNormals = new Float32Array(coarse.size * coarse.size * 3);
+    for (let r = 0; r < coarse.size; r++)
+      for (let c = 0; c < coarse.size; c++) {
+        const k = r * factor * g.size + c * factor;
+        coarseNormals.set(normals.subarray(3 * k, 3 * k + 3), 3 * (r * coarse.size + c));
+      }
+    return { coarse, horizons, normals, coarseNormals };
+  });
+  surface.light = { grids: [...surface.grids], rings };
+  return surface.light;
+}
+
+/**
+ * The light in the shadows at a moment, node by node: sunlight scattered once off the terrain around (from the direct
+ * sunlight on it), and earthshine on the node's slope where the Earth is above its skyline. Both as a share of direct
+ * sunlight. The scattered light is worked out for level ground.
+ */
+function shadowLight(
+  surface: BuiltSurface,
+  sky: { sun: SkyBody; earth: SkyBody },
+  sunlit: Float32Array[],
+): { ambient: Float32Array[]; earthshine: number } {
+  const geometry = shadowLightGeometry(surface);
+  const { grids } = surface;
+  const [se, sn, su] = sky.sun.dir;
+  const [ee, en, eu] = sky.earth.dir;
+  // The normals are three.js's: x east, y up, z south.
+  const facing = (normals: Float32Array, k: number, e: number, n: number, u: number) =>
+    Math.max(0, normals[3 * k] * e + normals[3 * k + 1] * u - normals[3 * k + 2] * n);
+  const direct = grids.map((_, i) => {
+    const { normals } = geometry.rings[i];
+    const lit = sunlit[i];
+    const d = new Float32Array(lit.length);
+    for (let k = 0; k < lit.length; k++) d[k] = lit[k] * facing(normals, k, se, sn, su);
+    return d;
+  });
+  const directAt = (east: number, north: number): number => {
+    for (let i = 0; i < grids.length; i++) {
+      const g = grids[i];
+      if (Math.abs(east) > g.halfM || Math.abs(north) > g.halfM) continue;
+      const k = Math.round((g.halfM - north) / g.spacingM) * g.size + Math.round((east + g.halfM) / g.spacingM);
+      if (Number.isFinite(g.up[k])) return direct[i][k];
+    }
+    return Number.NaN;
+  };
+  // The Earth's phase angle seen from here: the Sun is so far off that Earth-to-Sun is the Sun's direction.
+  const phase = Math.acos(Math.max(-1, Math.min(1, -(se * ee + sn * en + su * eu))));
+  const earthshine = earthshineIrradiance(phase, sky.earth.distKm, EARTH_RADIUS_KM);
+  const ambient = grids.map((g, i) => {
+    const { coarse, horizons, normals, coarseNormals } = geometry.rings[i];
+    const bounce = resampleGrid(
+      bouncedIrradiance(coarse, horizons, directAt, MOON_BOND_ALBEDO, coarseNormals),
+      coarse,
+      g,
+    );
+    const earthSeen = resampleGrid(sweepDiscVisibility(grids, coarse, sky.earth.dir, sky.earth.radiusDeg), coarse, g);
+    const out = new Float32Array(g.size * g.size);
+    for (let k = 0; k < out.length; k++)
+      out[k] = bounce[k] + earthshine * earthSeen[k] * facing(normals, k, ee, en, eu);
+    return out;
+  });
+  return { ambient, earthshine };
+}
+
+/** One ring's mesh, ready to send to the main thread (fresh arrays, so they can be transferred). */
+function levelOfBuilt(built: BuiltSurface, i: number): SurfaceLevelData {
+  const grid = built.grids[i];
+  const ring = built.rings[i];
+  const finer = i > 0 ? built.rings[i - 1] : undefined;
+  return {
+    ...ring,
+    size: grid.size,
+    // Under a finer ring a coarse one sinks a little (5% of its cell, plus a metre), so the finer ground is the one seen.
+    positions: gridPositions(grid, finer ? 0.05 * ring.spacingM + 1 : 0, finer?.halfM),
+    normals: gridNormals(grid),
+    indices: gridTriangles(grid, finer?.halfM),
+    up: ring.index <= built.walkIndex + 1 ? grid.up.slice() : undefined,
+  };
+}
+
+const levelBuffers = (l: SurfaceLevelData) => [
+  l.positions.buffer,
+  l.normals.buffer,
+  l.indices.buffer,
+  ...(l.up ? [l.up.buffer] : []),
+];
+
+/** The meshes of a built surface, ready to send to the main thread. */
+function sceneOf(key: string, latDeg: number, lonDeg: number, built: BuiltSurface): SurfaceScene {
+  const levels = built.grids.map((_, i) => levelOfBuilt(built, i));
+  return {
+    key,
+    latDeg,
+    lonDeg,
+    groundHeightM: built.frame.groundHeightM,
+    levels,
+    walkIndex: built.walkIndex,
+    fineRegion: built.fineRegion,
+  };
+}
+
+/** What a resampled grid says about where its heights came from. */
+function ringInfoOf(
+  grid: LocalGrid,
+  ring: SurfaceRing,
+  read: { patch: HeightPatch; datasetId: string },
+  provisional: boolean,
+): RingInfo {
+  let missing = 0;
+  let filled = 0;
+  for (const f of grid.from ?? []) {
+    if (f === 255) missing++;
+    else if (f > 0) filled++;
+  }
+  return {
+    index: ring.index,
+    datasetId: read.datasetId,
+    sourcePixM: read.patch.pixM,
+    spacingM: ring.spacingM,
+    halfM: ring.halfM,
+    missingPct: (100 * missing) / grid.up.length,
+    filledPct: (100 * filled) / grid.up.length,
+    provisional,
+  };
+}
+
+const surfaces = new Map<string, BuiltSurface>();
+const surfaceRequests = new Map<number, AbortController>();
+const SURFACES_KEPT = 3;
+
+const surfaceKey = (r: Pick<SurfaceRequest, 'latDeg' | 'lonDeg' | 'quality' | 'fine5'>) =>
+  `${r.latDeg},${r.lonDeg},${r.quality}${r.fine5 ? ',5m' : ''}`;
+
+/**
+ * A rectangle of a terrain level around a local square, read by byte ranges: the square's outline is carried into the
+ * polar plane and its bounding box read, plus a margin. `cornerX`/`cornerY` are the first cell's centre, as
+ * `patchHeightM` reads them. `complete` is false where the level's edge cut the rectangle short; undefined where the
+ * level does not reach at all.
+ */
+async function windowFor(
+  level: TerrainLevel,
+  frame: LocalFrame,
+  halfM: number,
+  signal: AbortSignal,
+): Promise<{ patch: HeightPatch; complete: boolean } | undefined> {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  const steps = 16;
+  for (let i = 0; i <= steps; i++) {
+    const along = -halfM + (2 * halfM * i) / steps;
+    for (const [e, n] of [
+      [along, halfM],
+      [along, -halfM],
+      [halfM, along],
+      [-halfM, along],
+    ]) {
+      // The square's outline on the site's horizontal plane, carried straight down onto the sphere.
+      const x = frame.origin[0] + e * frame.e[0] + n * frame.n[0];
+      const y = frame.origin[1] + e * frame.e[1] + n * frame.n[1];
+      const z = frame.origin[2] + e * frame.e[2] + n * frame.n[2];
+      const len = Math.hypot(x, y, z);
+      const q = polarXY([x / len, y / len, z / len]);
+      minX = Math.min(minX, q.x);
+      maxX = Math.max(maxX, q.x);
+      minY = Math.min(minY, q.y);
+      maxY = Math.max(maxY, q.y);
+    }
+  }
+  // Heights shift where the ground meets the plane by up to about 1% of the reach; two cells more for the bilinear read.
+  const margin = 0.01 * halfM + 2 * level.pixM;
+  const wantC0 = Math.floor((minX - margin - level.cornerX) / level.pixM);
+  const wantC1 = Math.ceil((maxX + margin - level.cornerX) / level.pixM);
+  const wantR0 = Math.floor((level.cornerY - maxY - margin) / level.pixM);
+  const wantR1 = Math.ceil((level.cornerY - minY + margin) / level.pixM);
+  const c0 = Math.max(0, wantC0);
+  const c1 = Math.min(level.width, wantC1);
+  const r0w = Math.max(0, wantR0);
+  const r1w = Math.min(level.height, wantR1);
+  if (c1 - c0 < 2 || r1w - r0w < 2) return undefined;
+  const complete = c0 === wantC0 && c1 === wantC1 && r0w === wantR0 && r1w === wantR1;
+  const values = await level.image.readRasters({
+    window: [c0, r0w, c1, r1w],
+    samples: [0],
+    interleave: true,
+    signal,
+  });
+  const heightsM = values instanceof Float32Array ? values : Float32Array.from(values as ArrayLike<number>);
+  // The files mark missing cells NaN; anything else non-finite or absurd is treated the same.
+  for (let i = 0; i < heightsM.length; i++) if (!(Math.abs(heightsM[i]) < 20_000)) heightsM[i] = Number.NaN;
+  return {
+    patch: {
+      cornerX: level.cornerX + (c0 + 0.5) * level.pixM,
+      cornerY: level.cornerY - (r0w + 0.5) * level.pixM,
+      pixM: level.pixM,
+      width: c1 - c0,
+      height: r1w - r0w,
+      heightsM,
+    },
+    complete,
+  };
+}
+
+/** The coarsest level of a pyramid that is still at least as fine as `spacingM`. */
+function levelFor(levels: readonly TerrainLevel[], spacingM: number): TerrainLevel {
+  let best = levels[0];
+  for (const level of levels) if (level.pixM <= spacingM * 1.001 && level.pixM > best.pixM) best = level;
+  return best;
+}
+
+/** A patch's height at a polar point, NaN where it has none. */
+const patchSource = (patch: HeightPatch): HeightSource => heightsFromPatches([patch]);
+
+function throwIfCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+}
+
+const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
+
+/** One Artemis III region's 5 m elevation model inside its zip, as `scripts/a3clr-regions.mjs` read it. */
+interface FineRegion {
+  archive: string;
+  name: string;
+  method: number;
+  crc32: number;
+  compressedBytes: number;
+  bytes: number;
+  dataOffset: number;
+  width: number;
+  height: number;
+  pixM: number;
+  cornerX: number;
+  cornerY: number;
+}
+const FINE5 = { id: 'a3clr-sfs-5m' };
+
+/** The region whose 5 m model covers a polar point, if any. */
+function fineRegionAt(x: number, y: number): FineRegion | undefined {
+  return (fineRegions.regions as FineRegion[]).find(
+    (r) => x > r.cornerX && x < r.cornerX + r.width * r.pixM && y < r.cornerY && y > r.cornerY - r.height * r.pixM,
+  );
+}
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+/** The zip format's CRC-32 of some bytes. */
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** A byte range fetched as six side-by-side requests, `onBytes` told the running total. */
+async function fetchRange(
+  url: string,
+  offset: number,
+  length: number,
+  signal: AbortSignal,
+  onBytes: (bytes: number) => void,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const out = new Uint8Array(new ArrayBuffer(length));
+  const parts = 6;
+  const size = Math.ceil(length / parts);
+  let total = 0;
+  await Promise.all(
+    Array.from({ length: parts }, async (_, i) => {
+      const start = i * size;
+      const end = Math.min(length, start + size) - 1;
+      if (start > end) return;
+      const r = await fetch(url, { headers: { Range: `bytes=${offset + start}-${offset + end}` }, signal });
+      if (r.status !== 206 || !r.body) throw new Error(`${url}: HTTP ${r.status}`);
+      const reader = r.body.getReader();
+      let at = start;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        out.set(value, at);
+        at += value.length;
+        total += value.length;
+        onBytes(total);
+      }
+      if (at !== end + 1) throw new Error(`${url}: the range came back short`);
+    }),
+  );
+  return out;
+}
+
+/**
+ * A region's 5 m elevation model as a terrain level: its member of the zip fetched whole (the zip stores it deflated,
+ * so no window of it can be read alone), inflated, checked against the zip's own size and CRC-32, and opened.
+ */
+async function loadFineRegion(
+  region: FineRegion,
+  signal: AbortSignal,
+  onBytes: (bytes: number) => void,
+): Promise<TerrainLevel> {
+  const url = `${fineRegions.baseUrl}/${region.archive}`;
+  // A region downloaded on an earlier visit is kept whole (once it has passed its check), and read back from there.
+  const keptKey = `${url}#member:${region.dataOffset}:${region.compressedBytes}`;
+  const kept = await terrainStore.get(keptKey);
+  const fromKept = kept?.length === region.compressedBytes;
+  if (fromKept) onBytes(region.compressedBytes);
+  const packed: Uint8Array<ArrayBuffer> =
+    fromKept && kept
+      ? new Uint8Array(kept)
+      : await fetchRange(url, region.dataOffset, region.compressedBytes, signal, onBytes);
+  let bytes: Uint8Array;
+  if (region.method === 0) bytes = packed;
+  else if (region.method === 8) {
+    const stream = new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  } else throw new Error(`${region.archive}: compression method ${region.method} is not handled`);
+  throwIfCancelled(signal);
+  if (bytes.length !== region.bytes || crc32(bytes) !== region.crc32)
+    throw new Error(`${region.archive}: the 5 m terrain failed its check`);
+  if (!fromKept) void terrainStore.put(keptKey, packed);
+  const { fromArrayBuffer } = await import('geotiff');
+  const image = await (await fromArrayBuffer(bytes.buffer as ArrayBuffer)).getImage();
+  return levelOf(image, image);
+}
+
+/** A first scene to show, and the work that sharpens it afterwards. */
+interface SurfaceBuild {
+  outcome: SurfaceOutcome;
+  refine?: () => Promise<void>;
+}
+
+/**
+ * The surface view's terrain around a point, in two steps so it shows quickly even on a slow connection:
+ *
+ * 1. The walkable ground at the 10 m terrain's full detail (or the 30 m terrain's, outside 83°S), and two small coarse
+ *    reads of the 30 m terrain that stand in for every other ring. That is a few tiles, and the scene goes up.
+ * 2. Then every other ring is read at its own detail, all at once, each from the level of a file whose cells match its
+ *    own, and handed over through `onRing` as it is rebuilt.
+ *
+ * Everything is resampled at real scale onto the point's local frame. No height is invented: a hole in one read is
+ * filled from a coarser read of real terrain, and a hole in all of them is left out of the mesh.
+ */
+async function buildSurface(
+  request: SurfaceRequest,
+  urls: DataUrls,
+  onProgress: (p: SurfaceProgress) => void,
+  onRing: (update: RingUpdate) => void,
+  signal: AbortSignal,
+): Promise<SurfaceBuild> {
+  const { latDeg, lonDeg } = request;
+  const site = polarXY(siteFrame(latDeg, lonDeg).u);
+  const fineRegion = request.fine5 ? fineRegionAt(site.x, site.y) : undefined;
+  const rings = surfaceRings(request.quality, fineRegion ? fineRegion.pixM : WALK_SPACING_M);
+  // The ring you walk on is the one at the 10 m terrain's spacing; a 5 m ring, if any, lies inside it.
+  const walkIndex = fineRegion ? 1 : 0;
+  let walkRead = false;
+  let farRead = false;
+  let fineBytes: number | undefined = fineRegion ? 0 : undefined;
+  const report = (now: SurfaceProgress['now']) =>
+    onProgress({ now, walkRead, farRead, fineBytes, fineTotal: fineRegion?.compressedBytes });
+  report('opening');
+  if (!urls.horizonTerrain) throw new Error('no terrain is configured for the surface view');
+  const [coarseLevels, fineLevels] = await Promise.all([
+    loadPyramid(urls.horizonTerrain),
+    urls.fine ? loadPyramid(urls.fine).catch(() => undefined) : Promise.resolve(undefined),
+  ]);
+  throwIfCancelled(signal);
+  const inside = (l: TerrainLevel) =>
+    site.x > l.cornerX &&
+    site.x < l.cornerX + l.width * l.pixM &&
+    site.y < l.cornerY &&
+    site.y > l.cornerY - l.height * l.pixM;
+  if (!inside(coarseLevels[0]) && !(fineLevels && inside(fineLevels[0]))) return { outcome: { status: 'outside' } };
+
+  // A provisional frame for choosing windows; the ground height only shifts it by a fraction of a cell.
+  const guess = localFrame(latDeg, lonDeg, 0);
+  type Read = { patch: HeightPatch; datasetId: string };
+  /**
+   * A ring's own read, from the level whose cells match its own: the 10 m file where the ring lies inside it (the
+   * walkable ground and the next ring even where they only partly do, filled from the 30 m file), the 30 m file else.
+   */
+  const readRing = async (ring: SurfaceRing): Promise<Read | undefined> => {
+    if (fineLevels) {
+      const window = await windowFor(levelFor(fineLevels, ring.spacingM), guess, ring.halfM, signal);
+      if (window && (window.complete || ring.index <= 1) && Number.isFinite(patchHeightM(window.patch, site.x, site.y)))
+        return { patch: window.patch, datasetId: FINE.id };
+    }
+    const window = await windowFor(levelFor(coarseLevels, ring.spacingM), guess, ring.halfM, signal);
+    return window && { patch: window.patch, datasetId: TERRAIN.id };
+  };
+  /** A coarse read of the 30 m terrain over a square, one tile or so, to stand in for rings not yet read. */
+  const standIn = async (cells: number, halfM: number): Promise<Read | undefined> => {
+    const window = await windowFor(levelFor(coarseLevels, (2 * halfM) / cells), guess, halfM, signal);
+    return window && { patch: window.patch, datasetId: TERRAIN.id };
+  };
+
+  report('reading');
+  const outermost = rings[rings.length - 1];
+  const middle = rings[Math.min(3 + walkIndex, rings.length - 1)];
+  /** The 5 m model's window around the point, when asked for and the point lies in a region. */
+  const readFine = async (ring: SurfaceRing): Promise<Read | undefined> => {
+    if (!fineRegion) return undefined;
+    let shown = 0;
+    const level = await loadFineRegion(fineRegion, signal, (bytes) => {
+      fineBytes = bytes;
+      // A report every half megabyte is plenty.
+      if (bytes - shown >= 500_000 || bytes === fineRegion.compressedBytes) {
+        shown = bytes;
+        report('reading');
+      }
+    });
+    const window = await windowFor(level, guess, ring.halfM, signal);
+    return window && Number.isFinite(patchHeightM(window.patch, site.x, site.y))
+      ? { patch: window.patch, datasetId: FINE5.id }
+      : undefined;
+  };
+  // The rings out to the one you walk on, each at full detail (the innermost from the 5 m model if asked for), and
+  // two coarse stand-ins for everything beyond.
+  const [inner, mid, far] = await Promise.all([
+    Promise.all(
+      rings.slice(0, walkIndex + 1).map((ring) => (ring.index === 0 && fineRegion ? readFine(ring) : readRing(ring))),
+    ).then((r) => {
+      walkRead = true;
+      report('reading');
+      return r;
+    }),
+    standIn(STAND_IN_CELLS, middle.halfM),
+    standIn(STAND_IN_CELLS, outermost.halfM).then((r) => {
+      farRead = true;
+      report('reading');
+      return r;
+    }),
+  ]);
+  throwIfCancelled(signal);
+  report('building');
+  // The ground's height, and with it the frame, from the finest read that has the point itself.
+  const groundRead = inner.find((r) => r !== undefined);
+  const groundHeightM = groundRead ? patchHeightM(groundRead.patch, site.x, site.y) : Number.NaN;
+  if (!groundRead || !Number.isFinite(groundHeightM)) return { outcome: { status: 'nodata' } };
+  if (fineRegion && !inner[0]) throw new Error(`the 5 m terrain of ${fineRegion.name} has no heights at this point`);
+
+  const frame = localFrame(latDeg, lonDeg, groundHeightM);
+  const standIns = [mid, far].filter((r): r is Read => r !== undefined);
+  const innerReads = inner.filter((r): r is Read => r !== undefined);
+  const grids: LocalGrid[] = [];
+  const infos: RingInfo[] = [];
+  for (const ring of rings) {
+    // Rings out to the walkable one: their own reads, finest first, then the stand-ins; the rest: stand-ins only.
+    const reads = ring.index <= walkIndex ? [...innerReads.slice(ring.index), ...standIns] : standIns;
+    if (reads.length === 0) break;
+    const grid = resampleToLocal(
+      frame,
+      reads.map((r) => patchSource(r.patch)),
+      ring.spacingM,
+      ring.halfM,
+    );
+    grids.push(grid);
+    infos.push(ringInfoOf(grid, ring, reads[0], ring.index > walkIndex));
+    throwIfCancelled(signal);
+  }
+  const key = surfaceKey(request);
+  const built: BuiltSurface = {
+    frame,
+    grids,
+    rings: infos,
+    shadowMapM: SHADOW_MAP_M[request.quality],
+    complete: grids.length <= walkIndex + 1,
+    walkIndex,
+    fineRegion: fineRegion?.name,
+  };
+  const scene = sceneOf(key, latDeg, lonDeg, built);
+  throwIfCancelled(signal);
+  surfaces.delete(key);
+  surfaces.set(key, built);
+  for (const old of surfaces.keys()) {
+    if (surfaces.size <= SURFACES_KEPT) break;
+    surfaces.delete(old);
+  }
+
+  const refine = async () => {
+    const own = new Map<number, Read>();
+    const queue = rings.slice(walkIndex + 1, grids.length);
+    const sharpen = async (ring: SurfaceRing) => {
+      const read = await readRing(ring);
+      throwIfCancelled(signal);
+      if (!read) return;
+      own.set(ring.index, read);
+      // Its own read first; for a hole in it, any coarser ring's own read already in; then the stand-ins.
+      const coarser = [...own.entries()]
+        .filter(([i]) => i > ring.index)
+        .sort((a, b) => a[0] - b[0])
+        .map(([, r]) => r);
+      const reads = [read, ...coarser, ...standIns];
+      const grid = resampleToLocal(
+        frame,
+        reads.map((r) => patchSource(r.patch)),
+        ring.spacingM,
+        ring.halfM,
+      );
+      throwIfCancelled(signal);
+      built.grids[ring.index] = grid;
+      built.rings[ring.index] = ringInfoOf(grid, ring, read, false);
+      const level = levelOfBuilt(built, ring.index);
+      onRing(Comlink.transfer({ key, level }, levelBuffers(level)));
+    };
+    // A few at a time, nearest first, each worker taking the next ring as it finishes one.
+    await Promise.all(
+      Array.from({ length: Math.min(RINGS_AT_ONCE, queue.length) }, async () => {
+        for (let ring = queue.shift(); ring; ring = queue.shift()) await sharpen(ring);
+      }),
+    );
+    built.complete = true;
+    onRing({ key, done: true });
+  };
+  return { outcome: { status: 'ready', scene }, refine: built.complete ? undefined : refine };
+}
+
+/** The Sun and the Earth seen from a built surface at a moment, from the SPICE ephemeris table. */
+async function skyAt(
+  surface: BuiltSurface,
+  tUtcMs: number,
+  dataUrl: string,
+): Promise<{ t: number; clamped: boolean; sunKm: Vec3; earthKm: Vec3; sun: SkyBody; earth: SkyBody }> {
+  const table = await loadEphemeris(dataUrl);
+  const t = Math.min(table.endUtcMs, Math.max(table.startUtcMs, tUtcMs));
+  const originKm: Vec3 = [
+    surface.frame.origin[0] / 1000,
+    surface.frame.origin[1] / 1000,
+    surface.frame.origin[2] / 1000,
+  ];
+  const body = (km: Vec3, radiusKm: number): SkyBody => {
+    const d: Vec3 = [km[0] - originKm[0], km[1] - originKm[1], km[2] - originKm[2]];
+    const distKm = Math.hypot(d[0], d[1], d[2]);
+    return { dir: [...localDirection(surface.frame, d)], distKm, radiusDeg: angularRadiusDeg(radiusKm, distKm) };
+  };
+  const sunKm = table.positionKm('sun', t);
+  const earthKm = table.positionKm('earth', t);
+  return {
+    t,
+    clamped: t !== tUtcMs,
+    sunKm,
+    earthKm,
+    sun: body(sunKm, SUN_RADIUS_KM),
+    earth: body(earthKm, EARTH_RADIUS_KM),
+  };
+}
+
+/** What an eye 1.7 m above the ground at (east, north) sees of the Sun and the Earth, from the drawn terrain. */
+function eyeAt(
+  surface: BuiltSurface,
+  east: number,
+  north: number,
+  sky: { sunKm: Vec3; earthKm: Vec3; sun: SkyBody; earth: SkyBody },
+): EyeView | undefined {
+  const { grids, frame } = surface;
+  const sun = eyeSky(grids, east, north, EYE_HEIGHT_M, sky.sun.dir, sky.sun.radiusDeg, HORIZON_MIN_DIST_M);
+  const earth = eyeSky(grids, east, north, EYE_HEIGHT_M, sky.earth.dir, sky.earth.radiusDeg, HORIZON_MIN_DIST_M);
+  if (!sun || !earth) return undefined;
+  const groundUpM = levelsUpAt(grids, east, north);
+  const at = localToGeo(frame, east, north, groundUpM);
+  // Elevation and azimuth in the eye's own frame (2 km from the point, the local vertical turns by 0.07°).
+  const own = siteFrame(at.latDeg, at.lonDeg, at.heightM, EYE_HEIGHT_M);
+  const sunSeen = elevAz(sky.sunKm, own);
+  const earthSeen = elevAz(sky.earthKm, own);
+  return {
+    east,
+    north,
+    groundUpM,
+    eyeHeightM: EYE_HEIGHT_M,
+    latDeg: at.latDeg,
+    lonDeg: at.lonDeg,
+    sun: { elevDeg: sunSeen.elevDeg, azDeg: sunSeen.azDeg, horizonDeg: sun.horizonDeg, fraction: sun.fraction },
+    earth: {
+      elevDeg: earthSeen.elevDeg,
+      azDeg: earthSeen.azDeg,
+      horizonDeg: earth.horizonDeg,
+      fraction: earth.fraction,
+    },
+  };
+}
 
 /** The point `dx`, `dy` metres away in the polar plane (rounded as the app rounds a picked site). */
 function offset(latDeg: number, lonDeg: number, dxM: number, dyM: number): { latDeg: number; lonDeg: number } {
@@ -520,6 +1483,10 @@ const api = {
       fineDone = { value };
       return value;
     });
+    // The ice-bearing regions load alongside the rest; without them the ice line just has no "detected nearby".
+    const iceRun = urls.iceRegions
+      ? quiet(loadIceRegions(urls.iceRegions), (m) => console.warn(`ice regions: ${m}`))
+      : Promise.resolve(undefined);
     const ephemeris = await loadEphemeris(urls.data);
     let terrainError: string | undefined;
     // NASA's long-term maps where the pipeline has published them, the demo's otherwise (#19).
@@ -554,11 +1521,15 @@ const api = {
       at && loaded && Number.isFinite(at.sunPct) ? { id: loaded.id, resolutionM: loaded.maps.pixM, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     const slopePending = slopeDone === undefined;
-    return Comlink.transfer({ result, terrain, terrainError, longTerm, slope, slopePending, terrainPending }, [
-      tUtcMs.buffer,
-      sun.buffer,
-      earth.buffer,
-    ]);
+    const iceRegions = await iceRun;
+    const nearest = iceRegions && nearestPolarRegion(iceRegions, latDeg, lonDeg);
+    const iceDetected: IceDetected | undefined = nearest && {
+      id: ICE_REGIONS.id,
+      distanceKm: nearest.distanceKm,
+      inside: nearest.inside,
+    };
+    const reply = { result, terrain, terrainError, longTerm, slope, slopePending, terrainPending, iceDetected };
+    return Comlink.transfer(reply, [tUtcMs.buffer, sun.buffer, earth.buffer]);
   },
 
   /** Day by day across the whole ephemeris, how much of each day this spot has the Sun and the Earth. */
@@ -572,9 +1543,137 @@ const api = {
   },
 
   /** Rank spots inside a region; the timelines are left out to keep the reply small. */
-  /** Sites in a region that pass all four checks for this landing date, by the site report's own verdict. */
-  passing(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<PassingSearch> {
-    return passingSites(search, query, urls);
+  /**
+   * Sites in a region that pass all four checks for this landing date, by the site report's own verdict. `onSite`, if
+   * given, hears of each one the moment it is confirmed; the reply lists them all.
+   */
+  passing(
+    search: BestSearch,
+    query: Omit<StayQuery, 'site'>,
+    urls: DataUrls,
+    onSite?: (site: PassingSite) => void,
+  ): Promise<PassingSearch> {
+    return passingSites(search, query, urls, onSite);
+  },
+
+  /**
+   * Land Here: the terrain around a point for the surface view, reported stage by stage through `onProgress`. Starting
+   * a request stops any other still running, so a site picked after another never shows the first one's ground; the
+   * main thread checks the id as well. A point visited lately is drawn again from what was read, without the network.
+   */
+  async surface(
+    request: SurfaceRequest,
+    urls: DataUrls,
+    onProgress: (p: SurfaceProgress) => void,
+    onRing: (update: RingUpdate) => void,
+  ): Promise<SurfaceOutcome> {
+    for (const [id, other] of surfaceRequests) {
+      other.abort();
+      surfaceRequests.delete(id);
+    }
+    const controller = new AbortController();
+    surfaceRequests.set(request.id, controller);
+    const release = () => {
+      if (surfaceRequests.get(request.id) === controller) surfaceRequests.delete(request.id);
+    };
+    const send = (outcome: SurfaceOutcome): SurfaceOutcome =>
+      outcome.status === 'ready' ? Comlink.transfer(outcome, outcome.scene.levels.flatMap(levelBuffers)) : outcome;
+    try {
+      const key = surfaceKey(request);
+      const known = surfaces.get(key);
+      if (known?.complete) {
+        onProgress({ now: 'building', walkRead: true, farRead: true });
+        release();
+        return send({ status: 'ready', scene: sceneOf(key, request.latDeg, request.lonDeg, known) });
+      }
+      const { outcome, refine } = await buildSurface(request, urls, onProgress, onRing, controller.signal);
+      if (refine) {
+        // The scene goes back now; the rings keep sharpening until done, cancelled or replaced.
+        refine()
+          .catch((e: unknown) => {
+            if (!isAbort(e) && !controller.signal.aborted)
+              console.warn(`surface: ${e instanceof Error ? e.message : e}`);
+          })
+          .finally(release);
+      } else release();
+      return send(outcome);
+    } catch (e) {
+      release();
+      if (isAbort(e) || controller.signal.aborted) return { status: 'cancelled' };
+      throw e;
+    }
+  },
+
+  /** Stops a surface request (Cancel, or the view closing); it answers `cancelled`. */
+  surfaceCancel(id: number): void {
+    surfaceRequests.get(id)?.abort();
+    surfaceRequests.delete(id);
+  },
+
+  /**
+   * The Sun and the Earth over a built surface at a moment, the cast shadows on every ring, and what the eye at
+   * (east, north) sees of both. `quick` works the shadows out four times coarser, for a first answer while the clock
+   * is being dragged. Undefined if the surface is no longer kept.
+   */
+  async surfaceSky(
+    key: string,
+    tUtcMs: number,
+    dataUrl: string,
+    eye: { east: number; north: number } | null,
+    quick: boolean,
+  ): Promise<SurfaceSky | undefined> {
+    const surface = surfaces.get(key);
+    if (!surface) return undefined;
+    const sky = await skyAt(surface, tUtcMs, dataUrl);
+    const { grids } = surface;
+    const sun = (out: PointGrid) => sweepDiscVisibility(grids, out, sky.sun.dir, sky.sun.radiusDeg);
+    // Every ring node by node; the quick pass every other node, filled in between.
+    const sunlit = grids.map((g) => {
+      if (!quick) return sun(g);
+      const coarse: PointGrid = { size: (g.size - 1) / 2 + 1, spacingM: g.spacingM * 2, halfM: g.halfM };
+      return resampleGrid(sun(coarse), coarse, g);
+    });
+    // The walkable ground's own shadow map, finer than its mesh (four times coarser on the quick pass).
+    const walk = grids[surface.walkIndex];
+    const mapM = surface.shadowMapM * (quick ? 4 : 1);
+    const mapSize = Math.round((2 * walk.halfM) / mapM) + 1;
+    const map = sun({ size: mapSize, spacingM: mapM, halfM: walk.halfM });
+    const data = new Uint8Array(map.length);
+    for (let i = 0; i < map.length; i++) data[i] = Math.round(map[i] * 255);
+    const { ambient, earthshine } = shadowLight(surface, sky, sunlit);
+    const result: SurfaceSky = {
+      tUtcMs: sky.t,
+      clamped: sky.clamped,
+      sun: sky.sun,
+      earth: sky.earth,
+      sunlit,
+      ambient,
+      earthshine,
+      shadowMap: { data, size: mapSize, spacingM: mapM, halfM: walk.halfM },
+      shadowM: mapM,
+      eye: eye ? eyeAt(surface, eye.east, eye.north, sky) : undefined,
+    };
+    return Comlink.transfer(result, [...sunlit.map((s) => s.buffer), ...ambient.map((a) => a.buffer), data.buffer]);
+  },
+
+  /** Only what the eye at (east, north) sees of the Sun and the Earth: cheap, for after each walk. */
+  async surfaceEye(
+    key: string,
+    tUtcMs: number,
+    dataUrl: string,
+    east: number,
+    north: number,
+  ): Promise<SurfaceSky | undefined> {
+    const surface = surfaces.get(key);
+    if (!surface) return undefined;
+    const sky = await skyAt(surface, tUtcMs, dataUrl);
+    return {
+      tUtcMs: sky.t,
+      clamped: sky.clamped,
+      sun: sky.sun,
+      earth: sky.earth,
+      eye: eyeAt(surface, east, north, sky),
+    };
   },
 
   async best(search: BestSearch, query: Omit<StayQuery, 'site'>, urls: DataUrls): Promise<BestSpot[]> {
@@ -615,15 +1714,20 @@ async function passingSites(
   search: BestSearch,
   query: Omit<StayQuery, 'site'>,
   urls: DataUrls,
+  onSite?: (site: PassingSite) => void,
 ): Promise<PassingSearch> {
   const ephemeris = await loadEphemeris(urls.data);
   const dem = await loadDrawnDem(urls.terrain);
   const grid = search.grid ?? 9;
   // The screen walks each skyline 120 km, not 300: quicker, and only ever more hopeful (see BestSearch.reachM).
-  const screen = bestSpots({ ...search, grid, top: grid * grid, reachM: SCREEN_REACH_M }, query, dem, ephemeris, {
-    sources: [...EPHEMERIS_SOURCES, DRAWN.id],
-    stepMinutes: 60,
-  });
+  const screen = bestSpots(
+    { ...search, grid, top: grid * grid, reachM: SCREEN_REACH_M },
+    query,
+    dem,
+    ephemeris,
+    { sources: [...EPHEMERIS_SOURCES, DRAWN.id], stepMinutes: 60 },
+    skylineCache(DRAWN.id, query.observerHeightM, SCREEN_REACH_M),
+  );
   // Candidates: points inside the zone with the Sun and the Earth up for the whole stay on the coarse terrain, best
   // first. The coarse terrain is the optimistic one (it misses the rises near a site that shade it), so a point it
   // fails would not pass at 30 m either; a region with none answers at once.
@@ -634,8 +1738,8 @@ async function passingSites(
 
   const check = async (latDeg: number, lonDeg: number) => {
     const site = { id: `moon:${latDeg},${lonDeg}`, body: 'moon' as const, latDeg, lonDeg };
-    const r = await api.stay({ ...query, site } as StayQuery, urls, PASSING_PATIENCE_MS);
-    return { r, checks: checksOf(r.result), passes: verdictOf(checksOf(r.result)) === 'pass' };
+    const result = await searchStay({ ...query, site } as StayQuery, urls, PASSING_PATIENCE_MS);
+    return { result, checks: checksOf(result), passes: verdictOf(checksOf(result)) === 'pass' };
   };
   const found: PassingSite[] = [];
   const top = search.top ?? 3;
@@ -668,7 +1772,7 @@ async function passingSites(
       }
     }
     if (!verdict.passes) return undefined;
-    const { result } = verdict.r;
+    const { result } = verdict;
     return {
       ...at,
       sunFractionMin: result.sunFractionMin,
@@ -677,7 +1781,14 @@ async function passingSites(
     };
   };
   for (let i = 0; i < candidates.length && found.length < top; i += CHECKS_AT_ONCE) {
-    const batch = await Promise.all(candidates.slice(i, i + CHECKS_AT_ONCE).map(confirm));
+    const batch = await Promise.all(
+      candidates.slice(i, i + CHECKS_AT_ONCE).map((c) =>
+        confirm(c).then((site) => {
+          if (site) void onSite?.(site);
+          return site;
+        }),
+      ),
+    );
     for (const site of batch) if (site) found.push(site);
   }
   found.sort(
@@ -688,4 +1799,11 @@ async function passingSites(
 }
 
 export type PhysicsApi = typeof api;
+
+/**
+ * The terrain files' byte ranges, kept in the browser between visits (terrainCache.ts): every GeoTIFF read in this
+ * worker goes through it, and so does the 5 m terrain, kept whole. The cache's name changes if what is kept ever does.
+ */
+const terrainStore = cacheStorageStore('siteline-terrain-v1');
+self.fetch = cachingFetch(self.fetch.bind(self), terrainStore, (url) => /\.tiff?($|\?)/i.test(url));
 Comlink.expose(api);

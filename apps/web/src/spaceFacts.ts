@@ -1,10 +1,9 @@
 import type { SolarBodyKey, Vec3 } from '@siteline/physics';
 import {
   BODY_CONSTANTS,
+  bodyEscapeSpeedKmS,
   distancesOf,
-  escapeSpeedKmS,
-  FACT_BODIES,
-  type FactBody,
+  FACT_BODY_OF,
   kelvinToCelsius,
   lightTimeS,
   surfaceGravityMS2,
@@ -13,8 +12,8 @@ import { DAY_S, MOON_COAST_DAYS, marsReference, SUN_GM_KM3_S2 } from './journey'
 
 /**
  * General questions about the solar system, answered from SiteLine's own data: where every planet and the Moon are on
- * the date shown (DE440 positions), how long a signal takes, how long the cheapest trip would take, and, for the Moon,
- * Earth and Mars, NASA's fact sheet numbers. Nothing here is typed in by hand.
+ * the date shown (DE440 positions), how long a signal takes, how long the cheapest trip would take, and NASA's fact
+ * sheet numbers for the Moon and every planet, worked out as the facts card works them out. Nothing here is typed in by hand.
  */
 
 export const SPACE_BODIES = [
@@ -32,8 +31,6 @@ export const SPACE_BODIES = [
 export type SpaceBody = (typeof SPACE_BODIES)[number];
 export const isSpaceBody = (v: unknown): v is SpaceBody =>
   typeof v === 'string' && (SPACE_BODIES as readonly string[]).includes(v);
-
-const FACT_NAME: Partial<Record<SpaceBody, FactBody>> = { moon: 'Moon', earth: 'Earth', mars: 'Mars' };
 
 /**
  * Time of flight of the ideal (Hohmann) transfer between circular orbits of radii r1 and r2 around the Sun: half the
@@ -69,11 +66,17 @@ export interface SpaceFacts {
     | null;
   physical: {
     radiusKm: number;
-    surfaceGravityMS2: number;
+    /** False for the giant planets: their gravity and temperature are given at a pressure level, not on a surface. */
+    solidSurface: boolean;
+    /** At the surface, or for a giant at the volumetric mean radius, as the facts card shows it. */
+    gravityMS2: number;
     escapeSpeedKmS: number;
     solarDayHours: number;
+    axialTiltDeg: number;
     meanTemperatureC: number | null;
     temperatureRangeC: [number, number] | null;
+    /** For a giant: the temperature at the pressure level NASA gives it at. */
+    temperatureAtLevel: { celsius: number; bar: number } | null;
     surfacePressureMbar: number | null;
   } | null;
   sources: string[];
@@ -110,15 +113,21 @@ export function spaceFacts(
     sources.push('spice-gm-de440');
   }
 
-  const factName = FACT_NAME[body];
   let physical: SpaceFacts['physical'] = null;
-  if (factName && (FACT_BODIES as readonly string[]).includes(factName)) {
-    const c = BODY_CONSTANTS[factName];
+  if (body !== 'sun') {
+    const c = BODY_CONSTANTS[FACT_BODY_OF[body]];
+    const escapeKmS = bodyEscapeSpeedKmS(c);
+    const t = c.temperatureK;
     physical = {
       radiusKm: c.radiusKm,
-      surfaceGravityMS2: Math.round(surfaceGravityMS2(c.gmKm3PerS2, c.radiusKm) * 100) / 100,
-      escapeSpeedKmS: Math.round(escapeSpeedKmS(c.gmKm3PerS2, c.radiusKm) * 100) / 100,
+      solidSurface: c.surface !== 'none',
+      gravityMS2: Math.round(surfaceGravityMS2(c.gmKm3PerS2, c.radiusKm) * 100) / 100,
+      // Three significant figures, as NASA prints them and the facts card shows them.
+      escapeSpeedKmS: escapeKmS >= 10 ? one(escapeKmS) : Math.round(escapeKmS * 100) / 100,
       solarDayHours: one(c.solarDayH),
+      axialTiltDeg: one(c.obliquityDeg),
+      temperatureAtLevel:
+        t.atLevelK === undefined ? null : { celsius: Math.round(kelvinToCelsius(t.atLevelK)), bar: c.levelBar ?? 1 },
       meanTemperatureC: c.temperatureK.meanK === undefined ? null : Math.round(kelvinToCelsius(c.temperatureK.meanK)),
       temperatureRangeC: c.temperatureK.rangeK
         ? [Math.round(kelvinToCelsius(c.temperatureK.rangeK[0])), Math.round(kelvinToCelsius(c.temperatureK.rangeK[1]))]

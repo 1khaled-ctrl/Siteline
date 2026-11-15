@@ -2,7 +2,6 @@
 
 **What's built (14 Nov 2026):** the relay runs on a free model, not Claude, to keep the project at no cost. `src/relay.ts` (tested in `relay.test.ts`) is served by the Pages Function `functions/api/copilot.ts` and calls `@cf/qwen/qwen3-30b-a3b-fp8` through the Pages project's Workers AI binding `AI`: no API key, and on Cloudflare's free plan, usage past the 10,000-neuron daily allocation fails rather than being billed. The browser half is `apps/web/src/copilotAi.ts`; it falls back to the keyword matcher whenever the relay isn't reachable. Locally: `npx wrangler login` once, then `corepack pnpm copilot` beside `corepack pnpm dev`. The notes below were written for Claude and still hold for the request rules, tools-in-the-browser design and number check.
 
-
 Owner: Copilot and quality. This is feature 25. Build it last, in stages, and only after the other 29 must-haves have shipped.
 
 - The Worker only relays messages. Tools run in the browser with the same functions the UI uses, so the copilot can never show a number the screen doesn't.

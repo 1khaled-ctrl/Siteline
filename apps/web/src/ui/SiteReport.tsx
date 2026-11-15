@@ -1,18 +1,29 @@
 import type { Reason, StayQuery, StayResult } from '@siteline/contracts';
-import { Fragment, useEffect } from 'react';
+import { Fragment, type ReactNode, useEffect } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { confidenceOf, type Reading } from '../confidence';
 import { formatNumber, formatUtc } from '../format';
+import { touchdownFromQuery } from '../land';
 import { DAY_MS, useStay } from '../physics';
 import { sound } from '../sound';
 import { MAX_PINS, samePin, useApp } from '../store';
-import { type Check, checksOf, verdictOf } from '../verdict';
+import {
+  type Check,
+  COLD_TRAP,
+  checksOf,
+  ICE_OUTLINE,
+  ICE_SOURCES,
+  iceDetectedLineOf,
+  iceLineOf,
+  verdictOf,
+} from '../verdict';
 import { StatTile } from './BodyFacts';
 import { Checks } from './Checks';
 import { ConfidenceBadge, ConfidenceKey } from './ConfidenceBadge';
 import { panel, smallButton } from './Controls';
 import { DayStripPanel } from './DayStrip';
 import { JourneyButton } from './Journey';
+import { LandHereButton } from './LandHere';
 import { RobotFit } from './RobotFit';
 import { ShareReport } from './ShareReport';
 import { Timeline } from './Timeline';
@@ -24,6 +35,15 @@ const VERDICT_BOX = {
   fail: 'border-fail/60 bg-fail/7',
   undecided: 'border-warn/60 bg-warn/8',
 } as const;
+/** A link to a page outside SiteLine, with its words from the translation it sits in. */
+function SourceLink({ href, children }: { href: string; children?: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="underline decoration-dotted hover:text-ink">
+      {children}
+    </a>
+  );
+}
+
 const CHIP: Record<Check, string> = {
   yes: 'border-pass/55 bg-pass/10 text-pass',
   no: 'border-fail/55 bg-fail/10 text-fail',
@@ -91,7 +111,8 @@ function useVerdictSound(query: StayQuery | undefined, result: StayResult | unde
 
 export function SiteReport() {
   const { t } = useTranslation();
-  const { query, result, terrain, terrainError, longTerm, slope, slopePending, error, loading, retry } = useStay();
+  const { query, result, terrain, terrainError, longTerm, slope, slopePending, iceDetected, error, loading, retry } =
+    useStay();
   useVerdictSound(query, result, slopePending);
   const pins = useApp((s) => s.pins);
   const pinned = query ? pins.some((p) => samePin(p, query.site)) : false;
@@ -107,6 +128,8 @@ export function SiteReport() {
 
   const c = checksOf(result);
   const verdict = verdictOf(c);
+  const ice = iceLineOf(result);
+  const detected = iceDetectedLineOf(iceDetected, ice);
   const verdictStyle = STYLE[verdict === 'pass' ? 'yes' : verdict === 'fail' ? 'no' : 'unknown'];
   const events = [
     ['sunset', result.nextSunsetUtc],
@@ -183,6 +206,80 @@ export function SiteReport() {
             </li>
           ))}
         </ul>
+        {(ice || detected) && (
+          // The fifth line: information beside the four checks, never one of them, so it has no tick or cross.
+          <div className="mt-2 border-t border-line/70 pt-2 text-[12.5px]" data-testid="ice-line">
+            {ice && (
+              <p>
+                <span aria-hidden="true">◇ </span>
+                {t('report.ice')}:{' '}
+                <strong className="font-semibold">
+                  {ice.atSite ? t('report.iceAtSite') : t('report.iceKm', { km: formatNumber(ice.distanceKm, 1) })}
+                </strong>{' '}
+                <span
+                  className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
+                  data-testid="ice-level"
+                >
+                  {t('report.iceLevel', { level: t(`report.iceLevels.${ice.level}`) })}
+                </span>{' '}
+                <ConfidenceBadge level={confidenceOf('longTerm', sure)} terrainM={sure.terrainM} />
+              </p>
+            )}
+            {detected && (
+              <>
+                <p className={ice ? 'mt-1' : undefined} data-testid="ice-detected">
+                  <span aria-hidden="true">◇ </span>
+                  {t('report.iceDetected')}:{' '}
+                  <strong className="font-semibold">
+                    <Trans
+                      i18nKey={detected.withinOutline ? 'report.iceDetectedWithin' : 'report.iceDetectedKm'}
+                      values={{ km: formatNumber(detected.distanceKm, 1) }}
+                      components={{ link: <SourceLink href={ICE_SOURCES.detectedNearby} /> }}
+                    />
+                  </strong>{' '}
+                  <span
+                    className="rounded-pill border border-line px-1.5 py-px text-[11px] text-quiet whitespace-nowrap"
+                    data-testid="ice-detected-level"
+                  >
+                    {t('report.iceLevel', { level: t(`report.iceLevels.${detected.level}`) })}
+                  </span>
+                </p>
+                <p className="mt-1 text-quiet">
+                  <Trans
+                    i18nKey="report.iceDetectedNote"
+                    values={{ m: formatNumber(ICE_OUTLINE.beyondShadowM, 0) }}
+                    components={{ m3: <SourceLink href={ICE_SOURCES.m3} /> }}
+                  />
+                </p>
+              </>
+            )}
+            <p className="mt-1 text-quiet">
+              <Trans
+                i18nKey="report.iceEvidence"
+                components={{
+                  b: <strong className="font-semibold text-ink" />,
+                  fisher: <SourceLink href={ICE_SOURCES.consistent} />,
+                  lemelin: <SourceLink href={ICE_SOURCES.detectedNearby} />,
+                  lcross: <SourceLink href={ICE_SOURCES.lcross} />,
+                  m3: <SourceLink href={ICE_SOURCES.m3} />,
+                }}
+              />
+            </p>
+            <p className="mt-1 text-quiet">
+              <Trans
+                i18nKey="report.iceColdTrap"
+                values={{
+                  c: formatNumber(COLD_TRAP.belowC, 0).replace('-', '−'),
+                  f: formatNumber(COLD_TRAP.belowF, 0).replace('-', '−'),
+                }}
+                components={{ nasa: <SourceLink href={COLD_TRAP.source} /> }}
+              />
+            </p>
+            <p className="mt-1 text-quiet">
+              <Trans i18nKey="report.iceUses" components={{ link: <SourceLink href={ICE_SOURCES.uses} /> }} />
+            </p>
+          </div>
+        )}
       </div>
 
       <dl className="grid grid-cols-2 gap-2">
@@ -243,7 +340,15 @@ export function SiteReport() {
         toMs={Date.parse(query.landingUtc) + query.stayDays * DAY_MS}
       />
 
-      <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
+      <div className="flex flex-col gap-2">
+        <JourneyButton target={{ body: 'Moon', latDeg: query.site.latDeg, lonDeg: query.site.lonDeg }} />
+        <LandHereButton
+          latDeg={query.site.latDeg}
+          lonDeg={query.site.lonDeg}
+          touchdownUtcMs={touchdownFromQuery(query)}
+          source={{ kind: 'report' }}
+        />
+      </div>
 
       {result.reasons.length > 0 && (
         <ul className="list-disc space-y-1 ps-5 text-sm">
@@ -273,18 +378,20 @@ export function SiteReport() {
       <p className="text-xs text-quiet">
         {t('report.sources')}:{' '}
         {/* Each dataset once: the long-term maps can be among the check's own sources (the cold trap) too. */}
-        {[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : [])])].map((id, i) => (
-          <Fragment key={id}>
-            {i > 0 && ', '}
-            <button
-              type="button"
-              className="underline decoration-dotted underline-offset-2 hover:text-ink"
-              onClick={() => useApp.getState().setSources(id)}
-            >
-              {id}
-            </button>
-          </Fragment>
-        ))}
+        {[...new Set([...result.sources, ...(longTerm ? [longTerm.id] : []), ...(detected ? [detected.id] : [])])].map(
+          (id, i) => (
+            <Fragment key={id}>
+              {i > 0 && ', '}
+              <button
+                type="button"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                onClick={() => useApp.getState().setSources(id)}
+              >
+                {id}
+              </button>
+            </Fragment>
+          ),
+        )}
       </p>
     </section>
   );

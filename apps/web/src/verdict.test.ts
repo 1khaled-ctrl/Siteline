@@ -1,6 +1,21 @@
 import type { Reason, StayResult } from '@siteline/contracts';
 import { describe, expect, it } from 'vitest';
-import { bestOf, cardFileName, checksOf, firstProblem, rankSites, shareLink, verdictOf } from './verdict';
+import en from './i18n/en.json';
+import {
+  bestOf,
+  COLD_TRAP,
+  cardFileName,
+  checksOf,
+  firstProblem,
+  ICE_LEVELS,
+  ICE_OUTLINE,
+  ICE_SOURCES,
+  iceDetectedLineOf,
+  iceLineOf,
+  rankSites,
+  shareLink,
+  verdictOf,
+} from './verdict';
 
 function result(reasons: Reason[], slope100mDeg = Number.NaN): StayResult {
   return {
@@ -148,5 +163,125 @@ describe('shareLink', () => {
     const none = new URL(shareLink('https://siteline.example/', { ...base, robot: null, landingRadiusM: 50 }));
     expect(none.searchParams.has('robot')).toBe(false);
     expect(none.searchParams.has('ring')).toBe(false);
+  });
+});
+
+describe('iceLineOf', () => {
+  const stay = (iceDistanceKm?: number) => ({ reasons: [], slope100mDeg: 1, iceDistanceKm }) as unknown as StayResult;
+
+  it('gives the distance to the nearest permanent shadow, and says when the site itself is in one', () => {
+    expect(iceLineOf(stay(2.4))).toEqual({ distanceKm: 2.4, atSite: false, level: 'canLast' });
+    expect(iceLineOf(stay(0))).toEqual({ distanceKm: 0, atSite: true, level: 'canLast' });
+  });
+
+  it('gives nothing where the maps carry no distance, rather than a made-up one', () => {
+    expect(iceLineOf(stay(undefined))).toBeUndefined();
+    expect(iceLineOf(stay(Number.NaN))).toBeUndefined();
+    expect(iceLineOf(stay(-1))).toBeUndefined();
+  });
+
+  it('never changes the verdict: it is not one of the checks', () => {
+    const near = stay(0.1);
+    const far = stay(40);
+    expect(verdictOf(checksOf(near))).toBe(verdictOf(checksOf(far)));
+    expect(Object.keys(checksOf(near))).not.toContain('ice');
+  });
+});
+
+describe('iceDetectedLineOf', () => {
+  /** The permanent-shadow reading at a south polar site, which the detected-nearby reading shows beside. */
+  const shadow = iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: 1.5 } as unknown as StayResult);
+
+  it('gives the distance to the nearest ice-bearing region, and says when the site is within its outline', () => {
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 3.2, inside: false }, shadow)).toEqual({
+      distanceKm: 3.2,
+      withinOutline: false,
+      level: 'detectedNearby',
+      id: 'lemelin-2021-ice-psrs',
+    });
+    expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: 0, inside: true }, shadow)?.withinOutline).toBe(
+      true,
+    );
+  });
+
+  it('shows only beside the permanent-shadow reading, so never at a northern site such as Apollo 11', () => {
+    // Apollo 11, 0.67° N 23.47° E: NASA's south polar maps do not reach it, so there is no permanent-shadow reading,
+    // and the nearest region in Lemelin et al. 2021's south polar file is 2,345 km away (iceRegions.data.test.ts).
+    // That is not the nearest ice (M3 also found surface ice near the north pole, Li et al. 2018): nothing is shown.
+    const apollo11 = { reasons: [], slope100mDeg: 1, iceDistanceKm: undefined } as unknown as StayResult;
+    const southward = { id: 'lemelin-2021-ice-psrs', distanceKm: 2345.4, inside: false };
+    expect(iceLineOf(apollo11)).toBeUndefined();
+    expect(iceDetectedLineOf(southward, iceLineOf(apollo11))).toBeUndefined();
+    expect(iceDetectedLineOf(southward, shadow)?.distanceKm).toBe(2345.4);
+  });
+
+  it('gives nothing without a region, rather than a made-up distance', () => {
+    expect(iceDetectedLineOf(undefined, shadow)).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: Number.NaN, inside: false }, shadow)).toBeUndefined();
+    expect(iceDetectedLineOf({ id: 'x', distanceKm: -1, inside: false }, shadow)).toBeUndefined();
+  });
+});
+
+describe('ice evidence wording', () => {
+  it('names four levels, weakest first, and each reading only ever shows its own', () => {
+    expect(ICE_LEVELS).toEqual(['canLast', 'consistent', 'detectedNearby', 'detected']);
+    for (const km of [0, 0.4, 12, 80]) {
+      expect(iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult)?.level).toBe(
+        'canLast',
+      );
+      const shadow = iceLineOf({ reasons: [], slope100mDeg: 1, iceDistanceKm: km } as unknown as StayResult);
+      expect(iceDetectedLineOf({ id: 'lemelin-2021-ice-psrs', distanceKm: km, inside: km === 0 }, shadow)?.level).toBe(
+        'detectedNearby',
+      );
+    }
+    // Every level has its words, and the note names the three kinds of evidence.
+    for (const level of ICE_LEVELS) expect(en.report.iceLevels[level]).toBeTruthy();
+    expect(en.report.iceEvidence).toMatch(/four levels.*can last.*consistent with ice.*detected nearby.*detected/s);
+  });
+
+  it('says what the detected-nearby distance is measured to, with its caveats, and takes its 280 m from the data', () => {
+    expect(en.report.iceDetectedKm).toBe(
+      '{{km}} km to a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)',
+    );
+    expect(en.report.iceDetectedNote).toContain(
+      'Distance to the outline of a shadowed region, which extends {{m}} m beyond the shadow itself',
+    );
+    expect(en.report.iceDetectedNote).toContain('patchy and low in abundance');
+    expect(en.report.iceDetectedNote).toContain('not a guarantee of ice at this site');
+    // The figure is the paper's one M3 pixel, filled in from ICE_OUTLINE, never typed into the words.
+    expect(ICE_OUTLINE).toEqual({ beyondShadowM: 280, source: ICE_SOURCES.detectedNearby });
+    expect(en.report.iceDetectedNote).not.toContain('280');
+    expect(en.sources.methods.ice).not.toContain('280');
+  });
+
+  it("shows NASA's two figures for a cold trap as NASA prints them, which agree to within its rounding", () => {
+    expect(COLD_TRAP).toMatchObject({ belowF: -260, belowC: -163 });
+    // −260 °F is −162.2 °C: NASA rounds both, so they agree to about a degree, and neither is worked out here.
+    expect(Math.abs(((COLD_TRAP.belowF - 32) * 5) / 9 - COLD_TRAP.belowC)).toBeLessThan(1);
+    expect(COLD_TRAP.source).toBe(ICE_SOURCES.coldTraps);
+  });
+
+  it('links every source by https, and names no URL twice', () => {
+    const urls = Object.values(ICE_SOURCES);
+    for (const url of urls) expect(url).toMatch(/^https:\/\//);
+    expect(new Set(urls).size).toBe(urls.length);
+  });
+
+  it('never says ice is at a place, that it was found at the Artemis sites, or that it lies in large fields', () => {
+    const strings: string[] = [];
+    const walk = (v: unknown) => {
+      if (typeof v === 'string') strings.push(v);
+      else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
+    };
+    walk(en);
+    const overstated =
+      /\bice is here\b|found ice|ice (was|has been) found at the artemis|ice fields?\b|large (ice|deposits)/i;
+    // The pattern itself catches what it guards against, so an empty list means something.
+    for (const bad of ['Ice is here.', 'NASA found ice at the Artemis sites.', 'Large ice fields at the pole.']) {
+      expect(overstated.test(bad), bad).toBe(true);
+    }
+    expect(overstated.test('Ice can last there, not that ice is there.')).toBe(false);
+    expect(strings.length).toBeGreaterThan(100);
+    expect(strings.filter((x) => overstated.test(x))).toEqual([]);
   });
 });
