@@ -406,9 +406,19 @@
     "landersNone": "No landings in our <list>mission list</list>",
     "close": "Close the facts card"
   },
+  "pinned": {
+    "heading_one": "{{count}} pinned spot",
+    "heading_other": "{{count}} pinned spots",
+    "go": "Go to {{site}}",
+    "unnamed": "Pinned spot {{n}}",
+    "here": "Shown now",
+    "compare": "Compare {{count}}",
+    "hideCompare": "Hide comparison",
+    "oneMore": "Pin another spot to compare them side by side.",
+    "hint": "Tap a spot to go back to it. Its verdict is for the date and slip above.",
+    "full": "That is the most you can pin ({{max}}): unpin one to add another."
+  },
   "compare": {
-    "heading_one": "{{count}} pinned site",
-    "heading_other": "{{count}} pinned sites",
     "site": "Site",
     "verdict": "Stay",
     "undecided": "Undecided",
