@@ -7,6 +7,18 @@ import { FACT_BODIES, type FactBody } from '../bodyFacts';
 import { landersOn, MISSIONS } from '../landers';
 import { BodyFacts } from './BodyFacts';
 
+describe('the facts card, as the panel first shows it', () => {
+  it('starts folded: only its heading and the arrow that opens it', () => {
+    const html = renderToStaticMarkup(createElement(BodyFacts, { body: 'Moon' }));
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).not.toContain('id="body-facts-body"');
+    // A planet's card, opened by a click (it has a close button), starts open.
+    expect(renderToStaticMarkup(createElement(BodyFacts, { body: 'Moon', onClose: () => undefined }))).toContain(
+      'id="body-facts-body"',
+    );
+  });
+});
+
 /** A made-up sky: each planet on one line from the Sun at a round distance, the Earth at 1 AU. */
 const AU: Record<SolarBodyKey, number> = {
   mercury: 0.4,
@@ -30,7 +42,8 @@ vi.mock('./Controls', () => ({ panel: '' }));
 // The app's store reads the page's address; the card only asks it to open the sources dialog.
 vi.mock('../store', () => ({ useApp: { getState: () => ({ setSources: () => undefined }) } }));
 
-const card = (body: FactBody) => renderToStaticMarkup(createElement(BodyFacts, { body }));
+// Opened from a click (it has a close button), the card starts open, as these tests need to read it.
+const card = (body: FactBody) => renderToStaticMarkup(createElement(BodyFacts, { body, onClose: () => undefined }));
 /** The card's words, without the markup. */
 const words = (body: FactBody) =>
   card(body)
