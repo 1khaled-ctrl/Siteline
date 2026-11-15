@@ -3,7 +3,7 @@ import { animate, motion, useMotionValue, useTransform } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatNumber, formatUtcShort } from '../format';
-import { DAY_MS, useStayMany } from '../physics';
+import { DAY_MS } from '../physics';
 import type { StayResponse } from '../physics.worker';
 import { useWide } from '../stage';
 import { type Pin, useApp } from '../store';
@@ -33,15 +33,14 @@ interface Line {
 }
 
 /**
- * Every pinned site re-checked for the current landing date and slip, side by side: one column a site, one row a
+ * Every pinned site re-checked for the current landing date and slip (`rows`, in the pins' order), side by side: one column a site, one row a
  * reading, the best value in each row starred, and the best site named by a rule stated under the table.
  */
-export function Compare() {
+export function Compare({ rows, names }: { rows: (StayResponse | undefined)[]; names: (string | undefined)[] }) {
   const { t } = useTranslation();
   const wide = useWide();
   const pins = useApp((s) => s.pins);
   const landingMs = useApp((s) => Date.parse(s.landingUtc) + s.slipDays * DAY_MS);
-  const rows = useStayMany(pins);
   if (pins.length === 0) return null;
 
   const judged: (Judged | undefined)[] = pins.map((_, i) => {
@@ -129,8 +128,7 @@ export function Compare() {
   );
 
   return (
-    <section className={panel} data-testid="compare">
-      <h2 className="mb-1 text-lg">{t('compare.heading', { count: pins.length })}</h2>
+    <section className={panel} data-testid="compare" aria-label={t('compare.caption')}>
       <p className="mb-2 text-xs text-quiet">{wide ? t('compare.intro') : t('compare.introDeck')}</p>
       {wide ? (
         <table className="w-full table-fixed border-collapse text-[13px]">
@@ -154,6 +152,11 @@ export function Compare() {
                     dir="ltr"
                     onClick={() => useApp.getState().focusSite(p.latDeg, p.lonDeg)}
                   >
+                    {names[i] && (
+                      <span className="mb-0.5 block truncate font-sans text-[12px] text-ink" dir="auto">
+                        {names[i]}
+                      </span>
+                    )}
                     <SiteName pin={p} />
                   </button>
                   <button
@@ -196,11 +199,11 @@ export function Compare() {
           </tbody>
         </table>
       ) : (
-        <Deck pins={pins} judged={judged} order={order} winner={winner} lines={lines} bests={bests} />
+        <Deck pins={pins} names={names} judged={judged} order={order} winner={winner} lines={lines} bests={bests} />
       )}
       {winner !== undefined && (
         <p className="mt-3 rounded-lg border border-accent/40 bg-accent/8 p-2.5 text-sm">
-          {t('compare.winner', { site: siteText(pins[winner], t) })}
+          {t('compare.winner', { site: names[winner] ?? siteText(pins[winner], t) })}
         </p>
       )}
       <p className="mt-2 text-xs text-quiet">{t('compare.rule')}</p>
@@ -235,6 +238,7 @@ const calm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 interface DeckProps {
   pins: Pin[];
+  names: (string | undefined)[];
   judged: (Judged | undefined)[];
   order: number[];
   winner?: number;
@@ -247,7 +251,7 @@ interface DeckProps {
  * the top card away (either way) and it goes to the back; the buttons and dots do the same without swiping. Every
  * reading of the table is on each card, with the same stars for the best value.
  */
-function Deck({ pins, judged, order, winner, lines, bests }: DeckProps) {
+function Deck({ pins, names, judged, order, winner, lines, bests }: DeckProps) {
   const { t } = useTranslation();
   const [turn, setTurn] = useState(0);
   const n = order.length;
@@ -267,7 +271,7 @@ function Deck({ pins, judged, order, winner, lines, bests }: DeckProps) {
           .map(({ site, depth }) =>
             depth === 0 ? (
               <TopCard key={site} onThrow={() => step(1)}>
-                <SiteCard site={site} {...{ pins, judged, winner, lines, bests }} />
+                <SiteCard site={site} {...{ pins, names, judged, winner, lines, bests }} />
               </TopCard>
             ) : (
               <motion.li
@@ -283,7 +287,7 @@ function Deck({ pins, judged, order, winner, lines, bests }: DeckProps) {
                 transition={calm() ? { duration: 0 } : { type: 'spring', stiffness: 320, damping: 30 }}
                 style={{ zIndex: n - depth, transformOrigin: '50% 100%' }}
               >
-                <SiteCard site={site} {...{ pins, judged, winner, lines, bests }} />
+                <SiteCard site={site} {...{ pins, names, judged, winner, lines, bests }} />
               </motion.li>
             ),
           )}
@@ -331,7 +335,7 @@ function TopCard({ onThrow, children }: { onThrow: () => void; children: ReactNo
   );
 }
 
-function SiteCard({ site, pins, judged, winner, lines, bests }: { site: number } & Omit<DeckProps, 'order'>) {
+function SiteCard({ site, pins, names, judged, winner, lines, bests }: { site: number } & Omit<DeckProps, 'order'>) {
   const { t } = useTranslation();
   const p = pins[site];
   const j = judged[site];
@@ -350,6 +354,7 @@ function SiteCard({ site, pins, judged, winner, lines, bests }: { site: number }
             dir="ltr"
             onClick={() => useApp.getState().focusSite(p.latDeg, p.lonDeg)}
           >
+            {names[site] && <span className="block font-sans text-ink">{names[site]}</span>}
             {siteText(p, t)}
           </button>
         </div>

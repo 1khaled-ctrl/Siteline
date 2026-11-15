@@ -7,7 +7,6 @@ import { REGIONS } from '../regions';
 import { sunAt } from '../sound/maps';
 import { MAX_SLIP_DAYS, PLAY_SPEEDS_H_PER_S, useApp } from '../store';
 import { BestSpots, SearchAll } from './BestSpots';
-import { Compare } from './Compare';
 
 /** One section of the floating panel: unboxed, as in the demo, so only its heading and spacing set it apart. */
 export const panel = 'min-w-0';
@@ -151,7 +150,7 @@ export function LandingTime() {
   );
 }
 
-/** The Moon's site picker: the latitude and longitude, the comparison and the named regions. */
+/** The Moon's site picker: the latitude and longitude, and the named regions. */
 export function Controls() {
   const { t } = useTranslation();
   const latDeg = useApp((s) => s.latDeg);
@@ -168,8 +167,6 @@ export function Controls() {
         </div>
         <p className="mt-2 text-xs text-quiet">{t('site.hint')}</p>
       </section>
-
-      <Compare />
 
       <section className={panel}>
         <h2 className="mb-2 font-semibold">{t('regions.heading')}</h2>

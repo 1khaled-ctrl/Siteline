@@ -21,6 +21,7 @@ import { MoonView } from './ui/MoonView';
 import { Orb } from './ui/Orb';
 import { OrbitDial } from './ui/OrbitDial';
 import { Peek } from './ui/Peek';
+import { PinnedSpots } from './ui/PinnedSpots';
 import { Sheet } from './ui/Sheet';
 import { SiteReport } from './ui/SiteReport';
 import { SoundEffects } from './ui/SoundEffects';
@@ -61,9 +62,21 @@ function PanelContent({ view }: { view: ViewName }): ReactNode {
     case 'site':
       return <SiteSide key="side" />;
     case 'globe':
-      return [factsCard, <LandingTime key="time" />, <MoonSide key="side" />, <Controls key="controls" />];
+      return [
+        factsCard,
+        <LandingTime key="time" />,
+        <PinnedSpots key="pinned" />,
+        <MoonSide key="side" />,
+        <Controls key="controls" />,
+      ];
     default:
-      return [<LandingTime key="time" />, <SiteReport key="report" />, <Controls key="controls" />, factsCard];
+      return [
+        <LandingTime key="time" />,
+        <PinnedSpots key="pinned" />,
+        <SiteReport key="report" />,
+        <Controls key="controls" />,
+        factsCard,
+      ];
   }
 }
 
