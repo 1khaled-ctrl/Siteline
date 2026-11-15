@@ -294,7 +294,14 @@
       "micBlocked": "The microphone is blocked. Allow it for this site in the browser's address bar, then try again.",
       "micFailed": "The mic didn't catch that. Try again, or type your question.",
       "speaking": "Reading replies aloud.",
-      "mute": "Stop reading aloud"
+      "mute": "Stop reading aloud",
+      "searchingMany": "Searching {{regions}} ({{done}} of {{of}} regions done)",
+      "say": {
+        "first": "Found a spot that passes in {{region}}. It's on your screen. I'm checking a couple more regions to compare.",
+        "another": "Another one passes, in {{region}}.",
+        "still": "Still searching: {{done}} of {{of}} regions checked, {{found}} found so far.",
+        "robot": "Now checking the {{robot}}'s needs at the best sites."
+      }
     },
     "live": {
       "start": "Talk live",

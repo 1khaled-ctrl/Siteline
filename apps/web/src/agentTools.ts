@@ -4,9 +4,9 @@ import type { TFunction } from 'i18next';
 import { parseIntent, summarize, type Target } from './copilot';
 import type { ToolCall, ToolResult } from './copilotAi';
 import { findLander, MISSIONS } from './landers';
-import { coordinate, type FoundSite, landingDate, pickRegions, rankFound } from './landingAgent';
+import { coordinate, type FoundSite, landingDate, pickRegions, rankFound, searchRegions } from './landingAgent';
 import { physics, queryFor, URLS } from './physics';
-import type { StayResponse } from './physics.worker';
+import type { PassingSite, StayResponse } from './physics.worker';
 import { REGIONS } from './regions';
 import { fitAt, isRobotId, LANDING_RADII_M, type LandingRadius, nearestLander, ROBOTS, type RobotId } from './robots';
 import { FIRST_UTC_MS, LAST_UTC_MS, LAYERS, type Layer, MAX_PINS, type MoonView, useApp } from './store';
@@ -34,7 +34,25 @@ export interface ToolContext {
   t: TFunction;
   /** A line about what the tool is doing now, shown on its step while it runs ("Searching Haworth, 3 of 9"). */
   progress: (detail: string) => void;
+  /**
+   * A short sentence worth saying aloud while a long tool runs ("Found a spot in Nobile Rim 1, checking a few more"):
+   * spoken by the voice agent in a live call, read out by the browser after a spoken question, ignored otherwise.
+   */
+  announce?: (sentence: string) => void;
 }
+
+/** Each region's passing sites for a landing date, so a repeat search or a follow-up question is instant. */
+const searched = new Map<string, { sites: PassingSite[]; checked: number }>();
+/** How many passing sites a search looks for before it stops starting new regions. */
+const SITES_WANTED = 3;
+/** Regions searched at once: their full checks mostly wait on terrain downloads, so they overlap. */
+const REGIONS_AT_ONCE = 3;
+/** Once a site is found, how long to look for alternatives before answering with what there is. */
+const GRACE_AFTER_FIRST_MS = 20_000;
+/** After this long, answer with what has been found so far (if anything); the rest keeps going in the background. */
+const SEARCH_DEADLINE_MS = 75_000;
+/** How long the search may go without saying anything before it says how far it has got. */
+const QUIET_MS = 15_000;
 
 /** Rounded to a tenth, the precision the report shows, so the model repeats what the screen says. */
 export const tenth = (v: number | undefined) =>
@@ -143,7 +161,7 @@ export const callText = (call: ToolCall) =>
     .join(', ')})`;
 
 /** Runs one tool. A tool that cannot do what it was asked throws, and the model reads why. */
-export async function runAgentTool(call: ToolCall, { t, progress }: ToolContext): Promise<AgentToolResult> {
+export async function runAgentTool(call: ToolCall, { t, progress, announce }: ToolContext): Promise<AgentToolResult> {
   const a = call.arguments;
   const shown = callText(call);
   const app = useApp.getState();
@@ -225,20 +243,65 @@ export async function runAgentTool(call: ToolCall, { t, progress }: ToolContext)
       app.set({ view: 'pole', pins: [] });
       const found: FoundSite[] = [];
       let checked = 0;
-      for (const [i, area] of areas.entries()) {
-        progress(t('copilot.agent.searching', { region: area.name, done: i + 1, of: areas.length }));
-        const out = await physics
-          .passing({ centreLatDeg: area.lat, centreLonDeg: area.lon, sizeKm: area.sizeKm, top: 2 }, query, URLS)
-          .catch(() => undefined);
-        checked += out?.checked ?? 0;
-        found.push(...(out?.sites ?? []).map((s) => ({ ...s, region: area.name })));
-        useApp.getState().set({ pins: rankFound(found).slice(0, MAX_PINS) });
+      let done = 0;
+      let lastSaid = Date.now();
+      const say = (sentence: string) => {
+        lastSaid = Date.now();
+        announce?.(sentence);
+      };
+      const running = new Set<string>();
+      const showRunning = () =>
+        progress(t('copilot.agent.searchingMany', { regions: [...running].join(', '), done, of: areas.length }));
+      // Something to hear during a long quiet stretch: how far the search has got.
+      const heartbeat = setInterval(() => {
+        if (Date.now() - lastSaid >= QUIET_MS)
+          say(t('copilot.agent.say.still', { done, of: areas.length, found: found.length }));
+      }, 3000);
+      let search: Awaited<ReturnType<typeof searchRegions<(typeof areas)[number]>>>;
+      try {
+        search = await searchRegions(
+          areas,
+          async (area) => {
+            const key = `${landingUtc}|${area.name}`;
+            const known = searched.get(key);
+            if (known) return known;
+            running.add(area.name);
+            showRunning();
+            const out = await physics
+              .passing({ centreLatDeg: area.lat, centreLonDeg: area.lon, sizeKm: area.sizeKm, top: 1 }, query, URLS)
+              .finally(() => running.delete(area.name));
+            searched.set(key, { sites: out.sites, checked: out.checked });
+            return out;
+          },
+          {
+            atOnce: REGIONS_AT_ONCE,
+            enough: SITES_WANTED,
+            graceAfterFirstMs: GRACE_AFTER_FIRST_MS,
+            deadlineMs: SEARCH_DEADLINE_MS,
+            onResult: ({ area, sites, checked: n }) => {
+              done += 1;
+              checked += n;
+              const first = found.length === 0 && sites.length > 0;
+              found.push(...sites.map((s) => ({ ...s, region: area.name })));
+              useApp.getState().set({ pins: rankFound(found).slice(0, MAX_PINS) });
+              if (first) {
+                // The first find is shown and said at once; the search keeps going for alternatives.
+                useApp.getState().focusSite(sites[0].latDeg, sites[0].lonDeg);
+                say(t('copilot.agent.say.first', { region: area.name }));
+              } else if (sites.length) say(t('copilot.agent.say.another', { region: area.name }));
+              showRunning();
+            },
+          },
+        );
+      } finally {
+        clearInterval(heartbeat);
       }
 
       // The robot's check on the best few, and the sources from a full check of the best one.
       const sources = new Set<string>(robot?.sources ?? []);
       let ranked = rankFound(found);
       const toCheck = ranked.slice(0, robot ? ROBOT_CHECKS : 1);
+      if (robot && toCheck.length) say(t('copilot.agent.say.robot', { robot: t(`robot.name.${robot.id}`) }));
       for (const [i, s] of toCheck.entries()) {
         if (robot)
           progress(t('copilot.agent.fitting', { robot: t(`robot.name.${robot.id}`), done: i + 1, of: toCheck.length }));
@@ -258,7 +321,10 @@ export async function runAgentTool(call: ToolCall, { t, progress }: ToolContext)
         data: {
           landingUtc,
           stayDays: query.stayDays,
-          regionsSearched: areas.map((r) => r.name),
+          regionsSearched: search.results.map((r) => r.area.name),
+          ...(search.stoppedEarly && {
+            stoppedEarly: `Answered early to keep the visitor waiting less: ${areas.length - search.results.length} region(s) not finished yet. They keep searching in the background; if the visitor asks for more options, call find_landing_sites again with the same date; regions already searched answer at once.`,
+          }),
           checkedInFull: checked,
           robot: robot ? t(`robot.name.${robot.id}`) : null,
           rankedBy: robot

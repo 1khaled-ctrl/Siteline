@@ -9,7 +9,7 @@ import type { ToolCall } from './copilotAi';
  */
 
 /** The RPC methods the agent calls (apps/voice-agent/src/voice.ts). */
-export const RPC = { tool: 'siteline.tool', state: 'siteline.state' } as const;
+export const RPC = { tool: 'siteline.tool', state: 'siteline.state', say: 'siteline.say' } as const;
 /** LiveKit's limit on an RPC reply is 15 KiB; a bigger tool result is refused rather than cut. */
 const MAX_REPLY_BYTES = 14_000;
 const AGENT_STATE = 'lk.agent.state';
@@ -29,11 +29,34 @@ export interface LiveHandlers {
 export interface LiveSession {
   /** A typed message, sent with the app's state ahead of it, as the chat sends one to the relay. */
   send: (text: string) => Promise<void>;
+  /** A progress line for the agent to speak while a tool is still running. */
+  say: (sentence: string) => Promise<void>;
   setMuted: (muted: boolean) => Promise<void>;
   stop: () => Promise<void>;
 }
 
 export type TokenReply = { url: string; token: string } | { error: string };
+
+let warmed = false;
+/**
+ * Starts the browser's WebRTC engine ahead of a call. Chrome's first WebRTC call can hold the page for seconds on some
+ * machines (3 to 7 s measured on a Windows laptop, against under 1 s for every later call), and inside a call that
+ * wait lands right after the tap. Run once, when the chat has opened and the page is idle, so the wait happens while
+ * the visitor reads and "Talk live" connects at once.
+ */
+export function warmUpWebRtc(): void {
+  if (warmed || typeof RTCRtpReceiver === 'undefined') return;
+  warmed = true;
+  const run = () => {
+    try {
+      RTCRtpReceiver.getCapabilities('audio');
+    } catch {
+      // A browser without it fails later, in the call, with a reason to show.
+    }
+  };
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 2000 });
+  else setTimeout(run, 1000);
+}
 
 export async function fetchVoiceToken(): Promise<TokenReply> {
   try {
@@ -120,6 +143,16 @@ export async function startLive(url: string, token: string, h: LiveHandlers): Pr
       if (room.state !== ConnectionState.Connected) throw new Error('not connected');
       await room.localParticipant.sendText(`<app_state>${JSON.stringify(h.appState())}</app_state>\n${text}`, {
         topic: 'lk.chat',
+      });
+    },
+    say: async (sentence) => {
+      const agent = [...room.remoteParticipants.values()].find((p) => p.isAgent);
+      if (!agent || room.state !== ConnectionState.Connected) return;
+      await room.localParticipant.performRpc({
+        destinationIdentity: agent.identity,
+        method: RPC.say,
+        payload: sentence,
+        responseTimeout: 5000,
       });
     },
     setMuted: async (muted) => {

@@ -72,6 +72,75 @@ export function rankFound(sites: readonly FoundSite[]): FoundSite[] {
   );
 }
 
+export interface RegionResult<T> {
+  area: T;
+  sites: PassingSite[];
+  checked: number;
+}
+
+/**
+ * Searches regions a few at a time and stops once `enough` sites have been found, reporting each region as it
+ * finishes. Most regions fail the quick screen in a couple of seconds; the slow part is the full check of a candidate,
+ * which mostly waits on terrain downloads, so a few regions at once overlap those waits. It answers once there are
+ * enough sites, or a while after the first, or at a deadline with whatever it has found: regions still running finish in the background (the caller's `search` can keep what they find)
+ * but are no longer reported, and no new ones start.
+ */
+export async function searchRegions<T>(
+  areas: readonly T[],
+  search: (area: T) => Promise<{ sites: PassingSite[]; checked: number } | undefined>,
+  {
+    atOnce = 3,
+    enough = 3,
+    graceAfterFirstMs = Number.POSITIVE_INFINITY,
+    deadlineMs = Number.POSITIVE_INFINITY,
+    onResult,
+  }: {
+    atOnce?: number;
+    enough?: number;
+    /** Once one site is found, how long to keep looking for more before answering with what there is. */
+    graceAfterFirstMs?: number;
+    /** After this long, answer with what there is, as long as something has been found. */
+    deadlineMs?: number;
+    onResult?: (r: RegionResult<T>) => void;
+  },
+): Promise<{ results: RegionResult<T>[]; stoppedEarly: boolean }> {
+  const results: RegionResult<T>[] = [];
+  let next = 0;
+  let found = 0;
+  let answered = false;
+  let enoughFound: () => void = () => {};
+  const hasEnough = new Promise<void>((resolve) => {
+    enoughFound = resolve;
+  });
+  const lane = async () => {
+    while (found < enough && next < areas.length) {
+      const area = areas[next++];
+      const out = await search(area).catch(() => undefined);
+      if (answered) return;
+      const r = { area, sites: out?.sites ?? [], checked: out?.checked ?? 0 };
+      found += r.sites.length;
+      results.push(r);
+      onResult?.(r);
+      if (found >= enough) enoughFound();
+      else if (found > 0 && !graceTimer && Number.isFinite(graceAfterFirstMs))
+        graceTimer = setTimeout(enoughFound, graceAfterFirstMs);
+    }
+  };
+  let graceTimer: ReturnType<typeof setTimeout> | undefined;
+  // The deadline only answers when there is something to answer with; until then the search keeps going.
+  const deadline = Number.isFinite(deadlineMs)
+    ? setInterval(() => {
+        if (found > 0 && performance.now() - startedMs >= deadlineMs) enoughFound();
+      }, 250)
+    : undefined;
+  const startedMs = performance.now();
+  await Promise.race([Promise.all(Array.from({ length: Math.min(atOnce, areas.length) }, lane)), hasEnough]);
+  answered = true;
+  clearTimeout(graceTimer);
+  clearInterval(deadline);
+  return { results, stoppedEarly: results.length < areas.length };
+}
+
 /** A coordinate from a tool's arguments, or an error the model can read. */
 export function coordinate(v: unknown, name: string, min: number, max: number): number {
   const n = typeof v === 'string' ? Number(v) : v;

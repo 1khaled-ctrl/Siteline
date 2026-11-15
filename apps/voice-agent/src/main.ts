@@ -10,7 +10,17 @@ import { fileURLToPath } from 'node:url';
 import { cli, defineAgent, inference, type JobContext, llm, ServerOptions, voice } from '@livekit/agents';
 import dotenv from 'dotenv';
 import { AGENT_NAME } from '../../copilot-worker/src/voiceToken';
-import { appStateNote, MODELS, RPC, timeoutFor, toolReply, VOICE_INSTRUCTIONS, VOICE_TOOLS } from './voice';
+import {
+  appStateNote,
+  GREETING,
+  MAX_SAY_CHARS,
+  MODELS,
+  RPC,
+  timeoutFor,
+  toolReply,
+  VOICE_INSTRUCTIONS,
+  VOICE_TOOLS,
+} from './voice';
 
 dotenv.config({ path: fileURLToPath(new URL('../.env.local', import.meta.url)) });
 
@@ -58,7 +68,9 @@ class SiteLineAgent extends voice.Agent {
 export default defineAgent({
   entry: async (ctx: JobContext) => {
     await ctx.connect();
-    const visitor = await ctx.waitForParticipant();
+    // A visitor who leaves before the agent arrives ends the job quietly.
+    const visitor = await ctx.waitForParticipant().catch(() => undefined);
+    if (!visitor) return;
     const callBrowser: CallBrowser = (method, payload, timeoutMs) => {
       const me = ctx.room.localParticipant;
       if (!me) return Promise.reject(new Error('not connected'));
@@ -68,16 +80,29 @@ export default defineAgent({
     const session = new voice.AgentSession({
       stt: MODELS.stt,
       llm: new inference.LLM({ model: MODELS.llm, strictToolSchema: false }),
-      tts: MODELS.tts,
+      tts: new inference.TTS({ model: MODELS.tts, fallback: MODELS.ttsFallback }),
       turnHandling: { turnDetection: 'stt' },
       // Search, maybe search again on another date, select, check the robot: room for the whole plan in one turn.
       maxToolSteps: 6,
     });
     await session.start({ agent: new SiteLineAgent(callBrowser), room: ctx.room });
-    session.generateReply({
-      instructions: 'Greet the visitor in one short sentence as Ask SiteLine, and offer to find them a landing site.',
+    // Progress the browser reports while a tool runs (a site found, how far a search has got), spoken as it comes.
+    ctx.room.localParticipant?.registerRpcMethod(RPC.say, async (data) => {
+      if (data.callerIdentity !== visitor.identity) return 'not allowed';
+      const sentence = data.payload.trim().slice(0, MAX_SAY_CHARS);
+      if (sentence) session.say(sentence, { addToChatCtx: false });
+      return 'ok';
     });
+    // A fixed greeting goes straight to speech, without waiting on the model.
+    session.say(GREETING);
   },
 });
 
-cli.runApp(new ServerOptions({ agent: fileURLToPath(import.meta.url), agentName: AGENT_NAME }));
+cli.runApp(
+  new ServerOptions({
+    agent: fileURLToPath(import.meta.url),
+    agentName: AGENT_NAME,
+    // One process kept ready, so a call doesn't wait seconds for a new one to start (dev mode keeps none).
+    numIdleProcesses: 1,
+  }),
+);

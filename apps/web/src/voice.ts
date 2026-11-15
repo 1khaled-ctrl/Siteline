@@ -92,11 +92,12 @@ export function speakable(text: string): string {
     .trim();
 }
 
-export function speak(text: string, language: string): void {
+/** Reads `text` aloud. A new answer cuts off what was being said; `queue` waits its turn (progress lines). */
+export function speak(text: string, language: string, { queue = false }: { queue?: boolean } = {}): void {
   if (!canSpeak()) return;
   const words = speakable(text);
   if (!words) return;
-  window.speechSynthesis.cancel();
+  if (!queue) window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(words);
   u.lang = localeOf(language);
   u.rate = 1.04;

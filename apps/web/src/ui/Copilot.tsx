@@ -95,8 +95,11 @@ export function Copilot() {
   } | null>(null);
 
   useEffect(() => {
-    if (open) input.current?.focus();
-    else {
+    if (open) {
+      input.current?.focus();
+      // Fetch LiveKit's client while the visitor reads the chat, so "Talk live" connects without that wait.
+      void import('../liveVoice').then((m) => m.warmUpWebRtc()).catch(() => {});
+    } else {
       stopListening.current?.();
       stopSpeaking();
       void live.current?.stop();
@@ -114,6 +117,9 @@ export function Copilot() {
   };
   const update = (id: number, patch: (m: Message) => Partial<Message>) =>
     setLog((l) => l.map((m) => (m.id === id ? { ...m, ...patch(m) } : m)));
+
+  /** A progress line read aloud after a spoken question, queued behind what is already being said. */
+  const narrate = (sentence: string) => speak(sentence, i18n.language, { queue: true });
 
   const say = (m: Omit<Message, 'id'>, spoken: boolean) => {
     add(m);
@@ -261,7 +267,7 @@ export function Copilot() {
    * A tool runner that shows its work: each call becomes a step on the working message, its progress lines update
    * the step, and a card it returns (the sites a search found) is kept for the reply.
    */
-  const stepper = (messageId: number, cards: SitesCard[]) => {
+  const stepper = (messageId: number, cards: SitesCard[], announce?: (sentence: string) => void) => {
     let stepId = 0;
     return async (call: ToolCall): Promise<ToolResult> => {
       stepId += 1;
@@ -278,7 +284,7 @@ export function Copilot() {
         update(messageId, (m) => ({ steps: (m.steps ?? []).map((s) => (s.id === id ? { ...s, ...p } : s)) }));
       update(messageId, (m) => ({ steps: [...(m.steps ?? []), step] }));
       try {
-        const out = await runAgentTool(call, { t, progress: (detail) => patchStep({ detail }) });
+        const out = await runAgentTool(call, { t, progress: (detail) => patchStep({ detail }), announce });
         if (out.card) cards.push(out.card);
         patchStep({ status: 'done', detail: undefined });
         return out;
@@ -293,7 +299,8 @@ export function Copilot() {
   const finish = (id: number, patch: Partial<Message>, spoken: boolean) => {
     update(id, () => ({ ...patch, working: false }));
     sound.chime();
-    if (spoken && patch.text) speak(patch.text, i18n.language);
+    // After the progress lines, not over them.
+    if (spoken && patch.text) speak(patch.text, i18n.language, { queue: true });
   };
 
   const run = async (message: string, spoken: boolean) => {
@@ -303,7 +310,12 @@ export function Copilot() {
     if (intent.tool === 'fly_to' || intent.tool === 'show_mission') return runBasic(message, spoken);
     const working = add({ from: 'siteline', text: '', steps: [], working: true });
     const cards: SitesCard[] = [];
-    const out = await askAi(message, appState(), history.current, stepper(working, cards));
+    const out = await askAi(
+      message,
+      appState(),
+      history.current,
+      stepper(working, cards, spoken ? narrate : undefined),
+    );
     if (out.ok && out.unverified.length === 0) {
       history.current = out.history;
       setMode('ai');
@@ -347,7 +359,15 @@ export function Copilot() {
       const working = add({ from: 'siteline', text: '', steps: [], working: true });
       const cards: SitesCard[] = [];
       try {
-        await stepper(working, cards)({ id: 'basic', name: 'find_landing_sites', arguments: {} });
+        await stepper(
+          working,
+          cards,
+          spoken ? narrate : undefined,
+        )({
+          id: 'basic',
+          name: 'find_landing_sites',
+          arguments: {},
+        });
       } catch {
         // The failed step says why.
       }
@@ -485,7 +505,12 @@ export function Copilot() {
           if (!liveWork.current) {
             const cards: SitesCard[] = [];
             const id = add({ from: 'siteline', text: '', steps: [], working: true });
-            liveWork.current = { id, cards, tools: [], run: stepper(id, cards) };
+            liveWork.current = {
+              id,
+              cards,
+              tools: [],
+              run: stepper(id, cards, (sentence) => void live.current?.say(sentence).catch(() => {})),
+            };
           }
           const work = liveWork.current;
           work.tools.push(call.name);
