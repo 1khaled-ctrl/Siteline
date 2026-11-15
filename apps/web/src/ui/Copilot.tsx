@@ -695,9 +695,10 @@ export function Copilot() {
     <section
       aria-label={t('copilot.title')}
       data-avoid
-      className="fixed inset-x-3 bottom-3 z-30 flex h-[min(600px,80dvh)] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-14 lg:h-[min(640px,calc(100%-80px))] lg:w-110"
+      className="fixed inset-x-0 bottom-0 z-[60] flex h-[88dvh] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-line bg-panel shadow-[0_-12px_40px_rgba(0,0,0,0.55)] lg:absolute lg:inset-x-auto lg:inset-s-3 lg:bottom-24 lg:z-30 lg:h-[min(640px,calc(100%-112px))] lg:w-110 lg:rounded-2xl lg:border-b lg:shadow-2xl"
       data-testid="copilot"
     >
+      <span aria-hidden="true" className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line lg:hidden" />
       <header className="flex items-center gap-3 border-b border-line bg-linear-to-b from-sun/10 to-transparent px-4 py-3">
         <span
           aria-hidden="true"
@@ -778,7 +779,8 @@ export function Copilot() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-ink">{t('copilot.live.ctaTitle')}</span>
-                <span className="block text-xs text-quiet">{t('copilot.live.ctaText')}</span>
+                <span className="hidden text-xs text-quiet sm:block">{t('copilot.live.ctaText')}</span>
+                <span className="block text-xs text-quiet sm:hidden">{t('copilot.live.ctaTextShort')}</span>
               </span>
               <span className="shrink-0 rounded-full bg-sun px-3 py-1.5 text-xs font-semibold text-panel group-hover:brightness-110">
                 {t('copilot.live.start')}
@@ -876,7 +878,7 @@ export function Copilot() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5 border-t border-line px-4 py-3">
+      <div className="flex flex-col gap-1.5 border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <form onSubmit={submit} className="flex items-center gap-2">
           <label htmlFor="copilot-input" className="sr-only">
             {t('copilot.inputLabel')}

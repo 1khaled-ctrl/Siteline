@@ -90,7 +90,7 @@ export function LunaHint({ side }: { side: 'start' | 'end' }) {
   return (
     <div
       role="status"
-      className={`luna-hint absolute bottom-full mb-3 w-max max-w-64 ${side === 'start' ? 'start-0' : 'end-0'}`}
+      className={`luna-hint absolute bottom-full mb-3 w-max max-w-60 sm:max-w-64 ${side === 'start' ? 'start-0' : 'end-0'}`}
       data-testid="luna-hint"
     >
       <div className="flex items-center gap-2 rounded-xl border border-sun/60 bg-panel/95 py-2 ps-3 pe-1.5 text-sm shadow-xl backdrop-blur">

@@ -329,7 +329,8 @@
       "muteShort": "Mute",
       "unmuteShort": "Unmute",
       "hearing": "Listening…",
-      "typePlaceholder": "Or type to Luna…"
+      "typePlaceholder": "Or type to Luna…",
+      "ctaTextShort": "Tap and just talk. She answers out loud."
     },
     "chat": {
       "greet": "Hi! I'm Luna 👋 I can fly you to any planet, tell you how far away it is and how long the trip takes, or find a safe place to land on the Moon. What would you like to do?",
