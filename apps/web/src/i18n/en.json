@@ -286,6 +286,7 @@
       "slope": "Slope: a lander needs ground flatter than {{deg}}° over 100 m. Inside 83°S the slope is measured on LOLA’s 10 m terrain of the south pole, reading only the few tiles around the site: a plane fitted to the heights within 50 m gives the landing slope, and Horn’s method on each 10 m cell within 1 km gives how much of that 2 km area is under 20°, as steep as astronauts can walk. Outside 83°S, or if those tiles do not arrive, the report says it needs finer terrain instead of guessing.",
       "zone": "Artemis zone: the spot must lie south of {{lat}}° latitude.",
       "longTerm": "Long-term sunlight, Earth view and permanent shadow: NASA's maps from LOLA terrain (Mazarico et al. 2011, PGDA product 69) at 60 m, averaged to 360 m by our pipeline, which also works out the distance to the nearest permanent shadow from them. Until the pipeline has published them, the Landfall concept demo's 2.4 km maps.",
+      "ice": "Ice nearby, shown and never checked: the distance to the nearest permanent shadow on NASA's long-term maps, where ice can last, and the distance to the nearest shadowed region where M3 detected surface ice (Lemelin et al. 2021), measured straight over the Moon's surface to that region's published outline, which extends {{beyond}} m beyond the shadow itself.",
       "planets": "The Worlds list and signal delays: distances from the DE440 planet table. A signal's time is that distance divided by the speed of light.",
       "facts": "World facts: NASA's planetary fact sheets and NAIF's gravitational parameters. Gravity and escape speed are worked out from them."
     },
@@ -523,14 +524,19 @@
     "ice": "Ice nearby (where it can last)",
     "iceKm": "{{km}} km to the nearest permanent shadow",
     "iceAtSite": "this spot is in permanent shadow",
+    "iceDetected": "Ice nearby (detected)",
+    "iceDetectedKm": "{{km}} km to a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)",
+    "iceDetectedWithin": "this spot is within the outline of a shadowed region where M3 detected surface ice (<link>Lemelin et al. 2021</link>)",
+    "iceDetectedNote": "Distance to the outline of a shadowed region, which extends {{m}} m beyond the shadow itself, measured straight over the Moon's surface. M3 detected surface ice in that region from orbit; that ice is patchy and low in abundance (<m3>Li et al. 2018</m3>), and it is not a guarantee of ice at this site.",
     "iceUses": "Ice can become drinking water, oxygen and rocket propellant (<link>The Planetary Society</link>).",
     "iceLevel": "Evidence: {{level}}",
     "iceLevels": {
       "canLast": "can last",
       "consistent": "consistent with ice",
+      "detectedNearby": "detected nearby",
       "detected": "detected"
     },
-    "iceEvidence": "Ice evidence comes at three levels: <b>can last</b> (permanent shadow, shown here), <b>consistent with ice</b> (brighter laser reflectance in the coldest ground, <fisher>Fisher et al. 2017</fisher>) and <b>detected</b> (measured directly, as by the LCROSS impact at Cabeus, <lcross>Colaprete et al. 2010</lcross>, and as patchy surface ice in M3 spectra, <m3>Li et al. 2018</m3>). This line shows only the first: ice can last there, not that ice is there. It is shown, not checked: no distance counts as near enough, and it never changes Pass or Fail.",
+    "iceEvidence": "Ice evidence comes at four levels: <b>can last</b> (permanent shadow, shown here), <b>consistent with ice</b> (brighter laser reflectance in the coldest ground, <fisher>Fisher et al. 2017</fisher>), <b>detected nearby</b> (surface ice M3 detected in a shadowed region near the site, shown here at south polar sites, <lemelin>Lemelin et al. 2021</lemelin>) and <b>detected</b> (measured directly, as by the LCROSS impact at Cabeus, <lcross>Colaprete et al. 2010</lcross>, and as patchy surface ice in M3 spectra, <m3>Li et al. 2018</m3>). Permanent shadow means ice can last there, not that ice is there, and ice detected in a region nearby says nothing certain about this spot. Ice is shown, never checked: no distance counts as near enough, and it never changes Pass or Fail.",
     "iceColdTrap": "<nasa>NASA</nasa> describes cold traps as permanently dark ground below {{c}} °C ({{f}} °F), where water ice can last for millions or billions of years. SiteLine maps the shadow, not its temperature."
   },
   "robot": {

@@ -40,14 +40,17 @@ import {
   mapsAtSite,
   mapsFromBytes,
   marsSubsolarPoint,
+  nearestPolarRegion,
   PLANET_NAMES,
   type PlanetName,
   type PlanetTable,
   type PointGrid,
   type PolarMaps,
+  type PolarRegion,
   parseEphemeris,
   parsePlanets,
   patchHeightM,
+  polarRegionsFromGeoJson,
   polarScaleFactor,
   polarToUnit,
   polarXY,
@@ -108,6 +111,11 @@ const HORIZON_REACH_M = 300_000;
 const DEMO_MAPS = { id: 'landfall-polar-maps', n: 186, pixM: 2400 };
 /** LOLA's 10 m terrain of the south pole inside 83°S (PGDA product 90), read only around the sites asked about. */
 const FINE = { id: 'lola-spole-10m' };
+/**
+ * Lemelin et al. 2021's water-ice-bearing permanently shadowed regions: the shadows where Moon Mineralogy Mapper (M3)
+ * detected surface ice, each outlined 280 m beyond the shadow itself. Read once, as published (CREDITS.md).
+ */
+const ICE_REGIONS = { id: 'lemelin-2021-ice-psrs' };
 
 export interface DataUrls {
   data: string;
@@ -122,6 +130,11 @@ export interface DataUrls {
   fine?: string;
   /** NASA's long-term maps (PGDA product 69), as the pipeline publishes them; `maps` is read where they are not. */
   illumination?: string;
+  /**
+   * Lemelin et al. 2021's water-ice-bearing shadowed regions, a GeoJSON in LOLA's south polar stereographic plane;
+   * without it the ice line has no "detected nearby" reading.
+   */
+  iceRegions?: string;
 }
 
 /** The slopes around a site, measured on the 10 m terrain. */
@@ -157,6 +170,21 @@ export interface LongTerm {
   shadowDistanceKm?: number;
 }
 
+/**
+ * The nearest shadowed region where M3 detected surface ice (Lemelin et al. 2021), for the ice line: information,
+ * never one of the checks.
+ */
+export interface IceDetected {
+  id: string;
+  /**
+   * Straight over the 1737.4 km sphere to the region's published outline, which extends 280 m beyond the shadow
+   * itself; 0 inside that outline.
+   */
+  distanceKm: number;
+  /** The site lies within the outline: within the shadow or the 280 m beyond it, the data cannot say which. */
+  inside: boolean;
+}
+
 export interface StayResponse {
   result: StayResult;
   terrain?: TerrainInfo;
@@ -171,6 +199,7 @@ export interface StayResponse {
    */
   terrainPending?: boolean;
   longTerm?: LongTerm;
+  iceDetected?: IceDetected;
 }
 
 interface Base64File {
@@ -358,6 +387,10 @@ const loadMapsFile = (url: string): Promise<LoadedMaps> =>
       ? { maps: mapsFromBytes(bytes, file.n, file.pixM, file.distanceUnitKm), id: file.datasetId ?? url }
       : { maps: mapsFromBytes(bytes, DEMO_MAPS.n, DEMO_MAPS.pixM), id: DEMO_MAPS.id };
   });
+
+/** The ice-bearing regions, read once. */
+const loadIceRegions = (url: string): Promise<PolarRegion[]> =>
+  memo(`iceRegions:${url}`, async () => polarRegionsFromGeoJson(await (await fetchOk(url)).json()));
 
 /** NASA's maps where the pipeline has published them, the demo's otherwise. */
 const loadMaps = (urls: DataUrls): Promise<LoadedMaps> =>
@@ -1440,6 +1473,10 @@ const api = {
       fineDone = { value };
       return value;
     });
+    // The ice-bearing regions load alongside the rest; without them the ice line just has no "detected nearby".
+    const iceRun = urls.iceRegions
+      ? quiet(loadIceRegions(urls.iceRegions), (m) => console.warn(`ice regions: ${m}`))
+      : Promise.resolve(undefined);
     const ephemeris = await loadEphemeris(urls.data);
     let terrainError: string | undefined;
     // NASA's long-term maps where the pipeline has published them, the demo's otherwise (#19).
@@ -1474,11 +1511,15 @@ const api = {
       at && loaded && Number.isFinite(at.sunPct) ? { id: loaded.id, resolutionM: loaded.maps.pixM, ...at } : undefined;
     const { tUtcMs, sun, earth } = result.series;
     const slopePending = slopeDone === undefined;
-    return Comlink.transfer({ result, terrain, terrainError, longTerm, slope, slopePending, terrainPending }, [
-      tUtcMs.buffer,
-      sun.buffer,
-      earth.buffer,
-    ]);
+    const iceRegions = await iceRun;
+    const nearest = iceRegions && nearestPolarRegion(iceRegions, latDeg, lonDeg);
+    const iceDetected: IceDetected | undefined = nearest && {
+      id: ICE_REGIONS.id,
+      distanceKm: nearest.distanceKm,
+      inside: nearest.inside,
+    };
+    const reply = { result, terrain, terrainError, longTerm, slope, slopePending, terrainPending, iceDetected };
+    return Comlink.transfer(reply, [tUtcMs.buffer, sun.buffer, earth.buffer]);
   },
 
   /** Day by day across the whole ephemeris, how much of each day this spot has the Sun and the Earth. */

@@ -23,11 +23,12 @@ export function checksOf(r: StayResult): Record<CheckKey, Check> {
 
 /**
  * How strong the evidence for ice at a place is, weakest first: ice can last there (permanent shadow), the ground is
- * consistent with ice (brighter LOLA reflectance in the coldest places, Fisher et al. 2017), or ice was detected there
- * by a direct measurement (LCROSS at Cabeus, Colaprete et al. 2010; M3, Li et al. 2018). A level is shown for a place
- * only where we hold a sourced map or point for it; today that is only the first.
+ * consistent with ice (brighter LOLA reflectance in the coldest places, Fisher et al. 2017), ice was detected in a
+ * shadowed region near it (M3 surface ice, Lemelin et al. 2021), or ice was detected there by a direct measurement
+ * (LCROSS at Cabeus, Colaprete et al. 2010; M3, Li et al. 2018). A level is shown for a place only where we hold a
+ * sourced map or outline for it: today the first and the third.
  */
-export const ICE_LEVELS = ['canLast', 'consistent', 'detected'] as const;
+export const ICE_LEVELS = ['canLast', 'consistent', 'detectedNearby', 'detected'] as const;
 export type IceLevel = (typeof ICE_LEVELS)[number];
 
 /** The stay's fifth line: how far it is to the nearest permanent shadow, where ice can last. */
@@ -54,6 +55,8 @@ export const ICE_SOURCES = {
   lcross: 'https://doi.org/10.1126/science.1186986',
   /** Li et al. 2018, PNAS 115, 8907-8912: patchy surface ice seen by M3. */
   m3: 'https://doi.org/10.1073/pnas.1802345115',
+  /** Lemelin et al. 2021, PSJ 2, 103: the shadowed regions where M3 detected surface ice, and how they are outlined. */
+  detectedNearby: 'https://doi.org/10.3847/PSJ/abf3c5',
 } as const;
 
 /**
@@ -65,6 +68,13 @@ export const ICE_SOURCES = {
 export const COLD_TRAP = { belowF: -260, belowC: -163, source: ICE_SOURCES.coldTraps } as const;
 
 /**
+ * How far beyond its shadow each of Lemelin et al. 2021's ice-bearing regions is outlined: one M3 pixel, 280 m, the
+ * paper's rule for counting a detection as the shadow's ("inside or within one M3-sized pixel (280 m)"). Each outline in
+ * the published file is exactly that much bigger than its shadow (iceRegions.data.test.ts checks it).
+ */
+export const ICE_OUTLINE = { beyondShadowM: 280, source: ICE_SOURCES.detectedNearby } as const;
+
+/**
  * The ice line, from the stay's `iceDistanceKm` (the nearest permanent shadow on NASA's long-term maps): a proxy, since
  * permanent shadow means ice can last there, not that ice has been found. It is information, never a check, and never
  * changes the verdict: no source we cite gives a distance that counts as near enough. Undefined where the maps carry
@@ -74,6 +84,36 @@ export function iceLineOf(r: StayResult): IceLine | undefined {
   const km = r.iceDistanceKm;
   if (km === undefined || !Number.isFinite(km) || km < 0) return undefined;
   return { distanceKm: km, atSite: km === 0, level: 'canLast' };
+}
+
+/**
+ * The ice line's second reading: how far it is to the nearest shadowed region where M3 detected surface ice (Lemelin et
+ * al. 2021). That is evidence near the site, never at it, so its level is "detected nearby"; like the first reading it is
+ * information, never a check.
+ */
+export interface IceDetectedLine {
+  /** Straight over the Moon's surface to the region's outline, km; 0 within the outline. */
+  distanceKm: number;
+  /** Within the outline, which extends 280 m beyond the shadow: in the shadow or beside it, the data cannot say which. */
+  withinOutline: boolean;
+  level: Extract<IceLevel, 'detectedNearby'>;
+  /** The dataset the distance comes from (CREDITS.md). */
+  id: string;
+}
+
+/**
+ * The second reading, from the worker's nearest ice-bearing region: undefined without one, never a made-up distance.
+ * It shows only beside the first reading (`shadow`, from `iceLineOf`), that is, only where NASA's south polar maps cover
+ * the site. Lemelin et al. 2021 outline the south polar region only, and M3 also found surface ice near the north pole
+ * (Li et al. 2018), so at a northern site, an Apollo site say, the nearest region in the file lies thousands of km south
+ * and is not the nearest ice.
+ */
+export function iceDetectedLineOf(
+  d: { id: string; distanceKm: number; inside: boolean } | undefined,
+  shadow: IceLine | undefined,
+): IceDetectedLine | undefined {
+  if (!shadow || !d || !Number.isFinite(d.distanceKm) || d.distanceKm < 0) return undefined;
+  return { distanceKm: d.distanceKm, withinOutline: d.inside, level: 'detectedNearby', id: d.id };
 }
 
 /** Any failed check fails the site; otherwise any unknown one leaves it undecided. */
