@@ -59,13 +59,20 @@ export const numbersIn = (text: string): string[] => text.match(/\d[\d,]*(?:\.\d
  */
 export function unverifiedNumbers(reply: string, sources: string[]): string[] {
   const known = sources.flatMap(numbersIn).map((n) => Number(n.replace(/,/g, '')));
-  return numbersIn(reply).filter((written) => {
-    const n = Number(written.replace(/,/g, ''));
+  const out: string[] = [];
+  // A number may carry a scale word: "789 million km" is found in 789000000, at the precision of a million.
+  for (const m of reply.matchAll(/(\d[\d,]*(?:\.\d+)?)(\s*(thousand|million|billion|trillion)\b)?/gi)) {
+    const written = m[1];
+    const scale = SCALE[(m[3] ?? '').toLowerCase()] ?? 1;
+    const n = Number(written.replace(/,/g, '')) * scale;
     const decimals = written.split('.')[1]?.length ?? 0;
-    const step = 10 ** -decimals;
-    return !known.some((k) => Math.abs(k - n) < step / 2 + 1e-9 || k === n);
-  });
+    const step = 10 ** -decimals * scale;
+    if (!known.some((k) => Math.abs(k - n) < step / 2 + 1e-9 || k === n)) out.push(written);
+  }
+  return out;
 }
+
+const SCALE: Record<string, number> = { thousand: 1e3, million: 1e6, billion: 1e9, trillion: 1e12 };
 
 /**
  * A reply as plain text. The model is told to write no markdown but sometimes does; the chat shows text as written, so
@@ -96,7 +103,9 @@ export async function askAi(
   let messages: ChatMessage[] = [...(history.length > MAX_HISTORY ? [] : history), start];
   const calls: string[] = [];
   const sources = new Set<string>();
-  const seen: string[] = [state, question];
+  // Numbers a tool gave earlier in the chat count too: "is it cold there?" may answer from the last turn's facts.
+  const seen: string[] = [state, question, ...history.filter((m) => m.role === 'tool').map((m) => m.content)];
+  let corrected = false;
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let reply: Awaited<ReturnType<Relay>>;
     try {
@@ -108,12 +117,25 @@ export async function askAi(
     if (reply.toolCalls.length === 0) {
       if (!reply.text) return { ok: false, reason: 'empty' };
       messages = [...messages, { role: 'assistant', content: reply.text }];
+      const invented = unverifiedNumbers(reply.text, seen);
+      // A number no tool gave goes back to the model once, named, so it can look it up instead of the turn being lost.
+      if (invented.length && !corrected && round < MAX_ROUNDS - 1) {
+        corrected = true;
+        messages = [
+          ...messages,
+          {
+            role: 'user',
+            content: `[check] These numbers in your reply came from no tool: ${invented.join(', ')}. Call the tool that has them (space_facts for a planet or the Moon, analyze_site or check_site for a site) and answer again quoting only its numbers, or answer without numbers. Don't mention this check.`,
+          },
+        ];
+        continue;
+      }
       return {
         ok: true,
         text: reply.text,
         calls,
         sources: [...sources],
-        unverified: unverifiedNumbers(reply.text, seen),
+        unverified: invented,
         history: messages,
       };
     }

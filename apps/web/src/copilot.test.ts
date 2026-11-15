@@ -23,6 +23,34 @@ describe('parseIntent', () => {
     expect(ask('where is curiosity?')).toEqual({ tool: 'show_mission', input: { id: curiosity?.id } });
   });
 
+  it('answers small talk as small talk, typos included, and never as a site question', () => {
+    const kind = (text: string) => {
+      const i = ask(text);
+      return i.tool === 'chat' ? i.input.kind : i.tool;
+    };
+    expect(kind('hello')).toBe('greet');
+    expect(kind('HELOO!!')).toBe('greet');
+    expect(kind('hey luna')).toBe('greet');
+    expect(kind('good morning')).toBe('greet');
+    expect(kind('how are you?')).toBe('howAreYou');
+    expect(kind('thanks, great job')).toBe('thanks');
+    expect(kind('who are you?')).toBe('about');
+    expect(kind('what can you do')).toBe('about');
+    expect(kind('bye')).toBe('bye');
+    expect(kind('asdf qwerty')).toBe('unknown');
+  });
+
+  it('reads a planet as a visit, and a facts question about any body as space facts', () => {
+    expect(ask('show me Saturn')).toEqual({ tool: 'space', input: { body: 'saturn', show: true, facts: true } });
+    expect(ask('How far is Jupiter?')).toEqual({ tool: 'space', input: { body: 'jupiter', show: true, facts: true } });
+    expect(ask('how far away is Mars')).toEqual({ tool: 'space', input: { body: 'mars', show: false, facts: true } });
+    expect(ask('how long does it take to get to the moon')).toMatchObject({ tool: 'space', input: { body: 'moon' } });
+    // Still flights and site questions, as before.
+    expect(ask('Fly to Mars')).toEqual({ tool: 'fly_to', input: { target: 'mars' } });
+    expect(ask('When does the Sun set?')).toMatchObject({ tool: 'analyze_site', input: { aspect: 'events' } });
+    expect(ask('Is Earth in view for radio?')).toMatchObject({ tool: 'analyze_site', input: { aspect: 'earth' } });
+  });
+
   it('reads a request to find a landing site as the search, not a check of the selected site', () => {
     expect(ask('Find me a landing site that passes')).toEqual({ tool: 'find_landing_sites' });
     expect(ask('Where should I land a rover?')).toEqual({ tool: 'find_landing_sites' });
@@ -47,9 +75,15 @@ describe('parseIntent', () => {
     expect(aspect('how accurate is the 19 year sunlight?')).toBe('confidence');
   });
 
-  it('falls back to help for anything else', () => {
-    expect(ask('')).toEqual({ tool: 'help' });
-    expect(ask('tell me a joke')).toEqual({ tool: 'help' });
+  it('answers anything else with a friendly pointer, never the site help', () => {
+    expect(ask('')).toEqual({ tool: 'chat', input: { kind: 'about' } });
+    expect(ask('tell me a joke')).toEqual({ tool: 'chat', input: { kind: 'unknown' } });
+  });
+
+  it("reads Luna as the assistant's name, not the Moon, while the Luna missions still open", () => {
+    expect(ask('hi luna')).toEqual({ tool: 'chat', input: { kind: 'greet' } });
+    const luna9 = MISSIONS.find((m) => /luna 9/i.test(m.name));
+    if (luna9) expect(ask('show me Luna 9')).toEqual({ tool: 'show_mission', input: { id: luna9.id } });
   });
 });
 

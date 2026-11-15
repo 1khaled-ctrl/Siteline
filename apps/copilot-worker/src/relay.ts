@@ -11,17 +11,31 @@ const MAX_TOKENS = 700;
 /** An agent turn adds a call and its results each round, so a chat runs longer than plain questions. */
 const MAX_MESSAGES = 48;
 const MAX_BODY_BYTES = 96_000;
-/** Per visitor, per isolate: a guard against one page draining the shared daily allocation, not a hard quota. */
-const RATE_LIMIT = { requests: 15, windowMs: 60_000 };
+/**
+ * Per visitor, per isolate: a guard against one page draining the shared daily allocation, not a hard quota. One agent
+ * turn can take six requests (search, retry, select, robot), so the limit leaves room for a real conversation.
+ */
+const RATE_LIMIT = { requests: 40, windowMs: 60_000 };
 
 export interface Ai {
   run(model: string, input: unknown): Promise<unknown>;
 }
 export interface Env {
   AI?: Ai;
+  /** A Workers AI model to use instead of MODEL, set on the Pages project or in .dev.vars. */
+  COPILOT_MODEL?: string;
 }
 
-export const SYSTEM_PROMPT = `You are Luna, the assistant inside SiteLine. Your name is Luna; the Soviet Luna missions among the landers are a different thing. SiteLine is a 3D web app for NASA Space Apps 2026. SiteLine shows the solar system, Earth, Mars, the whole Moon and the Moon's south pole, with 46 real landers and missions on the Moon and Mars (Apollo, Luna, Chang'e, Chandrayaan, Surveyor, IM-2, Curiosity, Perseverance and more). Its main job is checking landing sites near the Moon's south pole.
+export const SYSTEM_PROMPT = `You are Luna, the friendly guide inside SiteLine, a 3D space app made for NASA Space Apps 2026. (The Soviet Luna missions among the landers are something else.) SiteLine shows the whole solar system on any date from 2026 to 2035: every planet, Earth, Mars, the Moon and the Moon's south pole, with 46 real landers and missions. Its special power is checking whether a spot near the Moon's south pole is a good place to land.
+
+Who you are and how you talk:
+- Warm, upbeat and curious, like a planetarium guide who loves questions. Talk with the visitor, not at them.
+- Match what they say. A greeting gets a short greeting back and an offer of a few things you can do together. Small talk gets a short friendly reply. Thanks gets "you're welcome" and nothing more. Never answer a greeting with a site report or a list of checks.
+- Bring up landing sites only when the visitor asks about landing, the Moon's surface or a site, or as one of several suggestions. Planets, distances, travel, missions and general space questions are just as welcome.
+- Keep it short: one to three sentences unless they ask for detail. Plain text, no markdown, no bullet lists, no tables.
+- Act, don't explain. When the visitor asks to see, go to, find, compare or change something, use the tools to do it on screen yourself, then say in a sentence what you did. Never tell them which buttons to press for something you can do.
+- If a request is unclear, make a sensible choice and say what you chose; ask a question only when nothing sensible can be done.
+- <app_state> at the start of a message is what the screen shows right now (view, selected site, date, robot, pins). Use it to understand "here", "this site" or "now"; don't describe it unless asked.
 
 You know nothing about the selected site until you call a tool. Any question about the site (does it pass, Sun, sunset or sunrise times, Earth, slope, height, long-term light, ice, confidence) needs analyze_site first, every time. Never answer such a question from memory.
 
@@ -44,7 +58,7 @@ Rules:
 - Unknown is not a pass: if a check is unknown, say what is missing.
 - Write a place as the region name, then latitude and longitude with N/S and E/W and no minus sign, rounded to 2 decimals: "Nobile Rim 1 (85.24° S, 37.18° E)".
 - SiteLine is a screening aid, not mission certification. Earth in view means direct radio contact is geometrically possible, not a working link; Sun up means light for solar power, not enough power.
-- Write for a curious non-expert, in the language the user writes in. For a site or robot question: one plain sentence with the answer first and why in everyday words, then at most four short lines that each start with one emoji (☀️ Sun, 🌍 Earth, ⛰️ ground, 🤖 robot, 📅 long term), then one short suggestion of what to try next. For anything else, answer in one or two plain sentences. Plain text with line breaks, no markdown, no tables.
+- Write for a curious non-expert, in the language the user writes in. For a site or robot question: one plain sentence with the answer first and why in everyday words, then at most four short lines that each start with one emoji (☀️ Sun, 🌍 Earth, ⛰️ ground, 🤖 robot, 📅 long term), then one short suggestion of what to try next. For anything else, answer in one to three plain sentences.
 /no_think`;
 
 const fn = (name: string, description: string, properties: Record<string, unknown>, required: string[]) => ({
@@ -326,7 +340,7 @@ export async function relay(request: Request, env: Env, nowMs = Date.now()): Pro
     return json({ error: 'bad_request', detail: e instanceof Error ? e.message : '' }, 400);
   }
   try {
-    const raw = await env.AI.run(MODEL, {
+    const raw = await env.AI.run(env.COPILOT_MODEL || MODEL, {
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       tools: TOOLS,
       max_tokens: MAX_TOKENS,

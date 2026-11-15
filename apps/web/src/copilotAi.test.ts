@@ -28,6 +28,13 @@ describe('unverifiedNumbers', () => {
   it('finds a number that a source rounds to, at the precision it is written', () => {
     expect(unverifiedNumbers('Earth is in view 56% (55.9%) of the stay; slope 4.1°.', sources)).toEqual([]);
   });
+  it('reads scale words, so "789 million km" is found in 789000000 but "790 million" is not', () => {
+    const facts = ['{"distanceFromEarthKm":789000000,"distanceFromEarthKmSaturn":1270000000}'];
+    expect(unverifiedNumbers('Jupiter is about 789 million kilometres away.', facts)).toEqual([]);
+    expect(unverifiedNumbers('Saturn is about 1.27 billion km away.', facts)).toEqual([]);
+    expect(unverifiedNumbers('Jupiter is about 790 million kilometres away.', facts)).toEqual(['790']);
+  });
+
   it('flags a number no source holds', () => {
     expect(unverifiedNumbers('Earth is in view 57% of the stay, and the slope is 7°.', sources)).toEqual(['57', '7']);
   });
@@ -68,10 +75,42 @@ describe('askAi', () => {
     expect(sent[0][0]).toMatchObject({ role: 'user', content: expect.stringContaining('<app_state>{"view":"pole"}') });
   });
 
-  it('flags a number in the answer that no tool gave', async () => {
-    const { relay } = scripted([{ text: 'It is about 42 km from the pole.', toolCalls: [] }]);
+  it('flags a number no tool gave when the model keeps it after being told once', async () => {
+    const { relay, sent } = scripted([
+      { text: 'It is about 42 km from the pole.', toolCalls: [] },
+      { text: 'It is still about 42 km.', toolCalls: [] },
+    ]);
     const out = await askAi('How far?', {}, [], tool, relay);
     expect(out).toMatchObject({ ok: true, unverified: ['42'] });
+    // The second request told the model which number came from no tool.
+    expect(sent[1].at(-1)).toMatchObject({ role: 'user', content: expect.stringContaining('42') });
+  });
+
+  it('counts numbers a tool gave earlier in the chat, for follow-up questions', async () => {
+    const earlier: ChatMessage[] = [
+      { role: 'user', content: 'How far is Jupiter?' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ id: 't1', type: 'function', function: { name: 'space_facts', arguments: '{}' } }],
+      },
+      { role: 'tool', tool_call_id: 't1', content: '{"temperatureAtLevel":{"celsius":-108,"bar":1}}' },
+      { role: 'assistant', content: 'About 789 million km.' },
+    ];
+    const { relay } = scripted([{ text: 'It is about -108 °C at the 1 bar level.', toolCalls: [] }]);
+    const out = await askAi('Is it cold there?', {}, earlier, tool, relay);
+    expect(out).toMatchObject({ ok: true, unverified: [] });
+  });
+
+  it('gives the model one chance to look a number up instead of making it up', async () => {
+    const { relay } = scripted([
+      { text: 'Earth is in view about 80% of the stay.', toolCalls: [] },
+      { text: '', toolCalls: [{ id: 'c1', name: 'analyze_site', arguments: {} }] },
+      { text: 'Earth is in view about 56% of the stay.', toolCalls: [] },
+    ]);
+    const out = await askAi('Is Earth in view?', {}, [], tool, relay);
+    expect(out).toMatchObject({ ok: true, unverified: [], calls: ['analyze_site()'] });
+    if (out.ok) expect(out.text).toContain('56%');
   });
 
   it('hands a failed tool back to the model as an error rather than stopping', async () => {

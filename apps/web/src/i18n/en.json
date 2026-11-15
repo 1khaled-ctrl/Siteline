@@ -319,6 +319,31 @@
       "busy": "Too many live calls just now. Try again in a minute.",
       "failed": "The live call couldn't start: {{message}}",
       "note": "Live call with Luna, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks."
+    },
+    "chat": {
+      "greet": "Hi! I'm Luna 👋 I can fly you to any planet, tell you how far away it is and how long the trip takes, or find a safe place to land on the Moon. What would you like to do?",
+      "howAreYou": "I'm great, thanks for asking! Ready to explore. Want to visit a planet, or find a landing spot on the Moon?",
+      "thanks": "You're welcome! Anything else you'd like to explore?",
+      "bye": "Bye for now! Come back any time. 🚀",
+      "about": "I'm Luna, SiteLine's guide. I can fly you anywhere in the solar system, tell you how far a planet is and how long it takes to get there, find a Moon landing site that passes all four checks for your date and robot, and explain why a spot passes or fails. Try \"Show me Saturn\", \"How far is Mars?\" or \"Find me a landing site for a rover in March 2028\".",
+      "unknown": "Sorry, I didn't quite get that. I can show you a planet (\"Show me Jupiter\"), give distances and travel times (\"How far is Mars?\"), or find a place to land on the Moon (\"Find me a landing site\")."
+    },
+    "space": {
+      "head": "🪐 {{name}}, on the date shown:",
+      "shown": "Here's {{name}}. Ask me how far it is, how long the trip takes, or how cold it gets.",
+      "distance": "📏 {{far}} from Earth.",
+      "billion": "about {{n}} billion km",
+      "million": "about {{n}} million km",
+      "km": "about {{n}} km",
+      "signalS": "📡 A radio signal takes {{n}} seconds to get there.",
+      "signalMin": "📡 A radio signal takes about {{n}} minutes to get there.",
+      "travelMoon": "🚀 Apollo 11 took about {{days}} days to coast there.",
+      "travelYears": "🚀 The cheapest possible trip takes about {{n}} years; real missions differ.",
+      "travelDays": "🚀 The cheapest possible trip takes about {{n}} days; real missions differ.",
+      "giant": "🌡️ No solid surface: it's about {{c}} °C at the {{bar}} bar level, and gravity there is {{g}} m/s².",
+      "surface": "🌡️ Around {{c}} °C on average, with gravity of {{g}} m/s².",
+      "gravity": "🌍 Gravity: {{g}} m/s².",
+      "more": "💡 Want to see another planet, or find a landing site on the Moon?"
     }
   },
   "share": {

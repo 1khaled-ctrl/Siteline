@@ -119,13 +119,13 @@ describe('relay', () => {
     expect((await relay(post(ask, { Origin: 'http://localhost:8788' }), { AI: ai })).status).toBe(200);
   });
 
-  it('limits one visitor to 15 requests a minute', async () => {
+  it('limits one visitor to 40 requests a minute, room for several six-step agent turns', async () => {
     const { ai } = fakeAi({ response: 'ok' });
     const one = { 'CF-Connecting-IP': 'same-visitor' };
     const statuses: number[] = [];
-    for (let i = 0; i < 16; i++) statuses.push((await relay(post(ask, one), { AI: ai }, 1_000)).status);
-    expect(statuses.slice(0, 15).every((s) => s === 200)).toBe(true);
-    expect(statuses[15]).toBe(429);
+    for (let i = 0; i < 41; i++) statuses.push((await relay(post(ask, one), { AI: ai }, 1_000)).status);
+    expect(statuses.slice(0, 40).every((s) => s === 200)).toBe(true);
+    expect(statuses[40]).toBe(429);
     expect((await relay(post(ask, one), { AI: ai }, 1_000 + 61_000)).status).toBe(200);
   });
 

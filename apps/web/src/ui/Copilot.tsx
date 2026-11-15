@@ -2,13 +2,24 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MISSION_NAMES, runAgentTool, type SitesCard } from '../agentTools';
 import { type Confidence, confidenceOf, type Reading, SLOPE_NEEDS_M } from '../confidence';
-import { type Aspect, type Intent, parseIntent, type SiteSummary, summarize, type Target } from '../copilot';
+import {
+  type Aspect,
+  type Intent,
+  isFactsQuestion,
+  isSpaceBodyName,
+  parseIntent,
+  type SiteSummary,
+  type SpaceBodyName,
+  summarize,
+  type Target,
+} from '../copilot';
 import { askAi, type ChatMessage, plainReply, type ToolCall, type ToolResult } from '../copilotAi';
 import { formatNumber, formatUtc } from '../format';
 import { findLander } from '../landers';
 import type { LiveSession, LiveState } from '../liveVoice';
 import { physics, queryFor, URLS } from '../physics';
 import { sound } from '../sound';
+import type { SpaceFacts } from '../spaceFacts';
 import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
@@ -75,6 +86,8 @@ export function Copilot() {
   /** Replies are read aloud after a question asked by voice, until the visitor types again. */
   const [speakReplies, setSpeakReplies] = useState(false);
   const history = useRef<ChatMessage[]>([]);
+  /** The planet or body the conversation is about, so "is it cold there?" knows where "there" is. */
+  const topic = useRef<SpaceBodyName | null>(null);
   const next = useRef(1);
   const end = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -119,6 +132,51 @@ export function Copilot() {
   };
   const update = (id: number, patch: (m: Message) => Partial<Message>) =>
     setLog((l) => l.map((m) => (m.id === id ? { ...m, ...patch(m) } : m)));
+
+  /** Big distances in words a person would say: "1.3 billion km", "225 million km", "384,400 km". */
+  const bigKm = (km: number) =>
+    km >= 1e9
+      ? t('copilot.space.billion', { n: formatNumber(km / 1e9, 2) })
+      : km >= 1e6
+        ? t('copilot.space.million', { n: formatNumber(km / 1e6, 0) })
+        : t('copilot.space.km', { n: formatNumber(km, 0) });
+
+  /** A friendly answer about a body, line by line, from `space_facts` and nothing else. */
+  const spaceAnswer = (f: SpaceFacts): string => {
+    const name = t(`bodies.${f.body}`);
+    const lines = [t('copilot.space.head', { name })];
+    if (f.distanceFromEarthKm !== null) lines.push(t('copilot.space.distance', { far: bigKm(f.distanceFromEarthKm) }));
+    if (f.signalFromEarth)
+      lines.push(
+        f.signalFromEarth.seconds < 120
+          ? t('copilot.space.signalS', { n: formatNumber(f.signalFromEarth.seconds, 1) })
+          : t('copilot.space.signalMin', { n: formatNumber(f.signalFromEarth.minutes, 0) }),
+      );
+    if (f.travel?.kind === 'moon') lines.push(t('copilot.space.travelMoon', { days: f.travel.coastDays }));
+    if (f.travel?.kind === 'transfer')
+      lines.push(
+        f.travel.idealTransferYears !== null
+          ? t('copilot.space.travelYears', { n: formatNumber(f.travel.idealTransferYears, 1) })
+          : t('copilot.space.travelDays', { n: formatNumber(f.travel.idealTransferDays, 0) }),
+      );
+    const p = f.physical;
+    if (p) {
+      const g = formatNumber(p.gravityMS2, 2);
+      if (!p.solidSurface && p.temperatureAtLevel)
+        lines.push(
+          t('copilot.space.giant', {
+            c: formatNumber(p.temperatureAtLevel.celsius, 0),
+            bar: p.temperatureAtLevel.bar,
+            g,
+          }),
+        );
+      else if (p.meanTemperatureC !== null)
+        lines.push(t('copilot.space.surface', { c: formatNumber(p.meanTemperatureC, 0), g }));
+      else lines.push(t('copilot.space.gravity', { g }));
+    }
+    lines.push(t('copilot.space.more'));
+    return lines.join('\n');
+  };
 
   /** A progress line read aloud after a spoken question, queued behind what is already being said. */
   const narrate = (sentence: string) => speak(sentence, i18n.language, { queue: true });
@@ -262,6 +320,7 @@ export function Copilot() {
       robot: s.robot,
       pins: s.pins,
       openMission: s.missionId,
+      talkingAbout: topic.current,
     };
   };
 
@@ -285,6 +344,8 @@ export function Copilot() {
       const patchStep = (p: Partial<Step>) =>
         update(messageId, (m) => ({ steps: (m.steps ?? []).map((s) => (s.id === id ? { ...s, ...p } : s)) }));
       update(messageId, (m) => ({ steps: [...(m.steps ?? []), step] }));
+      const about = call.arguments.body ?? call.arguments.target;
+      if ((call.name === 'space_facts' || call.name === 'fly_to') && isSpaceBodyName(about)) topic.current = about;
       try {
         const out = await runAgentTool(call, { t, progress: (detail) => patchStep({ detail }), announce });
         if (out.card) cards.push(out.card);
@@ -310,6 +371,8 @@ export function Copilot() {
     // daily allowance is kept for questions.
     const intent = parseIntent(message, MISSION_NAMES);
     if (intent.tool === 'fly_to' || intent.tool === 'show_mission') return runBasic(message, spoken);
+    // Hello, thanks, who are you: answered at once in Luna's own words, without waiting on (or spending) the model.
+    if (intent.tool === 'chat' && intent.input.kind !== 'unknown') return runBasic(message, spoken);
     const working = add({ from: 'siteline', text: '', steps: [], working: true });
     const cards: SitesCard[] = [];
     const out = await askAi(
@@ -344,6 +407,33 @@ export function Copilot() {
     const intent = parseIntent(message, MISSION_NAMES);
     const call = callText(intent) || undefined;
     if (intent.tool === 'help') return say({ from: 'siteline', text: t('copilot.help') }, spoken);
+    // "Is it cold there?" names no body: it is about the one the conversation is on.
+    const space =
+      intent.tool === 'space'
+        ? intent.input
+        : intent.tool === 'chat' && intent.input.kind === 'unknown' && topic.current && isFactsQuestion(message)
+          ? { body: topic.current, show: false, facts: true }
+          : undefined;
+    if (intent.tool === 'chat' && !space)
+      return say({ from: 'siteline', text: t(`copilot.chat.${intent.input.kind}`) }, spoken);
+    if (space) {
+      // A planet without the model: the same tools Luna uses, and an answer built from their numbers.
+      const { body, show, facts } = space;
+      topic.current = body;
+      const working = add({ from: 'siteline', text: '', steps: [], working: true });
+      const tool = stepper(working, []);
+      if (show) await tool({ id: 'show', name: 'fly_to', arguments: { target: body } }).catch(() => undefined);
+      let text = t('copilot.space.shown', { name: t(`bodies.${body}`) });
+      let sources: string[] | undefined;
+      if (facts) {
+        const out = await tool({ id: 'facts', name: 'space_facts', arguments: { body } }).catch(() => undefined);
+        if (out) {
+          text = spaceAnswer(out.data as SpaceFacts);
+          sources = out.sources;
+        }
+      }
+      return finish(working, { text, sources }, spoken);
+    }
     if (intent.tool === 'fly_to') {
       useApp.getState().set({ view: VIEW_OF[intent.input.target] });
       return say(
@@ -382,6 +472,7 @@ export function Copilot() {
           : t('copilot.agent.basicNone');
       return finish(working, { text: reply, card }, spoken);
     }
+    if (intent.tool !== 'analyze_site') return;
     // analyze_site: the same check, on the same inputs, that the site report shows.
     const { latDeg, lonDeg, landingUtc, slipDays } = useApp.getState();
     const query = queryFor({ latDeg, lonDeg }, landingUtc, slipDays);
