@@ -121,7 +121,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [locked, setLocked] = useState(false);
   const [blocked, setBlocked] = useState<MoveBlock | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
-  const [sky, setSky] = useState<Omit<SurfaceSky, 'sunlit'>>();
+  const [sky, setSky] = useState<Omit<SurfaceSky, 'sunlit' | 'ambient' | 'shadowMap'>>();
   const [eye, setEye] = useState<EyeView>();
   const [shadowsBusy, setShadowsBusy] = useState(false);
   const [labelsOn, setLabelsOn] = useState(true);
@@ -130,6 +130,10 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [infoOpen, setInfoOpen] = useState(false);
   /** True when most of the walkable ground around the eye is in shadow at this moment. */
   const [darkHere, setDarkHere] = useState(false);
+  /** In shadow, the picture is exposed for it; `faint` when even the longest exposure finds almost no light. */
+  const [shadowLight, setShadowLight] = useState<'exposed' | 'faint' | null>(null);
+  const inspectOnRef = useRef(false);
+  inspectOnRef.current = inspectOn;
   // On a narrow screen the view's options fold away behind one button, to keep the horizon in view.
   const [toolsOpen, setToolsOpen] = useState(!narrow);
 
@@ -217,6 +221,17 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     setPhase({ kind: 'cancelled' });
   };
 
+  /**
+   * Whether the ground around (east, north) is mostly in shadow; if so (and the inspection light is off), the picture is
+   * exposed for the shadow's own light.
+   */
+  const judgeShadow = useCallback((view: SurfaceView, east: number, north: number) => {
+    const dark = view.sunlitAround(east, north, DARK_RADIUS_M) < DARK_SHARE;
+    setDarkHere(dark);
+    const exposed = view.exposeForShadow(dark && !inspectOnRef.current, east, north);
+    setShadowLight(dark ? (exposed.limited ? 'faint' : 'exposed') : null);
+  }, []);
+
   /** The Sun, the Earth, the shadows and the eye's readings for a moment; `quick` first, then in full. */
   const requestSky = useCallback(
     async (tUtcMs: number, quick: boolean): Promise<boolean> => {
@@ -234,11 +249,12 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
         earthDir: answer.earth.dir,
         earthRadiusDeg: answer.earth.radiusDeg,
         sunlit: answer.sunlit,
+        ambient: answer.ambient,
         shadowMap: answer.shadowMap,
       });
-      const { sunlit: _lit, shadowMap: _map, ...shown } = answer;
+      const { sunlit: _lit, ambient: _ambient, shadowMap: _map, ...shown } = answer;
       setSky(shown);
-      setDarkHere(view.sunlitAround(east, north, DARK_RADIUS_M) < DARK_SHARE);
+      judgeShadow(view, east, north);
       if (answer.eye) setEye(answer.eye);
       if (!quick) {
         setShadowsBusy(false);
@@ -246,7 +262,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
       }
       return true;
     },
-    [scene, skies],
+    [scene, skies, judgeShadow],
   );
 
   // The surface itself, once its terrain is in: lit for touchdown, then the descent.
@@ -282,7 +298,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
         onBlocked: setBlocked,
         onPointerLock: setLocked,
         onSettled: (east, north) => {
-          setDarkHere((viewRef.current?.sunlitAround(east, north, DARK_RADIUS_M) ?? 1) < DARK_SHARE);
+          if (viewRef.current) judgeShadow(viewRef.current, east, north);
           const id = eyes.start();
           physics.surfaceEye(scene.key, exploreRef.current, URLS.data, east, north).then(
             (answer) => eyes.isCurrent(id) && answer?.eye && setEye(answer.eye),
@@ -330,7 +346,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
       view.dispose();
     };
     // The time is read from a ref: moving the clock must not rebuild the surface.
-  }, [scene, requestSky, target.touchdownUtcMs, eyes, skies]);
+  }, [scene, requestSky, target.touchdownUtcMs, eyes, skies, judgeShadow]);
 
   // Moving the clock: a quick pass for the light at once, then the shadows in full.
   useEffect(() => {
@@ -373,7 +389,14 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
     return () => observer.disconnect();
   }, [exploring]);
   useEffect(() => viewRef.current?.setTouchdownMarker(markerOn), [markerOn]);
-  useEffect(() => viewRef.current?.setInspectionLight(inspectOn), [inspectOn]);
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.setInspectionLight(inspectOn);
+    // The lamp lights the shadow itself: no need to expose for it while it is on.
+    const { east, north } = view.position();
+    judgeShadow(view, east, north);
+  }, [inspectOn, judgeShadow]);
 
   const shiftClock = (hours: number) =>
     setOffsetMs((ms) => Math.min(OFFSET_MAX_H, Math.max(OFFSET_MIN_H, Math.round(ms / HOUR_MS) + hours)) * HOUR_MS);
@@ -614,7 +637,9 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 data-testid="surface-dark"
               >
                 <p className={`min-w-0 flex-1 basis-44 ${inspectOn ? 'text-accent' : 'text-quiet'}`}>
-                  {inspectOn ? t('land.inspectOn') : t('land.darkHere')}
+                  {inspectOn
+                    ? t('land.inspectOn')
+                    : `${t('land.darkHere')} ${t(shadowLight === 'faint' ? 'land.darkFaint' : 'land.darkExposed')}`}
                 </p>
                 <button
                   type="button"
@@ -682,6 +707,7 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
               walkIndex={scene.walkIndex}
               fineRegion={scene.fineRegion}
               shadowM={sky?.shadowM ?? near?.spacingM ?? 0}
+              earthshine={sky?.earthshine}
               onClose={() => {
                 setInfoOpen(false);
                 aboutButtonRef.current?.focus();

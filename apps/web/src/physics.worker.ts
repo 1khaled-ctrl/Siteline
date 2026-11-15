@@ -4,12 +4,14 @@ import {
   type BestSearch,
   type BestSpot,
   bestSpots,
+  bouncedIrradiance,
   type Dem,
   type DemHorizon,
   demFromInt16,
   EARTH_RADIUS_KM,
   type EphemerisTable,
   EYE_HEIGHT_M,
+  earthshineIrradiance,
   elevAz,
   eyeSky,
   flatHorizon,
@@ -20,6 +22,7 @@ import {
   type HeightSource,
   HORIZON_BINS,
   HORIZON_MIN_DIST_M,
+  type Horizon,
   heightsFromDem,
   heightsFromPatches,
   horizonFromDem,
@@ -33,6 +36,7 @@ import {
   localFrame,
   localToGeo,
   MAX_LANDING_SLOPE_DEG,
+  MOON_BOND_ALBEDO,
   mapsAtSite,
   mapsFromBytes,
   marsSubsolarPoint,
@@ -58,6 +62,7 @@ import {
   stayTest,
   subsolarPoint,
   sweepDiscVisibility,
+  sweepHorizon,
   unitToLatLon,
   type Vec3,
   WALK_RADIUS_M,
@@ -718,6 +723,13 @@ export interface SurfaceSky {
   earth: SkyBody;
   /** The share of the Sun's disc each node of each ring sees above the terrain, 0 to 1, ring by ring. */
   sunlit?: Float32Array[];
+  /**
+   * The light reaching each node of each ring besides the Sun's own: sunlight scattered off sunlit terrain around it,
+   * and earthshine, as a share of direct sunlight on a surface square to the Sun.
+   */
+  ambient?: Float32Array[];
+  /** Earthshine at this moment on a surface square to the Earth, as a share of direct sunlight. */
+  earthshine?: number;
   /** The same on the walkable ground, at `spacingM` (finer than its mesh), as bytes 0 to 255, laid out like a grid. */
   shadowMap?: { data: Uint8Array; size: number; spacingM: number; halfM: number };
   /** How finely the shadows were worked out on the walkable ground, metres. */
@@ -742,6 +754,95 @@ interface BuiltSurface {
   complete: boolean;
   walkIndex: number;
   fineRegion?: string;
+  /** The skylines for the light in the shadows, worked out once for these grids (see `shadowLightGeometry`). */
+  light?: ShadowLightGeometry;
+}
+
+/** The azimuths whose skylines give the light scattered off the terrain: every 45°. */
+const SCATTER_AZ_DEG = [0, 45, 90, 135, 180, 225, 270, 315];
+
+interface ShadowLightGeometry {
+  /** The grids it was worked out for: a ring sharpened since means working it out again. */
+  grids: LocalGrid[];
+  rings: { coarse: PointGrid; horizons: Horizon[]; normals: Float32Array; coarseNormals: Float32Array }[];
+}
+
+/**
+ * What each ring sees of the terrain around it, which does not change with the time: its skyline in eight azimuths
+ * and how far off the terrain setting it is, at a quarter of the ring's density (the scattered light is smooth), and
+ * each node's slope.
+ */
+function shadowLightGeometry(surface: BuiltSurface): ShadowLightGeometry {
+  const kept = surface.light;
+  if (kept && kept.grids.length === surface.grids.length && kept.grids.every((g, i) => g === surface.grids[i]))
+    return kept;
+  const rings = surface.grids.map((g) => {
+    const factor = (g.size - 1) % 4 === 0 ? 4 : (g.size - 1) % 2 === 0 ? 2 : 1;
+    const coarse: PointGrid = { size: (g.size - 1) / factor + 1, spacingM: g.spacingM * factor, halfM: g.halfM };
+    const horizons = SCATTER_AZ_DEG.map((azDeg) => ({ azDeg, ...sweepHorizon(surface.grids, coarse, azDeg) }));
+    const normals = gridNormals(g);
+    const coarseNormals = new Float32Array(coarse.size * coarse.size * 3);
+    for (let r = 0; r < coarse.size; r++)
+      for (let c = 0; c < coarse.size; c++) {
+        const k = r * factor * g.size + c * factor;
+        coarseNormals.set(normals.subarray(3 * k, 3 * k + 3), 3 * (r * coarse.size + c));
+      }
+    return { coarse, horizons, normals, coarseNormals };
+  });
+  surface.light = { grids: [...surface.grids], rings };
+  return surface.light;
+}
+
+/**
+ * The light in the shadows at a moment, node by node: sunlight scattered once off the terrain around (from the direct
+ * sunlight on it), and earthshine on the node's slope where the Earth is above its skyline. Both as a share of direct
+ * sunlight. The scattered light is worked out for level ground.
+ */
+function shadowLight(
+  surface: BuiltSurface,
+  sky: { sun: SkyBody; earth: SkyBody },
+  sunlit: Float32Array[],
+): { ambient: Float32Array[]; earthshine: number } {
+  const geometry = shadowLightGeometry(surface);
+  const { grids } = surface;
+  const [se, sn, su] = sky.sun.dir;
+  const [ee, en, eu] = sky.earth.dir;
+  // The normals are three.js's: x east, y up, z south.
+  const facing = (normals: Float32Array, k: number, e: number, n: number, u: number) =>
+    Math.max(0, normals[3 * k] * e + normals[3 * k + 1] * u - normals[3 * k + 2] * n);
+  const direct = grids.map((_, i) => {
+    const { normals } = geometry.rings[i];
+    const lit = sunlit[i];
+    const d = new Float32Array(lit.length);
+    for (let k = 0; k < lit.length; k++) d[k] = lit[k] * facing(normals, k, se, sn, su);
+    return d;
+  });
+  const directAt = (east: number, north: number): number => {
+    for (let i = 0; i < grids.length; i++) {
+      const g = grids[i];
+      if (Math.abs(east) > g.halfM || Math.abs(north) > g.halfM) continue;
+      const k = Math.round((g.halfM - north) / g.spacingM) * g.size + Math.round((east + g.halfM) / g.spacingM);
+      if (Number.isFinite(g.up[k])) return direct[i][k];
+    }
+    return Number.NaN;
+  };
+  // The Earth's phase angle seen from here: the Sun is so far off that Earth-to-Sun is the Sun's direction.
+  const phase = Math.acos(Math.max(-1, Math.min(1, -(se * ee + sn * en + su * eu))));
+  const earthshine = earthshineIrradiance(phase, sky.earth.distKm, EARTH_RADIUS_KM);
+  const ambient = grids.map((g, i) => {
+    const { coarse, horizons, normals, coarseNormals } = geometry.rings[i];
+    const bounce = resampleGrid(
+      bouncedIrradiance(coarse, horizons, directAt, MOON_BOND_ALBEDO, coarseNormals),
+      coarse,
+      g,
+    );
+    const earthSeen = resampleGrid(sweepDiscVisibility(grids, coarse, sky.earth.dir, sky.earth.radiusDeg), coarse, g);
+    const out = new Float32Array(g.size * g.size);
+    for (let k = 0; k < out.length; k++)
+      out[k] = bounce[k] + earthshine * earthSeen[k] * facing(normals, k, ee, en, eu);
+    return out;
+  });
+  return { ambient, earthshine };
 }
 
 /** One ring's mesh, ready to send to the main thread (fresh arrays, so they can be transferred). */
@@ -1488,17 +1589,20 @@ const api = {
     const map = sun({ size: mapSize, spacingM: mapM, halfM: walk.halfM });
     const data = new Uint8Array(map.length);
     for (let i = 0; i < map.length; i++) data[i] = Math.round(map[i] * 255);
+    const { ambient, earthshine } = shadowLight(surface, sky, sunlit);
     const result: SurfaceSky = {
       tUtcMs: sky.t,
       clamped: sky.clamped,
       sun: sky.sun,
       earth: sky.earth,
       sunlit,
+      ambient,
+      earthshine,
       shadowMap: { data, size: mapSize, spacingM: mapM, halfM: walk.halfM },
       shadowM: mapM,
       eye: eye ? eyeAt(surface, eye.east, eye.north, sky) : undefined,
     };
-    return Comlink.transfer(result, [...sunlit.map((s) => s.buffer), data.buffer]);
+    return Comlink.transfer(result, [...sunlit.map((s) => s.buffer), ...ambient.map((a) => a.buffer), data.buffer]);
   },
 
   /** Only what the eye at (east, north) sees of the Sun and the Earth: cheap, for after each walk. */
