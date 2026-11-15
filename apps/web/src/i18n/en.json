@@ -151,8 +151,8 @@
     }
   },
   "copilot": {
-    "open": "Ask SiteLine",
-    "title": "Ask SiteLine",
+    "open": "Ask Luna",
+    "title": "Luna",
     "badge": {
       "unknown": "Free AI, with a fallback",
       "ai": "Free AI: Cloudflare Workers AI",
@@ -163,7 +163,7 @@
     "placeholder": "Ask about this site, or say where to go",
     "send": "Send",
     "thinking": "Checking…",
-    "intro": "Ask me to find a landing site, check the selected one, open a mission, or say where to go. Type, or tap the mic and talk. Try one of these:",
+    "intro": "I'm Luna, SiteLine's guide. Ask me to find a landing site, check the selected one, open a mission, or say where to go. Type, or tap the mic and talk. Try one of these:",
     "example1": "Does this site pass?",
     "example2": "Why does it fail?",
     "example3": "When does the Sun set?",
@@ -290,7 +290,7 @@
       },
       "basicFound": "✅ The best site I found is in {{region}}, for a landing on {{date}}. I've flown there and pinned the others; they're listed below.",
       "basicNone": "❌ Nothing passes all four checks on this date. Try another date with the date stepper, or a launch slip, and ask again.",
-      "mic": "Talk to Ask SiteLine",
+      "mic": "Talk to Luna",
       "micStop": "Stop listening",
       "micBlocked": "The microphone is blocked. Allow it for this site in the browser's address bar, then try again.",
       "micFailed": "The mic didn't catch that. Try again, or type your question.",
@@ -318,7 +318,7 @@
       "unavailable": "Live voice isn't set up on this server yet. The mic button still works with your browser's own speech.",
       "busy": "Too many live calls just now. Try again in a minute.",
       "failed": "The live call couldn't start: {{message}}",
-      "note": "Live call with Ask SiteLine, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks."
+      "note": "Live call with Luna, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks."
     }
   },
   "share": {
@@ -971,7 +971,7 @@
   "orb": {
     "open": "Open the SiteLine menu",
     "close": "Close the menu",
-    "ask": "Ask SiteLine",
+    "ask": "Ask Luna",
     "hide": "Hide the interface",
     "show": "Show the interface"
   }

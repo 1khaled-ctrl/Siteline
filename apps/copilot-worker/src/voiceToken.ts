@@ -1,5 +1,5 @@
 /**
- * Ask SiteLine Live's token endpoint (POST /api/voice-token). A visitor who taps "Talk live" gets a short-lived
+ * Luna Live's token endpoint (POST /api/voice-token). A visitor who taps "Talk live" gets a short-lived
  * LiveKit access token for a room of their own, and the token itself asks LiveKit to send the SiteLine voice agent
  * (apps/voice-agent) into that room. The API key and secret stay here, set as secrets on the Pages project
  * (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`); the browser only ever sees the signed token.

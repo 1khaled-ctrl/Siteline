@@ -57,7 +57,8 @@ export function toolReply(raw: string): string {
 export const MAX_SAY_CHARS = 200;
 
 /** What the agent says as the call opens. */
-export const GREETING = "Hi, I'm Ask SiteLine. Tell me what you're landing and when, and I'll find you a spot.";
+export const GREETING =
+  "Hi, I'm Luna, SiteLine's guide. Tell me what you're landing and when, and I'll find you a spot.";
 
 /** The app's state for one turn, as a note after the cached prompt (never inside it). */
 export const appStateNote = (state: string) => `<app_state>${state}</app_state>`;

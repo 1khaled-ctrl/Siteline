@@ -52,7 +52,7 @@ const PGDA_PROXY = {
 };
 
 /**
- * Ask SiteLine's relay (functions/api/copilot.ts). On the deployed site it is the Pages Function itself; while
+ * Luna's relay (functions/api/copilot.ts). On the deployed site it is the Pages Function itself; while
  * developing, `corepack pnpm copilot` runs it under Wrangler on port 8788 with the Workers AI binding, and the dev
  * server passes /api there. With nothing on 8788 the copilot falls back to its matcher.
  */

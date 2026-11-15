@@ -1,5 +1,5 @@
 /**
- * Ask SiteLine Live: the voice agent. LiveKit sends it into a visitor's room when their browser joins with a token
+ * Luna Live: the voice agent. LiveKit sends it into a visitor's room when their browser joins with a token
  * from /api/voice-token. It hears the visitor (STT), thinks (LLM) and speaks (TTS) through LiveKit Inference, and every
  * tool it calls runs in the visitor's own browser over RPC, with the same functions the screen uses: the agent never
  * computes a number itself, and the view moves as it works.

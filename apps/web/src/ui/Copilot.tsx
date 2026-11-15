@@ -58,7 +58,7 @@ const callText = (intent: Intent) =>
         .join(', ')})`;
 
 /**
- * Ask SiteLine: a chat over the 3D view that works as an agent. It can fly the view, open a mission, check any Moon
+ * Luna: a chat over the 3D view that works as an agent. It can fly the view, open a mission, check any Moon
  * site, and search the south pole for a site that passes, showing each step as it runs and moving the screen as it
  * goes. Tools run here with the functions the screen uses. It speaks and listens through the browser's own speech.
  */
@@ -487,7 +487,7 @@ export function Copilot() {
     update(work.id, () => ({ working: false, card }));
   };
 
-  /** Ask SiteLine Live: a voice call with the LiveKit agent, whose tools run here, through the same steps as the chat. */
+  /** Luna Live: a voice call with the LiveKit agent, whose tools run here, through the same steps as the chat. */
   const startCall = async (): Promise<boolean> => {
     setVoiceError(undefined);
     stopListening.current?.();

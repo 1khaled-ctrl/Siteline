@@ -2,7 +2,7 @@ import { ConnectionState, type RemoteTrack, Room, RoomEvent, type RpcInvocationD
 import type { ToolCall } from './copilotAi';
 
 /**
- * Ask SiteLine Live in the browser: a LiveKit room with the SiteLine voice agent (apps/voice-agent). The visitor's mic
+ * Luna Live in the browser: a LiveKit room with the SiteLine voice agent (apps/voice-agent). The visitor's mic
  * goes to the agent and its voice comes back; both sides' words arrive as transcripts for the chat. When the agent
  * calls a tool, it asks this page over RPC, and the page runs it with the same code the chat uses (agentTools.ts), so
  * the view moves and the numbers are SiteLine's own. Typed messages go to the same agent over the room's chat topic.

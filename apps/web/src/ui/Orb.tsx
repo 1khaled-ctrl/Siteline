@@ -48,7 +48,7 @@ const EyeIcon = (
 
 /**
  * The orb: a glowing button at the bottom corner of the 3D view. A tap fans its actions out around it as floating round
- * buttons: Ask SiteLine, and hiding the whole interface for a clean look at the scene (the orb alone stays, dimmed,
+ * buttons: Luna, and hiding the whole interface for a clean look at the scene (the orb alone stays, dimmed,
  * to bring it back; so does Escape). On a wide screen it sits at the start edge and fans toward the middle; on a phone
  * it sits at the end edge beside the dial and fans the other way.
  */

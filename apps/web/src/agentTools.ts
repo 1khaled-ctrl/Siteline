@@ -13,7 +13,7 @@ import { isSpaceBody, spaceFacts } from './spaceFacts';
 import { FIRST_UTC_MS, LAST_UTC_MS, LAYERS, type Layer, MAX_PINS, type MoonView, useApp } from './store';
 
 /**
- * Every tool Ask SiteLine's agent can use, in one place. Each runs in the browser with the functions the screen itself
+ * Every tool Luna's agent can use, in one place. Each runs in the browser with the functions the screen itself
  * uses (the physics worker, the store), so whatever the agent says or shows is what SiteLine worked out. Read tools
  * only look; act tools move the view, the date, the pins or the map layer, as a visitor's own clicks would. None
  * writes data anywhere or calls an outside service.

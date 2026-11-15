@@ -1,4 +1,4 @@
-# apps/voice-agent: Ask SiteLine Live
+# apps/voice-agent: Luna Live
 
 Owner: Copilot and quality (feature 25, with apps/copilot-worker).
 

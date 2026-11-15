@@ -1,5 +1,5 @@
 /**
- * Voice for Ask SiteLine, from the browser itself: speech recognition for the mic and speech synthesis for replies.
+ * Voice for Luna, from the browser itself: speech recognition for the mic and speech synthesis for replies.
  * Nothing is sent anywhere by SiteLine; the browser's own speech service handles the audio (Chrome and Edge send it to
  * their vendor, Safari may run it on the device). This is the free first step; a LiveKit voice agent can replace it
  * later behind the same two functions.
