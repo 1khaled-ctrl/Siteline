@@ -27,6 +27,7 @@ import chimeUrl from '../assets/sound/chime.mp3';
 import tickUrl from '../assets/sound/tick.wav';
 import type { Verdict } from '../verdict';
 import {
+  breathShape,
   droneLevel,
   type FlightSize,
   HOME_CHORD,
@@ -54,6 +55,7 @@ export const played = {
   drone: 0,
   glint: 0,
   reveal: [] as Reveal[],
+  breath: 0,
 };
 
 /** Builds the output on the context the gesture started, and loads the two short sounds. */
@@ -241,6 +243,60 @@ function stopDroneAt(at: number): void {
     },
     Math.max(0, (at - now()) * 1000) + 300,
   );
+}
+
+// Breathing in the helmet, while you walk the surface ----------------------------------------------------------------
+
+let breath: { noise: Noise; band: Filter; level: Volume; timer: number; fast: boolean } | null = null;
+
+/** Starts the breathing, or changes its pace if it is already going. */
+export function breathStart(fast: boolean): void {
+  if (breath) {
+    breath.fast = fast;
+    return;
+  }
+  const level = new Volume(SILENT_DB).connect(master);
+  const band = new Filter({ type: 'bandpass', frequency: 900, Q: 0.8 }).connect(level);
+  const noise = new Noise('pink').connect(band);
+  noise.start();
+  const b = { noise, band, level, timer: 0, fast };
+  breath = b;
+  const cycle = () => {
+    if (breath !== b) return;
+    const s = breathShape(b.fast);
+    const t = now() + 0.02;
+    const out = t + s.inS + s.holdS;
+    played.breath++;
+    level.volume.cancelScheduledValues(t);
+    band.frequency.cancelScheduledValues(t);
+    // In: a brighter hiss that swells and stops. Out: lower and longer, fading away.
+    level.volume.setValueAtTime(SILENT_DB, t);
+    level.volume.linearRampToValueAtTime(s.peakDb, t + s.inS * 0.7);
+    level.volume.linearRampToValueAtTime(-60, t + s.inS);
+    band.frequency.setValueAtTime(1200, t);
+    band.frequency.exponentialRampToValueAtTime(1700, t + s.inS);
+    level.volume.setValueAtTime(-60, out);
+    level.volume.linearRampToValueAtTime(s.peakDb + 2, out + s.outS * 0.25);
+    level.volume.linearRampToValueAtTime(SILENT_DB, out + s.outS);
+    band.frequency.setValueAtTime(700, out);
+    band.frequency.exponentialRampToValueAtTime(380, out + s.outS);
+    b.timer = window.setTimeout(cycle, s.periodS * 1000);
+  };
+  cycle();
+}
+
+/** Stops the breathing, fading out what is left of the breath. */
+export function breathStop(): void {
+  const b = breath;
+  if (!b) return;
+  breath = null;
+  window.clearTimeout(b.timer);
+  const t = now();
+  b.level.volume.cancelScheduledValues(t);
+  b.level.volume.setValueAtTime(b.level.volume.value, t);
+  b.level.volume.linearRampToValueAtTime(SILENT_DB, t + 0.3);
+  b.noise.stop(t + 0.35);
+  disposeAt([b.noise, b.band, b.level], t + 0.4);
 }
 
 // Howler's fixed sounds -----------------------------------------------------------------------------------------------

@@ -45,6 +45,10 @@ const infoOf = ({ positions: _p, normals: _n, indices: _i, up: _u, ...info }: Su
 
 /** The stages the loading panel lists, in order. */
 const STAGES = ['opening', 'fine', 'walk', 'rings', 'building', 'light'] as const;
+const HOW_TO_KEY = 'siteline.howToMove';
+/** The rows of the "How to move" card, with a keyboard and mouse, and on a touch screen. */
+const HOW_TO_KEYS = ['walk', 'run', 'turn', 'look', 'capture', 'third', 'sound'] as const;
+const HOW_TO_TOUCH = ['touchWalk', 'touchLook', 'touchThird'] as const;
 /** Room the 5 m ring needs around the point inside a region's model, metres (the high-quality ring's half-width). */
 const FINE_RING_HALF_M = 800;
 type Stage = (typeof STAGES)[number];
@@ -128,6 +132,15 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   const [markerOn, setMarkerOn] = useState(true);
   const [inspectOn, setInspectOn] = useState(false);
   const [bodyOn, setBodyOn] = useState(true);
+  const [thirdPerson, setThirdPerson] = useState(false);
+  /** The "How to move" card: open the first time you walk, until you close it; reopened from the view's options. */
+  const [howToOpen, setHowToOpen] = useState(() => {
+    try {
+      return localStorage.getItem(HOW_TO_KEY) !== 'seen';
+    } catch {
+      return true;
+    }
+  });
   const [infoOpen, setInfoOpen] = useState(false);
   /** True when most of the walkable ground around the eye is in shadow at this moment. */
   const [darkHere, setDarkHere] = useState(false);
@@ -390,6 +403,36 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
   useEffect(() => viewRef.current?.setTouchdownMarker(markerOn), [markerOn]);
   useEffect(() => viewRef.current?.setInspectionLight(inspectOn), [inspectOn]);
   useEffect(() => viewRef.current?.setBodyShown(bodyOn), [bodyOn]);
+  useEffect(() => viewRef.current?.setThirdPerson(thirdPerson), [thirdPerson]);
+  const closeHowTo = () => {
+    setHowToOpen(false);
+    try {
+      localStorage.setItem(HOW_TO_KEY, 'seen');
+    } catch {
+      // Storage can be off (a private window): the card then shows again next visit.
+    }
+  };
+
+  // While you walk: breathing in the helmet, quicker while Shift is held, and V for the third-person view.
+  useEffect(() => {
+    if (!exploring) return;
+    sound.breath.start(false);
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || e.altKey || el?.closest?.('input, textarea, select, [contenteditable="true"]'))
+        return;
+      if (e.type === 'keydown' && e.code === 'KeyV' && !e.repeat) setThirdPerson((v) => !v);
+      // Any key restarts the breathing if sound was switched on after landing; Shift sets its pace.
+      sound.breath.start(e.shiftKey && e.type === 'keydown');
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      sound.breath.stop();
+    };
+  }, [exploring]);
 
   const shiftClock = (hours: number) =>
     setOffsetMs((ms) => Math.min(OFFSET_MAX_H, Math.max(OFFSET_MIN_H, Math.round(ms / HOUR_MS) + hours)) * HOUR_MS);
@@ -832,6 +875,23 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                   <button
                     type="button"
                     className={chip}
+                    aria-pressed={thirdPerson}
+                    onClick={() => setThirdPerson((v) => !v)}
+                    data-testid="surface-third-person"
+                  >
+                    {t('land.thirdPerson')}
+                  </button>
+                  <button
+                    type="button"
+                    className={chip}
+                    onClick={() => setHowToOpen(true)}
+                    data-testid="surface-how-to-open"
+                  >
+                    {t('land.howTo.open')}
+                  </button>
+                  <button
+                    type="button"
+                    className={chip}
                     aria-pressed={inspectOn}
                     onClick={() => setInspectOn((v) => !v)}
                     data-testid="surface-inspect"
@@ -880,6 +940,39 @@ export default function SurfaceExplorer({ target }: { target: LandingTarget }) {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {exploring && howToOpen && (
+        <div className="absolute inset-0 z-20 grid place-items-center bg-black/45 p-4" data-testid="surface-how-to">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="surface-how-to-title"
+            className="glass w-full max-w-sm px-5 py-4"
+          >
+            <h3 id="surface-how-to-title" className="font-display text-lg">
+              {t('land.howTo.title')}
+            </h3>
+            <ul className="mt-3 flex flex-col gap-2 text-sm">
+              {(coarsePointer ? HOW_TO_TOUCH : HOW_TO_KEYS).map((row) => (
+                <li key={row} className="grid grid-cols-[7.5rem_1fr] items-baseline gap-3">
+                  <span className="font-mono text-xs text-accent">{t(`land.howTo.${row}.keys`)}</span>
+                  <span>{t(`land.howTo.${row}.does`)}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className={`${button} mt-4 text-ink`}
+              onClick={closeHowTo}
+              // biome-ignore lint/a11y/noAutofocus: the card is a dialog that opens on its own; its one button takes focus
+              autoFocus
+              data-testid="surface-how-to-close"
+            >
+              {t('land.howTo.ok')}
+            </button>
           </div>
         </div>
       )}

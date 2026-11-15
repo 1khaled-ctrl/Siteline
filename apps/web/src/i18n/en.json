@@ -1118,6 +1118,52 @@
     "marker": "Touchdown marker",
     "inspect": "Inspection light",
     "body": "Your body",
+    "thirdPerson": "Third person",
+    "howTo": {
+      "open": "How to move",
+      "title": "How to move",
+      "ok": "Got it",
+      "walk": {
+        "keys": "W A S D or arrows",
+        "does": "Walk"
+      },
+      "run": {
+        "keys": "Hold Shift",
+        "does": "Travel fast (faster than walking)"
+      },
+      "turn": {
+        "keys": "Q and E",
+        "does": "Turn left and right"
+      },
+      "look": {
+        "keys": "Drag the mouse",
+        "does": "Look around"
+      },
+      "capture": {
+        "keys": "Look with the mouse",
+        "does": "Look by moving the mouse; Esc releases it"
+      },
+      "third": {
+        "keys": "V",
+        "does": "Switch between your eyes and third person"
+      },
+      "sound": {
+        "keys": "M",
+        "does": "Sound on or off (you hear your breathing)"
+      },
+      "touchWalk": {
+        "keys": "Hold an arrow",
+        "does": "Walk"
+      },
+      "touchLook": {
+        "keys": "Drag",
+        "does": "Look around"
+      },
+      "touchThird": {
+        "keys": "Third person",
+        "does": "In the view options: see yourself from behind"
+      }
+    },
     "inspectOn": "Inspection light on: a lamp at your eye, not the light at this time.",
     "darkHere": "Most of the ground around you is in shadow at this moment.",
     "darkExposed": "The picture is exposed for the shadow, as a camera would be: its light is sunlight scattered off sunlit slopes, and earthshine.",
@@ -1150,7 +1196,7 @@
     "fineOffer": "Finer ground: NASA's 5 m terrain ({{mb}} MB)",
     "fineOfferNote": "This point is in {{region}}, one of NASA's Artemis III candidate regions, mapped at 5 m by shape-from-shading. The model is downloaded once for this visit.",
     "lookMouse": "Look with the mouse",
-    "lookHint": "Drag to look around. W A S D or the arrow keys walk, Q and E turn, Shift travels fast ({{fast}} m/s, not a walking pace).",
+    "lookHint": "Drag to look around. W A S D or the arrow keys walk, Q and E turn, Shift travels fast ({{fast}} m/s, not a walking pace), V switches to third person.",
     "lockedHint": "The mouse is captured for looking. Press Esc to release it.",
     "touchHint": "Drag to look around; hold an arrow to walk.",
     "walk": {

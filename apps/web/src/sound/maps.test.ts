@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { droneLevel, HOME_CHORD, OPENING_CHORD, pullBackShape, sunAt, VERDICT_NOTES, whooshShape } from './maps';
+import {
+  breathShape,
+  droneLevel,
+  HOME_CHORD,
+  OPENING_CHORD,
+  pullBackShape,
+  sunAt,
+  VERDICT_NOTES,
+  whooshShape,
+} from './maps';
 
 /** A note name such as G#5 as its pitch in Hz (A4 = 440 Hz, equal temperament). */
 function hz(note: string): number {
@@ -117,5 +126,19 @@ describe('the verdict phrases', () => {
   it('are all short', () => {
     for (const notes of Object.values(VERDICT_NOTES))
       for (const n of notes) expect(n.at + n.seconds).toBeLessThanOrEqual(0.6);
+  });
+});
+
+describe('breathing in the helmet', () => {
+  it('fits each breath in its period, and breathes quicker and louder while travelling fast', () => {
+    for (const fast of [false, true]) {
+      const b = breathShape(fast);
+      expect(b.inS + b.holdS + b.outS).toBeLessThan(b.periodS);
+    }
+    const calm = breathShape(false);
+    const quick = breathShape(true);
+    expect(60 / calm.periodS).toBe(15);
+    expect(quick.periodS).toBeLessThan(calm.periodS);
+    expect(quick.peakDb).toBeGreaterThan(calm.peakDb);
   });
 });
