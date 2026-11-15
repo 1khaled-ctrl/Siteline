@@ -17,6 +17,7 @@ The tools and the base prompt are the chat relay's own (`TOOLS` and `SYSTEM_PROM
 
 1. Make a LiveKit Cloud project. From its settings, take the URL (`wss://….livekit.cloud`), an API key and its secret.
 2. `apps/voice-agent/.env.local` (git ignores it):
+
    ```
    LIVEKIT_URL=wss://your-project.livekit.cloud
    LIVEKIT_API_KEY=...

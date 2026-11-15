@@ -5,8 +5,8 @@ packages:
 # Install scripts the voice agent's dependencies ask to run. None is needed: the agent uses LiveKit Inference (no
 # local models), and the native packages it loads ship prebuilt. Listed so installs (and CI) don't stop on them.
 allowBuilds:
-  '@livekit/blingfire': false
-  '@livekit/local-inference': false
+  "@livekit/blingfire": false
+  "@livekit/local-inference": false
   esbuild: false
   onnxruntime-node: false
   protobufjs: false
