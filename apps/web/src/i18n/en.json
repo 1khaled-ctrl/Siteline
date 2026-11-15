@@ -1012,7 +1012,7 @@
     "labels": "Labels",
     "marker": "Touchdown marker",
     "inspect": "Inspection light",
-    "inspectOn": "Inspection light on: a lamp at your eye, not the light at this time",
+    "inspectOn": "Inspection light on: a lamp at your eye, not the light at this time.",
     "darkHere": "Most of the ground around you is in shadow at this moment.",
     "darkExposed": "The picture is exposed for the shadow, as a camera would be: its light is sunlight scattered off sunlit slopes, and earthshine.",
     "darkFaint": "Almost no light reaches here: no sunlit slope or Earth in view lights it enough to show.",
