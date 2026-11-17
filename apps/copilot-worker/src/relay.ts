@@ -5,8 +5,11 @@
  * `AI` binding, and on Cloudflare's free plan, usage past the daily free allocation fails instead of being billed.
  */
 
-/** Qwen3 30B A3B: function calling, 32k context, and among the cheapest per token on Workers AI's free allocation. */
-export const MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
+/**
+ * Gemma 4 26B A4B: function calling, a 256k context, and the cheapest per token of the replacements Cloudflare suggests
+ * for Qwen3 30B A3B, which Workers AI retires on 20 November 2026. COPILOT_MODEL overrides it without a code change.
+ */
+export const MODEL = '@cf/google/gemma-4-26b-a4b-it';
 const MAX_TOKENS = 700;
 /** An agent turn adds a call and its results each round, so a chat runs longer than plain questions. */
 const MAX_MESSAGES = 48;
@@ -314,7 +317,7 @@ const parseArgs = (a: unknown): Record<string, unknown> => {
   return {};
 };
 
-/** Qwen3 may think out loud before answering; only the answer is passed on. */
+/** A model may think out loud before answering (Qwen3 does); only the answer is passed on. */
 const stripThinking = (s: string) => s.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^[\s\S]*<\/think>/, '');
 
 /**
