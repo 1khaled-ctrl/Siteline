@@ -184,7 +184,7 @@
       "flatHorizon": "Horizon taken as flat, as this spot is off the loaded terrain: {{list}}.",
       "notMeasured": "Not measured yet: {{list}}."
     },
-    "note": "Answers come from a free AI model (Qwen3 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead.",
+    "note": "Answers come from a free AI model (Google's Gemma 4 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead.",
     "help": "I can search the south pole for a landing site (\"Find me a landing site for a rover in March 2028\"), check the selected site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\"), fly the view (\"Fly to Mars\"), or open a mission (\"Show me Curiosity\").",
     "flying": "Flying to {{place}}.",
     "places": {
