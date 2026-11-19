@@ -611,7 +611,7 @@ export function Copilot() {
     setSpeakReplies(false);
     setLiveState('connecting');
     // LiveKit's client loads with the first call, not with the app.
-    const { fetchVoiceToken, startLive } = await import('../liveVoice');
+    const { fetchVoiceToken, greetingWatch, startLive } = await import('../liveVoice');
     const got = await fetchVoiceToken();
     if ('error' in got) {
       setLiveState(null);
@@ -622,9 +622,24 @@ export function Copilot() {
       setVoiceError(t(got.error === 'rate_limited' ? 'copilot.live.busy' : 'copilot.live.unavailable'));
       return false;
     }
+    // Luna's agent greets every caller first. If it joins and stays silent, the speech service behind it isn't answering
+    // (on LiveKit's free plan, once the month's AI credits are used up), so the call ends and the browser's own speech
+    // takes over for the rest of the visit, answered by the chat's AI and read aloud, as on a server without live voice.
+    const greeting = greetingWatch(() => {
+      const call = live.current;
+      live.current = null;
+      void call?.stop().catch(() => {});
+      setLiveState(null);
+      noLiveVoice.current = true;
+      setLiveUnavailable(true);
+      if (voice) listenInBrowser();
+      setVoiceError(t(voice ? 'copilot.live.silent' : 'copilot.live.silentType'));
+    });
     try {
       live.current = await startLive(got.url, got.token, {
         transcript: ({ id, from, text }) => {
+          if (greeting.silent()) return;
+          if (from === 'siteline') greeting.heard();
           const words = from === 'siteline' ? plainReply(text) : text.trim();
           if (!words) return;
           const key = `${from}:${id}`;
@@ -635,6 +650,9 @@ export function Copilot() {
           segments.current.set(key, add({ from, text: words }));
         },
         state: (state) => {
+          if (greeting.silent()) return;
+          if (state !== 'connecting') greeting.joined();
+          if (state === 'speaking') greeting.heard();
           setLiveState(state);
           if (state === 'listening') settleLive();
         },
@@ -659,6 +677,7 @@ export function Copilot() {
         appState,
         speaking: setYouSpeaking,
         ended: () => {
+          greeting.cancel();
           setYouSpeaking(false);
           settleLive();
           live.current = null;
@@ -667,8 +686,16 @@ export function Copilot() {
           setMuted(false);
         },
       });
+      if (greeting.silent()) {
+        // The watch gave up while the call was still connecting, and the browser's speech has already taken over.
+        const call = live.current;
+        live.current = null;
+        void call.stop().catch(() => {});
+        return true;
+      }
       setMode('ai');
     } catch (e) {
+      greeting.cancel();
       live.current = null;
       setLiveState(null);
       setVoiceError(t('copilot.live.failed', { message: e instanceof Error ? e.message : String(e) }));

@@ -321,6 +321,8 @@
       "unavailable": "Live voice isn't set up on this server yet. The mic button still works with your browser's own speech.",
       "busy": "Too many live calls just now. Try again in a minute.",
       "failed": "The live call couldn't start: {{message}}",
+      "silent": "Luna's live voice isn't answering right now, so she's listening through your browser instead. Ask your question and she'll answer out loud.",
+      "silentType": "Luna's live voice isn't answering right now. Type your question below and she'll answer here.",
       "note": "Live call with Luna, through LiveKit. Your voice goes to LiveKit and its speech and AI providers to be transcribed and answered. The tools still run here in your browser, so every number it gives comes from SiteLine's own checks.",
       "ctaTitle": "Talk to Luna live 🎙️",
       "ctaText": "Your voice assistant: just ask out loud, and she answers and moves the screen for you.",
