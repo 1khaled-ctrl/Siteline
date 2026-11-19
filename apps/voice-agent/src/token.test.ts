@@ -9,6 +9,7 @@ import { AGENT_NAME, voiceToken } from '../../copilot-worker/src/voiceToken';
 describe('the /api/voice-token JWT, read by LiveKit', () => {
   it('verifies and carries the room grant and the agent dispatch', async () => {
     const env = {
+      LIVE_VOICE: 'livekit',
       LIVEKIT_URL: 'wss://x.livekit.cloud',
       LIVEKIT_API_KEY: 'APIabc',
       LIVEKIT_API_SECRET: 'a-long-secret-0123456789abcdef',

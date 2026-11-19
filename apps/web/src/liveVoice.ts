@@ -71,6 +71,45 @@ export async function fetchVoiceToken(): Promise<TokenReply> {
   }
 }
 
+/** How long Luna's agent has to join a call, and then to start her greeting, before the call counts as silent. */
+export const GREETING_WAIT = { joinMs: 15_000, greetMs: 8_000 };
+
+/**
+ * Watches a new call for Luna's first words. Her agent greets every caller with a fixed sentence as soon as it joins,
+ * before any AI is asked anything, so an agent that joins and stays silent means the speech service behind it isn't
+ * answering. On LiveKit's free plan that is what happens once the month's AI credits are used up: the agent still
+ * joins, but every request it makes is refused. `onSilent` runs at most once; `heard` and `cancel` end the watch.
+ */
+export function greetingWatch(onSilent: () => void, { joinMs, greetMs } = GREETING_WAIT) {
+  let done = false;
+  let fired = false;
+  let joinedYet = false;
+  const fire = () => {
+    if (done) return;
+    done = true;
+    fired = true;
+    onSilent();
+  };
+  let timer = setTimeout(fire, joinMs);
+  const stop = () => {
+    done = true;
+    clearTimeout(timer);
+  };
+  return {
+    /** The agent is in the call: it now has `greetMs` to start talking. Later state changes don't move that. */
+    joined: () => {
+      if (done || joinedYet) return;
+      joinedYet = true;
+      clearTimeout(timer);
+      timer = setTimeout(fire, greetMs);
+    },
+    heard: stop,
+    cancel: stop,
+    /** Whether the watch gave up on the call. */
+    silent: () => fired,
+  };
+}
+
 /** The text the agent should read for a tool's result, or an error when it would not fit an RPC reply. */
 export function rpcReply(result: { data: unknown } | { error: string }): string {
   const text = JSON.stringify(result);

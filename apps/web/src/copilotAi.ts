@@ -31,7 +31,11 @@ export type AiOutcome =
   | { ok: true; text: string; calls: string[]; sources: string[]; unverified: string[]; history: ChatMessage[] }
   | { ok: false; reason: string };
 
-export type Relay = (messages: ChatMessage[]) => Promise<{ text: string; toolCalls: ToolCall[] } | { error: string }>;
+/** `spoken` asks for an answer to be said out loud: one to three short sentences. */
+export type Relay = (
+  messages: ChatMessage[],
+  spoken?: boolean,
+) => Promise<{ text: string; toolCalls: ToolCall[] } | { error: string }>;
 
 /** Rounds of tools per question before the model must answer: enough to search, retry on another date, and select. */
 const MAX_ROUNDS = 6;
@@ -39,11 +43,11 @@ const MAX_ROUNDS = 6;
 const MAX_HISTORY = 20;
 
 /** The relay at /api/copilot. */
-export const fetchRelay: Relay = async (messages) => {
+export const fetchRelay: Relay = async (messages, spoken = false) => {
   const res = await fetch('/api/copilot', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify(spoken ? { messages, spoken } : { messages }),
   });
   // A Vite server with no relay answers 404 with its own page.
   if (!(res.headers.get('Content-Type') ?? '').includes('application/json')) return { error: `http_${res.status}` };
@@ -124,6 +128,7 @@ export async function askAi(
   history: ChatMessage[],
   runTool: (call: ToolCall) => Promise<ToolResult>,
   relay: Relay = fetchRelay,
+  spoken = false,
 ): Promise<AiOutcome> {
   const state = JSON.stringify(appState);
   const start: ChatMessage = { role: 'user', content: `<app_state>${state}</app_state>\n${visitorText(question)}` };
@@ -141,7 +146,7 @@ export async function askAi(
   for (let round = 0; round < MAX_ROUNDS; round++) {
     let reply: Awaited<ReturnType<Relay>>;
     try {
-      reply = await relay(messages);
+      reply = await relay(messages, spoken);
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : String(e) };
     }

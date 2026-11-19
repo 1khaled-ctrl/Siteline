@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { type Ai, MODEL, readChat, readModelReply, relay, SYSTEM_PROMPT, TOOLS } from './relay';
+import {
+  type Ai,
+  MODEL,
+  readChat,
+  readModelReply,
+  relay,
+  SPOKEN_PROMPT,
+  SPOKEN_RULES,
+  SYSTEM_PROMPT,
+  TOOLS,
+} from './relay';
 
 const post = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('https://siteline.example/api/copilot', {
@@ -132,6 +142,16 @@ describe('relay', () => {
     const input = calls[0].input as { messages: { role: string; content: string }[]; tools: unknown };
     expect(input.messages[0]).toEqual({ role: 'system', content: SYSTEM_PROMPT });
     expect(input.tools).toBe(TOOLS);
+  });
+
+  it('asks for a short spoken answer when the question was spoken, and keeps the chat’s own rules', async () => {
+    const { ai, calls } = fakeAi({ response: 'Mars is on your screen.' });
+    await relay(post({ ...(ask as object), spoken: true }, { 'CF-Connecting-IP': 'spoken-1' }), { AI: ai });
+    const system = (calls[0].input as { messages: { content: string }[] }).messages[0].content;
+    expect(system).toBe(SPOKEN_PROMPT);
+    expect(system.startsWith(SYSTEM_PROMPT.replace(/\n?\/no_think\s*$/, ''))).toBe(true);
+    expect(system).toContain('one to three short spoken sentences');
+    expect(SPOKEN_RULES).not.toContain('end_call');
   });
 
   it('says no_ai where there is no Workers AI binding, so the browser falls back', async () => {
