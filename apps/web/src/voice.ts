@@ -1,8 +1,8 @@
 /**
- * Voice for Luna, from the browser itself: speech recognition for the mic and speech synthesis for replies.
- * Nothing is sent anywhere by SiteLine; the browser's own speech service handles the audio (Chrome and Edge send it to
- * their vendor, Safari may run it on the device). This is the free first step; a LiveKit voice agent can replace it
- * later behind the same two functions.
+ * Voice for Luna: the browser's own speech recognition for the mic (Chrome and Edge send the audio to their vendor,
+ * Safari may run it on the device), and Luna's own voice for replies: the reply's text goes to /api/speak (Cartesia,
+ * or Aura "luna" on Workers AI), with the browser's speech synthesis as the fallback. No audio of the visitor goes to
+ * SiteLine.
  */
 
 interface RecognitionResult {
@@ -145,4 +145,139 @@ if (canSpeak()) window.speechSynthesis.getVoices();
 
 export function stopSpeaking(): void {
   if (canSpeak()) window.speechSynthesis.cancel();
+}
+
+// Luna's own voice ------------------------------------------------------------------------------------------------
+
+/** The longest line sent to /api/speak, as the endpoint itself cuts it. */
+const MAX_SPEAK_CHARS = 600;
+
+let audio: AudioContext | null = null;
+/** Set when this server has no voice of its own (no endpoint, or neither voice answers): the browser speaks instead. */
+let noServerVoice = false;
+
+/**
+ * Wakes the audio output from inside a tap, the only moment iPhones allow it, with a silent sample so the tap counts.
+ * Called on "Talk live" and the mic button; safe to call on every tap.
+ */
+export function unlockAudio(): void {
+  if (typeof window === 'undefined') return;
+  const Ctx =
+    window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return;
+  try {
+    audio ??= new Ctx();
+    if (audio.state === 'suspended') void audio.resume();
+    const tick = audio.createBufferSource();
+    tick.buffer = audio.createBuffer(1, 1, 22_050);
+    tick.connect(audio.destination);
+    tick.start(0);
+  } catch {
+    audio = null;
+  }
+}
+
+/** A line being spoken: `done` settles when it has been said (or stopped) and names the voice used. */
+export interface Speech {
+  done: Promise<'cartesia' | 'aura' | 'browser' | 'none'>;
+  stop: () => void;
+}
+
+/** The browser's own voice for one line, settling when it ends; Chrome sometimes never says so, hence the timer. */
+function browserSay(words: string, language: string, onStop: (stop: () => void) => void): Promise<void> {
+  return new Promise((resolve) => {
+    if (!canSpeak()) return resolve();
+    const u = new SpeechSynthesisUtterance(words);
+    u.lang = localeOf(language);
+    const voice = bestVoice(window.speechSynthesis.getVoices(), u.lang);
+    if (voice) u.voice = voice;
+    u.rate = 1.02;
+    const timer = setTimeout(resolve, 3_000 + words.length * 90);
+    const end = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    u.onend = end;
+    u.onerror = end;
+    onStop(() => {
+      window.speechSynthesis.cancel();
+      end();
+    });
+    window.speechSynthesis.speak(u);
+  });
+}
+
+/**
+ * Says one line in Luna's own voice: /api/speak (Cartesia, or Aura "luna" on Workers AI) played through the unlocked
+ * audio output. Any failure, or no unlocked output, falls back to the browser's own voice, so she always answers out
+ * loud where the browser can speak.
+ */
+export function speakAsLuna(text: string, language: string, fetcher: typeof fetch = fetch): Speech {
+  const words = speakable(text).slice(0, MAX_SPEAK_CHARS);
+  let stopped = false;
+  let stopNow = () => {};
+  const done = (async (): Promise<Awaited<Speech['done']>> => {
+    if (!words) return 'none';
+    const out = audio;
+    if (out && !noServerVoice) {
+      try {
+        const res = await fetcher('/api/speak', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: words }),
+        });
+        if (stopped) return 'none';
+        const voice = res.headers.get('X-Luna-Voice');
+        if (res.ok && (res.headers.get('Content-Type') ?? '').startsWith('audio/')) {
+          const clip = await out.decodeAudioData(await res.arrayBuffer());
+          if (stopped) return 'none';
+          await new Promise<void>((resolve) => {
+            const src = out.createBufferSource();
+            src.buffer = clip;
+            src.connect(out.destination);
+            src.onended = () => resolve();
+            stopNow = () => {
+              try {
+                src.stop();
+              } catch {
+                // Already ended.
+              }
+              resolve();
+            };
+            src.start();
+          });
+          return voice === 'cartesia' ? 'cartesia' : 'aura';
+        }
+        // No endpoint (a plain Vite server answers 404 with its own page) or no voice behind it: stop asking.
+        if (res.status === 404 || res.status === 503) noServerVoice = true;
+      } catch {
+        // Offline, or audio that wouldn't decode: the browser speaks this line.
+      }
+    }
+    if (stopped) return 'none';
+    await browserSay(words, language, (s) => {
+      stopNow = s;
+    });
+    return 'browser';
+  })();
+  return {
+    done,
+    stop: () => {
+      stopped = true;
+      stopNow();
+    },
+  };
+}
+
+/** Whether a spoken message ends the conversation: a goodbye, or asking to end or hang up. */
+export function isGoodbye(text: string): boolean {
+  const t = text
+    .toLowerCase()
+    .replace(/[.!?,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (/\b(end|stop) (the )?(call|conversation|talking)\b|\bhang up\b/.test(t)) return true;
+  return /^(ok(ay)? |thanks? (you )?|thank you )?(bye( bye)?|goodbye|good bye|see you|that'?s all|that'?s it|i'?m done|we'?re done)( luna)?( thanks?( you)?)?$/.test(
+    t,
+  );
 }

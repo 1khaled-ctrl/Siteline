@@ -3,7 +3,7 @@
  * prompt are the chat relay's (apps/copilot-worker/src/relay.ts), so voice and chat can't drift apart; this adds what
  * changes when the answer is spoken, and how tool calls travel to the visitor's browser.
  */
-import { SYSTEM_PROMPT, TOOLS } from '../../copilot-worker/src/relay';
+import { SPOKEN_RULES, SYSTEM_PROMPT, TOOLS } from '../../copilot-worker/src/relay';
 
 /** The RPC methods the browser registers (apps/web/src/liveVoice.ts). */
 export const RPC = { tool: 'siteline.tool', state: 'siteline.state', say: 'siteline.say' } as const;
@@ -19,14 +19,10 @@ export const MODELS = {
   ttsFallback: process.env.SITELINE_TTS_FALLBACK ?? 'deepgram/aura-2',
 };
 
-const SPOKEN = `
-You are speaking out loud in a live voice call, not writing.
-- Answer in one to three short spoken sentences. No emoji, no lists, no markdown, no line-by-line report.
-- Round what you say: whole percentages and one decimal for slopes. Name a site by its region; say coordinates only if asked.
+/** The chat's spoken rules, and what only a LiveKit call has: progress the app speaks for her, and end_call. */
+const SPOKEN = `${SPOKEN_RULES}
 - Before a tool that takes a while (find_landing_sites, check_site, robot_fit), first say one short line such as "Let me search the nine Artemis regions, that takes a moment."
 - While find_landing_sites runs, the app speaks its progress for you (each site it finds, how far it has got). Don't repeat those lines; when the result comes, answer in one or two sentences.
-- The screen shows the details, the sources and a list of sites. Say "it's on your screen" rather than reading everything out.
-- If the visitor interrupts, stop and follow the new request.
 - When the visitor says they are done ("that's all", "bye", "I'm done", "thanks, that's it", "you can hang up"), call end_call. Don't ask whether they are sure.`;
 
 /** When end_call is right, added to the tool's own description. */

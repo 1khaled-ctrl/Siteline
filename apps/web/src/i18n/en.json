@@ -184,7 +184,7 @@
       "flatHorizon": "Horizon taken as flat, as this spot is off the loaded terrain: {{list}}.",
       "notMeasured": "Not measured yet: {{list}}."
     },
-    "note": "Answers come from a free AI model (Google's Gemma 4 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead.",
+    "note": "Answers come from a free AI model (Google's Gemma 4 on Cloudflare Workers AI) that may only repeat numbers SiteLine itself worked out, shown with the tools it used. It reads data and moves the view; it changes nothing. When the AI isn't reachable, a simple matcher in your browser answers instead. When you talk to Luna, your voice goes to your browser's own speech service to be turned into words (Google's, in Chrome), and her reply's text goes to Cartesia or Cloudflare to be spoken in her voice.",
     "help": "I can search the south pole for a landing site (\"Find me a landing site for a rover in March 2028\"), check the selected site (\"Does it pass?\", \"When does the Sun set?\", \"How steep is it?\"), fly the view (\"Fly to Mars\"), or open a mission (\"Show me Curiosity\").",
     "flying": "Flying to {{place}}.",
     "places": {
@@ -335,6 +335,19 @@
       "ctaTextShort": "Tap and just talk. She answers out loud.",
       "muteTip": "Turn your microphone off, so noise around you doesn't interrupt Luna",
       "unmuteTip": "Turn your microphone back on to talk to Luna"
+    },
+    "talk": {
+      "greeting": "Hi, I'm Luna, SiteLine's guide! I can give you a quick tour, fly you to any planet, or find a safe place to land on the Moon. What would you like?",
+      "bye": "Thanks for talking with me! Tap Talk live any time to start again.",
+      "type": "Your browser can't listen (Firefox has no speech recognition), so type your question below and Luna will answer out loud.",
+      "paused": "Luna stopped listening because it went quiet. Tap Resume when you want to talk again.",
+      "hint": "Just talk; Luna listens again after each answer. Say \"bye\" or tap End call when you're done.",
+      "typeHint": "Type below and Luna answers out loud. Tap End call when you are done.",
+      "pausedHint": "Listening is paused. Tap Resume to talk, or type below.",
+      "interrupt": "Interrupt",
+      "pause": "Pause",
+      "resume": "Resume",
+      "note": "Talking with Luna. Your voice goes to your browser's own speech service to be turned into words (Google's, in Chrome; Safari may do it on your device). The words go to Luna's free AI (Gemma 4 on Cloudflare Workers AI), and her reply's text goes to Cartesia, or Cloudflare when Cartesia can't, to be spoken in her voice. The tools still run here in your browser, so every number she gives comes from SiteLine's own checks."
     },
     "chat": {
       "greet": "Hi! I'm Luna 👋 I can fly you to any planet, tell you how far away it is and how long the trip takes, or find a safe place to land on the Moon. What would you like to do?",

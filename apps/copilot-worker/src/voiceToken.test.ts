@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AGENT_NAME, signJwt, tokenAllowed, visitorClaims, voiceToken } from './voiceToken';
 
 const env = {
+  LIVE_VOICE: 'livekit',
   LIVEKIT_URL: 'wss://example.livekit.cloud',
   LIVEKIT_API_KEY: 'APIkey',
   LIVEKIT_API_SECRET: 'secret-0123',
@@ -80,5 +81,14 @@ describe('voiceToken', () => {
     const off = await voiceToken(post(), {});
     expect(off.status).toBe(503);
     expect(await off.json()).toEqual({ error: 'no_voice' });
+  });
+
+  it('keeps LiveKit off unless LIVE_VOICE is "livekit", even with its secrets set', async () => {
+    const { LIVE_VOICE: _on, ...secretsOnly } = env;
+    for (const e of [secretsOnly, { ...secretsOnly, LIVE_VOICE: 'off' }]) {
+      const res = await voiceToken(post(), e, 2_000_000, 'v-off');
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: 'no_voice' });
+    }
   });
 });

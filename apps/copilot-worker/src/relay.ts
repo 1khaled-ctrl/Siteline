@@ -102,6 +102,20 @@ const fn = (name: string, description: string, properties: Record<string, unknow
 });
 
 /** Fixed order and wording, so the request stays the same from turn to turn. */
+/**
+ * How Luna answers a question that was spoken, shared with the LiveKit agent (apps/voice-agent/src/voice.ts): short
+ * sentences she can say out loud, which also keeps the free voice's monthly allowance going further.
+ */
+export const SPOKEN_RULES = `
+You are speaking out loud in a voice conversation, not writing.
+- Answer in one to three short spoken sentences. No emoji, no lists, no markdown, no line-by-line report.
+- Round what you say: whole percentages and one decimal for slopes. Name a site by its region; say coordinates only if asked.
+- The screen shows the details, the sources and a list of sites. Say "it's on your screen" rather than reading everything out.
+- If the visitor interrupts, stop and follow the new request.`;
+
+/** The prompt for a spoken question: the chat's own, with the spoken rules ahead of its Qwen-only switch. */
+export const SPOKEN_PROMPT = `${SYSTEM_PROMPT.replace(/\n?\/no_think\s*$/, '')}\n${SPOKEN_RULES}\n/no_think`;
+
 export const TOOLS = [
   fn(
     'fly_to',
@@ -404,14 +418,18 @@ export async function relay(request: Request, env: Env, nowMs = Date.now()): Pro
   const body = await request.text();
   if (body.length > MAX_BODY_BYTES) return json({ error: 'bad_request' }, 413);
   let messages: ChatMessage[];
+  let spoken = false;
   try {
-    messages = readChat(JSON.parse(body));
+    const parsed: unknown = JSON.parse(body);
+    messages = readChat(parsed);
+    // A question asked by voice gets a short answer to be spoken.
+    spoken = (parsed as { spoken?: unknown }).spoken === true;
   } catch (e) {
     return json({ error: 'bad_request', detail: e instanceof Error ? e.message : '' }, 400);
   }
   try {
     const raw = await env.AI.run(env.COPILOT_MODEL || MODEL, {
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: 'system', content: spoken ? SPOKEN_PROMPT : SYSTEM_PROMPT }, ...messages],
       tools: TOOLS,
       max_tokens: MAX_TOKENS,
       temperature: 0.2,

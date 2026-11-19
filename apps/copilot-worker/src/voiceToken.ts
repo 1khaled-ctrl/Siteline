@@ -10,6 +10,8 @@
 import { allowedOrigin, underLimit } from './relay';
 
 export interface VoiceEnv {
+  /** Live calls through LiveKit are off unless this is "livekit": "Talk live" then runs in the browser at no cost. */
+  LIVE_VOICE?: string;
   LIVEKIT_URL?: string;
   LIVEKIT_API_KEY?: string;
   LIVEKIT_API_SECRET?: string;
@@ -91,8 +93,8 @@ const json = (body: unknown, status = 200) =>
   });
 
 /**
- * One token request. Errors come back with a short `error` code the chat turns into words: `no_voice` (the LiveKit
- * secrets aren't set, as on a plain Vite server or before setup), `rate_limited`, `origin` and `method`.
+ * One token request. Errors come back with a short `error` code the chat turns into words: `no_voice` (live calls
+ * aren't turned on with LIVE_VOICE=livekit, or the LiveKit secrets aren't set, as on a plain Vite server), `rate_limited`, `origin` and `method`.
  */
 export async function voiceToken(
   request: Request,
@@ -103,7 +105,7 @@ export async function voiceToken(
   if (request.method !== 'POST') return json({ error: 'method' }, 405);
   if (!allowedOrigin(request)) return json({ error: 'origin' }, 403);
   const { LIVEKIT_URL: url, LIVEKIT_API_KEY: apiKey, LIVEKIT_API_SECRET: secret } = env;
-  if (!url || !apiKey || !secret) return json({ error: 'no_voice' }, 503);
+  if (env.LIVE_VOICE !== 'livekit' || !url || !apiKey || !secret) return json({ error: 'no_voice' }, 503);
   const ip = request.headers.get('CF-Connecting-IP') ?? 'local';
   if (!underLimit(`voice:${ip}`, nowMs) || !tokenAllowed(ip, nowMs)) return json({ error: 'rate_limited' }, 429);
   const claims = visitorClaims(apiKey, visitorId, Math.floor(nowMs / 1000));

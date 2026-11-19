@@ -24,7 +24,7 @@ import type { SpaceFacts } from '../spaceFacts';
 import { useStage } from '../stage';
 import { type MoonView, useApp } from '../store';
 import { CHECK_KEYS } from '../verdict';
-import { canListen, canSpeak, listen, speak, stopSpeaking } from '../voice';
+import { canListen, canSpeak, isGoodbye, listen, type Speech, speakAsLuna, stopSpeaking, unlockAudio } from '../voice';
 import { LunaMark } from './LunaMark';
 import { Spinner } from './ViewStatus';
 
@@ -102,6 +102,18 @@ export function Copilot() {
   /** Set once the server says it has no live voice, so the mic goes straight to the browser's speech from then on. */
   const noLiveVoice = useRef(false);
   const [liveUnavailable, setLiveUnavailable] = useState(false);
+  /**
+   * "Talk live" at no cost: Luna greets, the browser listens, the chat's AI answers with the tools running here, and she
+   * speaks in her own voice, round and round until the visitor ends it. `talkLooping` keeps it to one loop; `mutedRef`
+   * pauses the listening.
+   */
+  const talk = useRef(false);
+  const talkLooping = useRef(false);
+  const mutedRef = useRef(false);
+  /** What Luna is saying, the lines queued behind it, and a count that drops the queue when she is cut off. */
+  const speech = useRef<Speech | null>(null);
+  const speechChain = useRef<Promise<void>>(Promise.resolve());
+  const speechTurn = useRef(0);
   /** The visitor is speaking in the live call right now (LiveKit's voice activity, ahead of the transcript). */
   const [youSpeaking, setYouSpeaking] = useState(false);
   /** Each transcript segment's message, so a growing segment updates its message instead of adding one. */
@@ -121,7 +133,12 @@ export function Copilot() {
       void import('../liveVoice').then((m) => m.warmUpWebRtc()).catch(() => {});
     } else {
       stopListening.current?.();
+      // Closing the panel ends a talk: no more listening, and Luna stops mid-sentence.
+      talk.current = false;
+      speechTurn.current++;
+      speech.current?.stop();
       stopSpeaking();
+      setLiveState(null);
       void live.current?.stop();
     }
   }, [open]);
@@ -183,14 +200,38 @@ export function Copilot() {
     return lines.join('\n');
   };
 
+  /** Stops what Luna is saying and drops what was queued behind it. */
+  const hush = () => {
+    speechTurn.current++;
+    speech.current?.stop();
+    speech.current = null;
+    speechChain.current = Promise.resolve();
+    stopSpeaking();
+  };
+
+  /** One line in Luna's own voice; `queue` waits behind what she is saying, otherwise it cuts in. Settles once said. */
+  const voiceOut = (text: string, queue = false): Promise<void> => {
+    if (!queue) hush();
+    const turn = speechTurn.current;
+    speechChain.current = speechChain.current.then(async () => {
+      if (turn !== speechTurn.current) return;
+      const line = speakAsLuna(text, i18n.language);
+      speech.current = line;
+      if (talk.current) setLiveState('speaking');
+      await line.done;
+      if (speech.current === line) speech.current = null;
+    });
+    return speechChain.current;
+  };
+
   /** A progress line read aloud after a spoken question, queued behind what is already being said. */
-  const narrate = (sentence: string) => speak(sentence, i18n.language, { queue: true });
+  const narrate = (sentence: string) => void voiceOut(sentence, true);
 
   const say = (m: Omit<Message, 'id'>, spoken: boolean) => {
     add(m);
     if (m.from === 'siteline') {
       sound.chime();
-      if (spoken && m.text) speak(m.text, i18n.language);
+      if (spoken && m.text) void voiceOut(m.text);
     }
   };
 
@@ -369,7 +410,7 @@ export function Copilot() {
     update(id, () => ({ ...patch, working: false }));
     sound.chime();
     // After the progress lines, not over them.
-    if (spoken && patch.text) speak(patch.text, i18n.language, { queue: true });
+    if (spoken && patch.text) void voiceOut(patch.text, true);
   };
 
   const run = async (message: string, spoken: boolean) => {
@@ -389,6 +430,8 @@ export function Copilot() {
       appState(),
       history.current,
       stepper(working, cards, spoken ? narrate : undefined),
+      undefined,
+      spoken,
     );
     if (out.ok && out.unverified.length === 0) {
       history.current = out.history;
@@ -524,7 +567,7 @@ export function Copilot() {
       return;
     }
     setSpeakReplies(spoken);
-    stopSpeaking();
+    hush();
     add({ from: 'you', text: m });
     setBusy(true);
     try {
@@ -536,11 +579,23 @@ export function Copilot() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    void send(text);
+    // In a talk, a typed question is answered out loud too (the way to talk where the browser can't listen).
+    void send(text, talk.current);
   };
 
   const toggleMic = () => {
     setVoiceError(undefined);
+    unlockAudio();
+    if (talk.current) {
+      // In a talk the mic button cuts Luna off (and she listens), or pauses and resumes the listening.
+      if (speech.current) return hush();
+      const pause = !mutedRef.current;
+      mutedRef.current = pause;
+      setMuted(pause);
+      if (pause) stopListening.current?.();
+      else void talkLoop();
+      return;
+    }
     if (live.current) {
       const next = !muted;
       setMuted(next);
@@ -566,7 +621,7 @@ export function Copilot() {
   /** One question heard by the browser's own speech recognition, answered in the chat and read aloud. */
   const listenInBrowser = () => {
     setVoiceError(undefined);
-    stopSpeaking();
+    hush();
     setListening(true);
     stopListening.current = listen(
       i18n.language,
@@ -603,24 +658,118 @@ export function Copilot() {
     update(work.id, () => ({ working: false, card }));
   };
 
-  /** Luna Live: a voice call with the LiveKit agent, whose tools run here, through the same steps as the chat. */
+  /** One utterance heard by the browser's speech recognition, as a promise. */
+  const hearOnce = () =>
+    new Promise<{ text: string } | { error: string }>((resolve) => {
+      stopListening.current = listen(
+        i18n.language,
+        (partial) => setText(partial),
+        (result) => {
+          stopListening.current = null;
+          setText('');
+          resolve(result);
+        },
+      );
+    });
+
+  /** Ends a talk: no more listening, and Luna stops mid-sentence. */
+  const endTalk = () => {
+    talk.current = false;
+    stopListening.current?.();
+    hush();
+    mutedRef.current = false;
+    setMuted(false);
+    setLiveState(null);
+  };
+
+  /** The talk itself: wait for Luna to finish, listen, answer; again, until the visitor ends it or pauses it. */
+  const talkLoop = async () => {
+    if (talkLooping.current) return;
+    talkLooping.current = true;
+    let quiet = 0;
+    try {
+      while (talk.current && !mutedRef.current) {
+        // Never listen while she speaks, so she can't hear herself.
+        await speechChain.current;
+        if (!talk.current || mutedRef.current) return;
+        setLiveState('listening');
+        // Without speech recognition (Firefox) the visitor types; her answers are still spoken.
+        if (!voice) return;
+        const heard = await hearOnce();
+        if (!talk.current || mutedRef.current) return;
+        if ('error' in heard) {
+          setVoiceError(t(heard.error === 'not-allowed' ? 'copilot.agent.micBlocked' : 'copilot.agent.micFailed'));
+          return endTalk();
+        }
+        if (!heard.text) {
+          // Three quiet turns in a row: pause rather than keep the mic open on an empty room.
+          quiet++;
+          if (quiet >= 3) {
+            mutedRef.current = true;
+            setMuted(true);
+            setVoiceError(t('copilot.talk.paused'));
+            return;
+          }
+          continue;
+        }
+        quiet = 0;
+        if (isGoodbye(heard.text)) {
+          add({ from: 'you', text: heard.text });
+          add({ from: 'siteline', text: t('copilot.talk.bye') });
+          await voiceOut(t('copilot.talk.bye'));
+          return endTalk();
+        }
+        setLiveState('thinking');
+        await send(heard.text, true);
+      }
+    } finally {
+      talkLooping.current = false;
+    }
+  };
+
+  /** "Talk live" in the browser, at no cost: Luna greets in her own voice, and the talk takes it from there. */
+  const startTalk = async () => {
+    if (talk.current) return;
+    unlockAudio();
+    stopListening.current?.();
+    talk.current = true;
+    mutedRef.current = false;
+    setMuted(false);
+    setSpeakReplies(true);
+    setVoiceError(voice ? undefined : t('copilot.talk.type'));
+    const hello = t('copilot.talk.greeting');
+    add({ from: 'siteline', text: hello });
+    setLiveState('speaking');
+    await voiceOut(hello);
+    void talkLoop();
+  };
+
+  /**
+   * Luna Live through LiveKit, where a Pages setting turns it on (LIVE_VOICE=livekit): a voice call with the agent,
+   * whose tools run here, through the same steps as the chat. Everywhere else, and once a call has come back silent,
+   * "Talk live" is the talk in the browser.
+   */
   const startCall = async (): Promise<boolean> => {
+    unlockAudio();
+    if (noLiveVoice.current) {
+      void startTalk();
+      return true;
+    }
     setVoiceError(undefined);
     stopListening.current?.();
-    stopSpeaking();
+    hush();
     setSpeakReplies(false);
     setLiveState('connecting');
     // LiveKit's client loads with the first call, not with the app.
     const { fetchVoiceToken, greetingWatch, startLive } = await import('../liveVoice');
     const got = await fetchVoiceToken();
     if ('error' in got) {
+      // No LiveKit here (off unless turned on, or its limit is reached): the talk in the browser starts at once.
       setLiveState(null);
-      if (got.error === 'no_voice') {
-        noLiveVoice.current = true;
-        setLiveUnavailable(true);
-      }
-      setVoiceError(t(got.error === 'rate_limited' ? 'copilot.live.busy' : 'copilot.live.unavailable'));
-      return false;
+      noLiveVoice.current = true;
+      setLiveUnavailable(true);
+      void startTalk();
+      return true;
     }
     // Luna's agent greets every caller first. If it joins and stays silent, the speech service behind it isn't answering
     // (on LiveKit's free plan, once the month's AI credits are used up), so the call ends and the browser's own speech
@@ -632,7 +781,7 @@ export function Copilot() {
       setLiveState(null);
       noLiveVoice.current = true;
       setLiveUnavailable(true);
-      if (voice) listenInBrowser();
+      void startTalk();
       setVoiceError(t(voice ? 'copilot.live.silent' : 'copilot.live.silentType'));
     });
     try {
@@ -757,66 +906,79 @@ export function Copilot() {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3">
-        {!liveUnavailable &&
-          (liveState ? (
-            <div
-              className="flex items-center gap-3 rounded-xl border border-sun/60 bg-sun/10 px-3 py-2.5"
-              data-testid="live-banner"
-            >
-              <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel">
-                <MicIcon />
-                {liveState !== 'connecting' && !muted && (
-                  <span className="absolute inset-0 animate-ping rounded-full bg-sun/30 motion-reduce:hidden" />
-                )}
+        {liveState ? (
+          <div
+            className="flex items-center gap-3 rounded-xl border border-sun/60 bg-sun/10 px-3 py-2.5"
+            data-testid="live-banner"
+          >
+            <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel">
+              <MicIcon />
+              {liveState !== 'connecting' && !muted && (
+                <span className="absolute inset-0 animate-ping rounded-full bg-sun/30 motion-reduce:hidden" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">{t(`copilot.live.state.${liveState}`)}</span>
+              <span className="block text-xs text-quiet">
+                {talk.current
+                  ? t(muted ? 'copilot.talk.pausedHint' : voice ? 'copilot.talk.hint' : 'copilot.talk.typeHint')
+                  : muted
+                    ? t('copilot.live.mutedHint')
+                    : t('copilot.live.onHint')}
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">{t(`copilot.live.state.${liveState}`)}</span>
-                <span className="block text-xs text-quiet">
-                  {muted ? t('copilot.live.mutedHint') : t('copilot.live.onHint')}
-                </span>
-              </span>
-              <button
-                type="button"
-                disabled={liveState === 'connecting'}
-                onClick={toggleMic}
-                aria-pressed={muted}
-                title={muted ? t('copilot.live.unmuteTip') : t('copilot.live.muteTip')}
-                className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap disabled:opacity-60 ${
-                  muted ? 'border-sun bg-sun text-panel' : 'border-line-hover bg-panel-raised hover:border-sun'
-                }`}
-              >
-                {muted ? t('copilot.live.unmuteShort') : t('copilot.live.muteShort')}
-              </button>
-              <button
-                type="button"
-                disabled={liveState === 'connecting'}
-                onClick={() => void live.current?.stop()}
-                className="min-h-9 shrink-0 rounded-full border border-fail/60 bg-fail/10 px-3 text-xs font-medium hover:border-fail disabled:opacity-60"
-              >
-                {t('copilot.live.end')}
-              </button>
-            </div>
-          ) : (
+            </span>
             <button
               type="button"
-              onClick={() => void startCall()}
-              className="group flex w-full items-center gap-3 rounded-xl border border-sun/70 bg-linear-to-r from-sun/25 to-sun/5 px-3 py-2.5 text-start transition hover:border-sun hover:from-sun/35 focus-visible:outline-2 focus-visible:outline-sun"
-              data-testid="live-banner"
+              disabled={liveState === 'connecting' || (talk.current && !voice && liveState !== 'speaking')}
+              onClick={toggleMic}
+              aria-pressed={muted}
+              title={muted ? t('copilot.live.unmuteTip') : t('copilot.live.muteTip')}
+              className={`min-h-9 shrink-0 rounded-full border px-3 text-xs font-medium whitespace-nowrap disabled:opacity-60 ${
+                muted ? 'border-sun bg-sun text-panel' : 'border-line-hover bg-panel-raised hover:border-sun'
+              }`}
             >
-              <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel shadow-[0_0_18px_rgba(244,182,63,0.55)]">
-                <MicIcon />
-                <span className="absolute inset-0 animate-ping rounded-full bg-sun/40 [animation-duration:2.2s] motion-reduce:hidden" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-ink">{t('copilot.live.ctaTitle')}</span>
-                <span className="hidden text-xs text-quiet sm:block">{t('copilot.live.ctaText')}</span>
-                <span className="block text-xs text-quiet sm:hidden">{t('copilot.live.ctaTextShort')}</span>
-              </span>
-              <span className="shrink-0 rounded-full bg-sun px-3 py-1.5 text-xs font-semibold text-panel group-hover:brightness-110">
-                {t('copilot.live.start')}
-              </span>
+              {talk.current
+                ? t(
+                    liveState === 'speaking'
+                      ? 'copilot.talk.interrupt'
+                      : muted
+                        ? 'copilot.talk.resume'
+                        : 'copilot.talk.pause',
+                  )
+                : muted
+                  ? t('copilot.live.unmuteShort')
+                  : t('copilot.live.muteShort')}
             </button>
-          ))}
+            <button
+              type="button"
+              disabled={liveState === 'connecting'}
+              onClick={() => (talk.current ? endTalk() : void live.current?.stop())}
+              className="min-h-9 shrink-0 rounded-full border border-fail/60 bg-fail/10 px-3 text-xs font-medium hover:border-fail disabled:opacity-60"
+            >
+              {t('copilot.live.end')}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void startCall()}
+            className="group flex w-full items-center gap-3 rounded-xl border border-sun/70 bg-linear-to-r from-sun/25 to-sun/5 px-3 py-2.5 text-start transition hover:border-sun hover:from-sun/35 focus-visible:outline-2 focus-visible:outline-sun"
+            data-testid="live-banner"
+          >
+            <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-sun text-panel shadow-[0_0_18px_rgba(244,182,63,0.55)]">
+              <MicIcon />
+              <span className="absolute inset-0 animate-ping rounded-full bg-sun/40 [animation-duration:2.2s] motion-reduce:hidden" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold text-ink">{t('copilot.live.ctaTitle')}</span>
+              <span className="hidden text-xs text-quiet sm:block">{t('copilot.live.ctaText')}</span>
+              <span className="block text-xs text-quiet sm:hidden">{t('copilot.live.ctaTextShort')}</span>
+            </span>
+            <span className="shrink-0 rounded-full bg-sun px-3 py-1.5 text-xs font-semibold text-panel group-hover:brightness-110">
+              {t('copilot.live.start')}
+            </span>
+          </button>
+        )}
 
         <div className="-me-2 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pe-2 pb-1" aria-live="polite">
           {log.length === 0 && (
@@ -958,14 +1120,14 @@ export function Copilot() {
           </div>
         </form>
         {voiceError && <p className="text-[11.5px] text-warn">{voiceError}</p>}
-        {speakReplies && canSpeak() && (
+        {speakReplies && !liveState && canSpeak() && (
           <p className="flex items-center justify-between gap-2 text-[11.5px] text-quiet">
             <span>{t('copilot.agent.speaking')}</span>
             <button
               type="button"
               className="underline decoration-dotted underline-offset-2 hover:text-ink"
               onClick={() => {
-                stopSpeaking();
+                hush();
                 setSpeakReplies(false);
               }}
             >
@@ -976,7 +1138,15 @@ export function Copilot() {
         <details className="text-[11px] text-quiet">
           <summary className="cursor-pointer select-none hover:text-ink">{t('copilot.how')}</summary>
           <p className="mt-1">
-            {t(liveState ? 'copilot.live.note' : mode === 'basic' ? 'copilot.noteBasic' : 'copilot.note')}
+            {t(
+              live.current
+                ? 'copilot.live.note'
+                : talk.current
+                  ? 'copilot.talk.note'
+                  : mode === 'basic'
+                    ? 'copilot.noteBasic'
+                    : 'copilot.note',
+            )}
           </p>
         </details>
       </div>

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { bestVoice, speakable } from './voice';
+import { describe, expect, it, vi } from 'vitest';
+import { bestVoice, isGoodbye, speakAsLuna, speakable } from './voice';
 
 describe('speakable', () => {
   it('drops emoji and turns lines into sentences', () => {
@@ -27,5 +27,42 @@ describe('bestVoice', () => {
   });
   it('lets the browser choose when no voice speaks the language', () => {
     expect(bestVoice(voices.slice(0, 2), 'ar-SA')).toBeUndefined();
+  });
+});
+
+describe('isGoodbye', () => {
+  it('ends the talk on a goodbye or a request to hang up', () => {
+    for (const s of [
+      'Bye',
+      'bye bye!',
+      'Goodbye, Luna.',
+      "OK, that's all",
+      'Thanks, bye',
+      'End call',
+      'please end the call',
+      'hang up',
+      "I'm done",
+    ])
+      expect(isGoodbye(s)).toBe(true);
+  });
+  it('keeps going on a question that only mentions the words', () => {
+    for (const s of [
+      'Fly to Mars',
+      'Thanks',
+      'What does the end of the stay look like?',
+      'Is that all the sites?',
+      'Find me a landing site for a rover',
+    ])
+      expect(isGoodbye(s)).toBe(false);
+  });
+});
+
+describe('speakAsLuna', () => {
+  it('never asks the server before a tap has unlocked the audio, and settles at once where the browser has no voice', async () => {
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const speech = speakAsLuna('Hello from the Moon 🌙', 'en', fetcher);
+    expect(await speech.done).toBe('browser');
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await speakAsLuna('👋', 'en', fetcher).done).toBe('none');
   });
 });
