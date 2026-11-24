@@ -11,6 +11,11 @@
  */
 export const MODEL = '@cf/google/gemma-4-26b-a4b-it';
 const MAX_TOKENS = 700;
+/**
+ * Gemma 4 thinks before it answers unless told not to, and the thinking can use up the whole reply budget: the answer
+ * then comes back empty after 15 to 35 seconds and Luna drops into basic mode. Asking for no thinking avoids that.
+ */
+const NO_THINKING = { chat_template_kwargs: { enable_thinking: false } };
 /** An agent turn adds a call and its results each round, so a chat runs longer than plain questions. */
 const MAX_MESSAGES = 48;
 const MAX_BODY_BYTES = 96_000;
@@ -428,13 +433,19 @@ export async function relay(request: Request, env: Env, nowMs = Date.now()): Pro
     return json({ error: 'bad_request', detail: e instanceof Error ? e.message : '' }, 400);
   }
   try {
-    const raw = await env.AI.run(env.COPILOT_MODEL || MODEL, {
+    const model = env.COPILOT_MODEL || MODEL;
+    const input = {
       messages: [{ role: 'system', content: spoken ? SPOKEN_PROMPT : SYSTEM_PROMPT }, ...messages],
       tools: TOOLS,
       max_tokens: MAX_TOKENS,
+      max_completion_tokens: MAX_TOKENS,
       temperature: 0.2,
-    });
-    return json(readModelReply(raw));
+      ...(model.startsWith('@cf/google/gemma') ? NO_THINKING : {}),
+    };
+    let reply = readModelReply(await env.AI.run(model, input));
+    // An empty reply (no words and no tool call) gets one more try before the browser falls back to basic mode.
+    if (!reply.text && reply.toolCalls.length === 0) reply = readModelReply(await env.AI.run(model, input));
+    return json(reply);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // Workers AI answers with a daily-limit error once the free allocation is spent.

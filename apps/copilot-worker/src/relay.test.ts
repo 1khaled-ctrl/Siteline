@@ -154,6 +154,42 @@ describe('relay', () => {
     expect(SPOKEN_RULES).not.toContain('end_call');
   });
 
+  it('asks Gemma not to think first, so the reply budget goes to the answer', async () => {
+    const { ai, calls } = fakeAi({ response: 'Yes, it passes.' });
+    await relay(post(ask, { 'CF-Connecting-IP': 'think-1' }), { AI: ai });
+    expect(calls).toHaveLength(1);
+    const input = calls[0].input as Record<string, unknown>;
+    expect(input.chat_template_kwargs).toEqual({ enable_thinking: false });
+    expect(input.max_completion_tokens).toBe(input.max_tokens);
+    const other = fakeAi({ response: 'Yes.' });
+    await relay(post(ask, { 'CF-Connecting-IP': 'think-2' }), { AI: other.ai, COPILOT_MODEL: '@cf/other/model' });
+    expect((other.calls[0].input as Record<string, unknown>).chat_template_kwargs).toBeUndefined();
+  });
+
+  it('asks once more after an empty reply, and returns the second one', async () => {
+    const replies = [{ response: '' }, { response: 'Nobile Rim 1 passes.' }];
+    const calls: unknown[] = [];
+    const ai: Ai = {
+      run: async (_model, input) => {
+        calls.push(input);
+        return replies.shift();
+      },
+    };
+    const res = await relay(post(ask, { 'CF-Connecting-IP': 'empty-1' }), { AI: ai });
+    expect(calls).toHaveLength(2);
+    expect(await res.json()).toEqual({ text: 'Nobile Rim 1 passes.', toolCalls: [] });
+    const twice: unknown[] = [];
+    const empty: Ai = {
+      run: async (_model, input) => {
+        twice.push(input);
+        return { response: '' };
+      },
+    };
+    const again = await relay(post(ask, { 'CF-Connecting-IP': 'empty-2' }), { AI: empty });
+    expect(twice).toHaveLength(2);
+    expect(await again.json()).toEqual({ text: '', toolCalls: [] });
+  });
+
   it('says no_ai where there is no Workers AI binding, so the browser falls back', async () => {
     const res = await relay(post(ask), {});
     expect(res.status).toBe(503);
